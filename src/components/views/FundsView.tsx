@@ -1,0 +1,917 @@
+import React, { useState } from 'react';
+import {
+  Wallet,
+  Plus,
+  RefreshCw,
+  AlertTriangle,
+  ArrowDownLeft,
+  CheckCircle2,
+  BadgeAlert,
+  CreditCard,
+  X,
+} from 'lucide-react';
+import { PettyCashFund, StandingAccount, CashReceipt, Expense } from '../../types/domain';
+import { dataStore } from '../../lib/storage';
+import { formatCurrency } from '../../lib/utils/format';
+import { Button } from '../ui/button';
+
+interface FundsViewProps {
+  onOpenNewFund: () => void;
+  onOpenNewSettlement: () => void;
+  onSelectView: (view: string) => void;
+}
+
+export const FundsView: React.FC<FundsViewProps> = ({
+  onOpenNewFund,
+  onOpenNewSettlement,
+  onSelectView,
+}) => {
+  const [activeTab, setActiveTab] = useState<'funds' | 'receipts' | 'deficit' | 'standing'>('funds');
+  
+  // Replenish Fund State
+  const [replenishModalFund, setReplenishModalFund] = useState<PettyCashFund | null>(null);
+  const [replenishAmount, setReplenishAmount] = useState('10000');
+  const [replenishNotes, setReplenishNotes] = useState('');
+
+  // New Cash Receipt State
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+  const [receiptAmount, setReceiptAmount] = useState('');
+  const [receiptSource, setReceiptSource] = useState('');
+  const [receiptType, setReceiptType] = useState<'order_payment' | 'cash_box' | 'purchase_advance' | 'other'>('cash_box');
+  const [receiptNotes, setReceiptNotes] = useState('');
+
+  // New Standing Account State
+  const [isStandingModalOpen, setIsStandingModalOpen] = useState(false);
+  const [standingName, setStandingName] = useState('');
+  const [standingCategory, setStandingCategory] = useState('');
+  const [standingDirection, setStandingDirection] = useState<'payable_by_us' | 'receivable_for_us'>('payable_by_us');
+  const [standingMonthlyLimit, setStandingMonthlyLimit] = useState('');
+  const [standingNotes, setStandingNotes] = useState('');
+
+  const currentUser = dataStore.getCurrentUser();
+  const funds = dataStore.getFunds();
+  const expenses = dataStore.getExpenses();
+  const cashReceipts = dataStore.getCashReceipts();
+  const standingAccounts = dataStore.getStandingAccounts();
+
+  // Deficit / Negative balance expenses
+  const deficitExpenses = expenses.filter((e) => e.isDeficit);
+  const pendingDeficitExpenses = deficitExpenses.filter((e) => !e.isCoveredFromCash);
+
+  // Financial aggregates
+  const totalAllocated = funds.reduce((s, f) => s + f.totalAllocation, 0);
+  const totalBalance = funds.reduce((s, f) => s + f.currentBalance, 0);
+  const totalSpent = funds.reduce((s, f) => s + f.spentBalance, 0);
+  const totalReceipts = cashReceipts.reduce((s, r) => s + r.amount, 0);
+  const totalPendingDeficit = pendingDeficitExpenses.reduce((s, e) => s + (e.deficitAmount || e.totalWithTax), 0);
+
+  const handleConfirmReplenish = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!replenishModalFund || parseFloat(replenishAmount) <= 0) return;
+
+    dataStore.replenishFund(
+      replenishModalFund.id,
+      parseFloat(replenishAmount),
+      replenishNotes || 'تغذية رصيد تعويضية للعهدة النقدية'
+    );
+    setReplenishModalFund(null);
+    setReplenishAmount('10000');
+    setReplenishNotes('');
+  };
+
+  const handleCreateCashReceipt = (e: React.FormEvent) => {
+    e.preventDefault();
+    const amt = parseFloat(receiptAmount);
+    if (!amt || amt <= 0 || !receiptSource.trim()) {
+      alert('يرجى إدخال مبلغ صحيح وتحديد المصدر');
+      return;
+    }
+
+    dataStore.addCashReceipt({
+      amount: amt,
+      source: receiptSource.trim(),
+      type: receiptType,
+      receivedBy: currentUser.name,
+      date: new Date().toISOString().split('T')[0],
+      notes: receiptNotes || undefined,
+    });
+
+    setIsReceiptModalOpen(false);
+    setReceiptAmount('');
+    setReceiptSource('');
+    setReceiptNotes('');
+  };
+
+  const handleCreateStandingAccount = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!standingName.trim() || !standingCategory.trim()) {
+      alert('يرجى إدخال اسم وتصنيف الحساب الدائم');
+      return;
+    }
+
+    dataStore.addStandingAccount({
+      name: standingName.trim(),
+      category: standingCategory.trim(),
+      direction: (standingDirection === 'payable_by_us' ? 'payable' : 'receivable') as any,
+      monthlyLimit: standingMonthlyLimit ? parseFloat(standingMonthlyLimit) : undefined,
+      defaultAmount: standingMonthlyLimit ? parseFloat(standingMonthlyLimit) : undefined,
+      notes: standingNotes || undefined,
+      active: true,
+    });
+
+    setIsStandingModalOpen(false);
+    setStandingName('');
+    setStandingCategory('');
+    setStandingMonthlyLimit('');
+    setStandingNotes('');
+  };
+
+  const handleCoverDeficit = (expenseId: string) => {
+    dataStore.coverDeficitExpenseFromCash(expenseId, currentUser.name);
+  };
+
+  return (
+    <div className="space-y-7 animate-in fade-in duration-200">
+      {/* Top Banner: Soft UI Master Card */}
+      <div className="neu-raised-lg rounded-3xl p-6 sm:p-7 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
+        <div>
+          <div className="flex items-center gap-2 text-[#3D674E] font-bold text-xs uppercase mb-1">
+            <Wallet className="w-4 h-4" />
+            <span>المنظومة المالية المدمجة وإدارة العهد والصندوق</span>
+          </div>
+          <h2 className="text-xl sm:text-2xl font-black text-[#1A2E22] font-serif-display">
+            سجل العهد، السيولة، المقبوضات وتغطية العجز
+          </h2>
+          <p className="text-xs text-[#526F5E] mt-0.5 font-medium">
+            الرقابة المالية الذكية: تتبع استنزاف العهد المتعددة، تسوية الرصيد السالب، والمقبوضات النقدية
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <Button
+            variant="outline"
+            size="md"
+            onClick={() => setIsReceiptModalOpen(true)}
+            icon={<ArrowDownLeft className="w-4 h-4 ml-1" />}
+            className="text-xs font-bold"
+          >
+            توريد مقبوضات نقدية
+          </Button>
+          <Button
+            variant="outline"
+            size="md"
+            onClick={onOpenNewSettlement}
+            className="text-xs font-bold"
+          >
+            طلب تسوية دورية
+          </Button>
+          <Button
+            variant="primary"
+            size="md"
+            onClick={onOpenNewFund}
+            icon={<Plus className="w-4 h-4 ml-1" />}
+            className="text-xs font-bold"
+          >
+            عهدة جديدة
+          </Button>
+        </div>
+      </div>
+
+      {/* KPI Overview Cards with Dual Shadows */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="neu-raised rounded-3xl p-5 space-y-1">
+          <span className="text-xs font-semibold text-[#577262] block">إجمالي المخصصات المعتمدة</span>
+          <span className="text-2xl font-black text-[#1A2E22] block font-mono dir-ltr">
+            {formatCurrency(totalAllocated)}
+          </span>
+          <span className="text-[11px] text-[#6E8779] block font-medium">{funds.length} عهد مسجلة</span>
+        </div>
+
+        <div className="neu-raised rounded-3xl p-5 space-y-1">
+          <span className="text-xs font-semibold text-[#577262] block">الرصيد المتاح في العهد</span>
+          <span className="text-2xl font-black text-[#265538] block font-mono dir-ltr">
+            {formatCurrency(totalBalance)}
+          </span>
+          <span className="text-[11px] text-[#3A684C] font-bold block">
+            نسبة السيولة: {totalAllocated > 0 ? Math.round((totalBalance / totalAllocated) * 100) : 0}%
+          </span>
+        </div>
+
+        <div className="neu-raised rounded-3xl p-5 space-y-1">
+          <span className="text-xs font-semibold text-[#577262] block">المقبوضات في الصندوق</span>
+          <span className="text-2xl font-black text-[#2B4E6B] block font-mono dir-ltr">
+            {formatCurrency(totalReceipts)}
+          </span>
+          <span className="text-[11px] text-[#3B6488] font-bold block">
+            {cashReceipts.length} مقبوض مسجل
+          </span>
+        </div>
+
+        <div className={`neu-raised rounded-3xl p-5 space-y-1 ${pendingDeficitExpenses.length > 0 ? 'ring-2 ring-[#C2584A]/30' : ''}`}>
+          <span className="text-xs font-bold text-[#A03E33] block">عجز معلق تغطيته (رصيد سالب)</span>
+          <span className="text-2xl font-black text-[#A03E33] block font-mono dir-ltr">
+            {formatCurrency(totalPendingDeficit)}
+          </span>
+          <span className="text-[11px] text-[#A03E33] font-medium block">
+            {pendingDeficitExpenses.length} فواتير تتطلب تسوية من الصندوق
+          </span>
+        </div>
+      </div>
+
+      {/* Navigation Sub-Tabs with Neumorphic Inset Well */}
+      <div className="neu-inset-sm p-2 rounded-2xl flex items-center gap-2 overflow-x-auto text-xs sm:text-sm font-bold">
+        <button
+          onClick={() => setActiveTab('funds')}
+          className={`px-4.5 py-3 rounded-2xl transition cursor-pointer flex items-center gap-2.5 shrink-0 min-h-[46px] ${
+            activeTab === 'funds'
+              ? 'neu-button text-[#142B1E] font-black'
+              : 'text-[#4A6957] hover:text-[#183122]'
+          }`}
+        >
+          <Wallet className="w-5 h-5 stroke-[2.2]" />
+          <span>العهد النقدية والمخصصات ({funds.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('deficit')}
+          className={`px-4.5 py-3 rounded-2xl transition cursor-pointer flex items-center gap-2.5 shrink-0 min-h-[46px] ${
+            activeTab === 'deficit'
+              ? 'neu-button text-[#142B1E] font-black'
+              : 'text-[#4A6957] hover:text-[#183122]'
+          }`}
+        >
+          <BadgeAlert className="w-5 h-5 text-[#9C392D] stroke-[2.2]" />
+          <span>العجز والمصروفات السالبة ({pendingDeficitExpenses.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('receipts')}
+          className={`px-4.5 py-3 rounded-2xl transition cursor-pointer flex items-center gap-2.5 shrink-0 min-h-[46px] ${
+            activeTab === 'receipts'
+              ? 'neu-button text-[#142B1E] font-black'
+              : 'text-[#4A6957] hover:text-[#183122]'
+          }`}
+        >
+          <ArrowDownLeft className="w-5 h-5 text-[#245237] stroke-[2.2]" />
+          <span>سجل المقبوضات النقدية والصندوق ({cashReceipts.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('standing')}
+          className={`px-4.5 py-3 rounded-2xl transition cursor-pointer flex items-center gap-2.5 shrink-0 min-h-[46px] ${
+            activeTab === 'standing'
+              ? 'neu-button text-[#142B1E] font-black'
+              : 'text-[#4A6957] hover:text-[#183122]'
+          }`}
+        >
+          <CreditCard className="w-5 h-5 text-[#2B4E6B] stroke-[2.2]" />
+          <span>الحسابات الدائمة (لنا / علينا) ({standingAccounts.length})</span>
+        </button>
+      </div>
+
+      {/* TAB 1: Petty Cash Funds Grid */}
+      {activeTab === 'funds' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {funds.map((fund) => {
+            const ratio = Math.round((fund.currentBalance / fund.totalAllocation) * 100);
+            const isWarning = ratio <= fund.warningThreshold;
+            const isDepleted = fund.currentBalance <= 0;
+
+            return (
+              <div key={fund.id} className="neu-raised rounded-3xl p-6 sm:p-7 space-y-5 transition-all">
+                {/* Header */}
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                      <span className="font-mono text-xs font-bold text-[#2A543A] neu-inset-sm px-2.5 py-1 rounded-full">
+                        {fund.code}
+                      </span>
+                      {isDepleted ? (
+                        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full neu-inset-sm text-[#A03E33]">
+                          منفذة بالكامل (0.00)
+                        </span>
+                      ) : isWarning ? (
+                        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full neu-inset-sm text-[#915B1F]">
+                          تنبيه: رصيد منخفض
+                        </span>
+                      ) : (
+                        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full neu-raised-sm text-[#275338]">
+                          نشطة ومستقرة
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-lg font-black text-[#1A2E22] font-serif-display">{fund.name}</h3>
+                    <p className="text-xs text-[#537060] mt-0.5 font-medium">{fund.purpose || 'تغطية المصاريف الميدانية اليومية'}</p>
+                  </div>
+
+                  <div className="text-left shrink-0">
+                    <span className="text-xs text-[#5D7B6B] block font-medium">الرصيد المتاح</span>
+                    <strong className="text-xl font-black text-[#192E21] dir-ltr block font-mono">
+                      {formatCurrency(fund.currentBalance, fund.currency)}
+                    </strong>
+                  </div>
+                </div>
+
+                {/* Progress Bar with Inset Track */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs text-[#4F6C5B]">
+                    <span>نسبة الرصيد المتبقي: <strong className="font-mono">{ratio}%</strong></span>
+                    <span>المخصص: <strong className="dir-ltr font-mono">{formatCurrency(fund.totalAllocation)}</strong></span>
+                  </div>
+                  <div className="w-full neu-inset-sm h-3 rounded-full overflow-hidden p-0.5">
+                    <div
+                      className={`h-full rounded-full transition-all duration-300 ${
+                        isDepleted ? 'bg-[#A03E33]' : isWarning ? 'bg-[#9C6322]' : 'bg-[#3D694E]'
+                      }`}
+                      style={{ width: `${Math.max(ratio, 0)}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Info Grid Inset Card */}
+                <div className="grid grid-cols-2 gap-3 p-4 neu-inset rounded-2xl text-xs text-[#3C5747]">
+                  <div>
+                    <span className="text-[#648071] block text-[11px] font-semibold">أمين العهدة المسؤول</span>
+                    <strong className="text-[#192E21]">{fund.holderName}</strong>
+                    <span className="text-[10px] text-[#648071] block">{fund.holderDepartment}</span>
+                  </div>
+                  <div>
+                    <span className="text-[#648071] block text-[11px] font-semibold">آخر تغذية رصيد</span>
+                    <strong className="text-[#192E21] font-mono">{fund.lastReplenishedDate}</strong>
+                    <span className="text-[10px] text-[#648071] block">حد التنبيه: {fund.warningThreshold}%</span>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center justify-between pt-3 border-t border-[#C8D3CC]/50">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onSelectView('expenses')}
+                    className="text-xs"
+                  >
+                    عرض الفواتير
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setReplenishModalFund(fund)}
+                    icon={<RefreshCw className="w-3.5 h-3.5 ml-1" />}
+                    className="text-xs font-bold"
+                  >
+                    تغذية الرصيد
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* TAB 2: Deficit Expenses & Immediate Cash Box Reconciliation */}
+      {activeTab === 'deficit' && (
+        <div className="neu-raised-lg rounded-3xl p-6 sm:p-7 space-y-5">
+          <div className="flex items-center justify-between pb-3 border-b border-[#C8D3CC]/50">
+            <div>
+              <h3 className="text-base sm:text-lg font-black text-[#1A2E22] font-serif-display flex items-center gap-2">
+                <BadgeAlert className="w-5 h-5 text-[#A03E33]" />
+                <span>حسابات العجز والمصروفات السالبة (Negative Balance Ledger)</span>
+              </h3>
+              <p className="text-xs text-[#526F5E] mt-0.5">
+                تتيح للمنفذ تسجيل المصروف الميداني عند نفاد العهدة مؤقتاً، مع تسوية وتغطية فورية بضغطة زر عند دخول أموال جديدة للصندوق
+              </p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-xs">
+              <thead className="text-[#557161] font-bold border-b border-[#C8D3CC]/50">
+                <tr>
+                  <th className="p-3.5">الكود والتاريخ</th>
+                  <th className="p-3.5">البيان والمهمة المرتبطة</th>
+                  <th className="p-3.5">المسؤول المنفذ</th>
+                  <th className="p-3.5">مبلغ العجز (سالب)</th>
+                  <th className="p-3.5">الحالة والتغطية</th>
+                  <th className="p-3.5 text-center">إجراء التسوية الفورية</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#C8D3CC]/30">
+                {deficitExpenses.map((exp) => (
+                  <tr key={exp.id} className="hover:neu-inset transition">
+                    <td className="p-3.5 font-mono">
+                      <strong className="text-[#1A2E22] block">{exp.code}</strong>
+                      <span className="text-[10px] text-[#638070]">{exp.submittedAt}</span>
+                    </td>
+
+                    <td className="p-3.5 max-w-xs">
+                      <strong className="text-[#192D21] block">{exp.vendorName}</strong>
+                      <span className="text-[11px] text-[#556F60] block truncate">{exp.notes || exp.description || exp.category}</span>
+                      {exp.taskTitle && (
+                        <span className="text-[10px] text-[#2F593F] font-bold block mt-0.5">
+                          مهمة: {exp.taskTitle}
+                        </span>
+                      )}
+                    </td>
+
+                    <td className="p-3.5">
+                      <strong className="text-[#203628]">{exp.submittedBy}</strong>
+                    </td>
+
+                    <td className="p-3.5 font-mono">
+                      <span className="text-[#A03E33] font-black text-sm dir-ltr block">
+                        -{formatCurrency(exp.deficitAmount || exp.totalWithTax)}
+                      </span>
+                    </td>
+
+                    <td className="p-3.5">
+                      {exp.isCoveredFromCash ? (
+                        <div className="space-y-0.5">
+                          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full neu-raised-sm text-[#275538] inline-flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            تمت التغطية من الصندوق
+                          </span>
+                          <span className="text-[10px] text-[#648071] block">
+                            بواسطة {exp.coveredBy} ({exp.coveredAt})
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full neu-inset-sm text-[#A03E33]">
+                          عجز معلق لم يُسوَّ بعد
+                        </span>
+                      )}
+                    </td>
+
+                    <td className="p-3.5 text-center">
+                      {!exp.isCoveredFromCash ? (
+                        <Button
+                          variant="success"
+                          size="sm"
+                          onClick={() => handleCoverDeficit(exp.id)}
+                          icon={<CheckCircle2 className="w-4.5 h-4.5 ml-1 stroke-[2.2]" />}
+                          className="text-xs sm:text-sm font-bold min-h-[42px] px-4"
+                        >
+                          تغطية المبلغ من الصندوق
+                        </Button>
+                      ) : (
+                        <span className="text-[#597565] text-xs font-medium">الحساب مسوّى</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+
+                {deficitExpenses.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="text-center py-8 text-xs text-[#638071]">
+                      لا توجد فواتير عجز أو رصيد سالب معلقة. جميع الحسابات منتظمة!
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: Cash Receipts & Box Log */}
+      {activeTab === 'receipts' && (
+        <div className="neu-raised-lg rounded-3xl p-6 sm:p-7 space-y-5">
+          <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-[#C8D3CC]/50">
+            <div>
+              <h3 className="text-base sm:text-lg font-black text-[#1A2E22] font-serif-display flex items-center gap-2">
+                <ArrowDownLeft className="w-5 h-5 text-[#2C593E]" />
+                <span>سجل المقبوضات النقدية والصندوق (Cash Inflow & Orders)</span>
+              </h3>
+              <p className="text-xs text-[#526F5E] mt-0.5">
+                توثيق أي مبالغ تم استلامها نقدياً، قيمة طلبيات، أو تحويلات مخصصة للشراء مع تحديد المصدر بدقة
+              </p>
+            </div>
+
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setIsReceiptModalOpen(true)}
+              icon={<Plus className="w-3.5 h-3.5 ml-1" />}
+              className="text-xs font-bold"
+            >
+              تسجيل مقبوض جديد
+            </Button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-xs">
+              <thead className="text-[#557161] font-bold border-b border-[#C8D3CC]/50">
+                <tr>
+                  <th className="p-3.5">الكود والتاريخ</th>
+                  <th className="p-3.5">المبلغ المقبوض</th>
+                  <th className="p-3.5">المصدر والجهة الموردة</th>
+                  <th className="p-3.5">التصنيف والنوع</th>
+                  <th className="p-3.5">المستلم الميداني</th>
+                  <th className="p-3.5">ملاحظات وسند التوريد</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#C8D3CC]/30">
+                {cashReceipts.map((rc) => {
+                  const typeLabels: Record<string, string> = {
+                    order_payment: 'دفعة قيمة طلبية / مبيعات',
+                    cash_box: 'توريد سيولة نقدية للصندوق',
+                    purchase_advance: 'مبلغ مخصص لمهمة شراء',
+                    other: 'مقبوضات أخرى',
+                  };
+
+                  return (
+                    <tr key={rc.id} className="hover:neu-inset transition">
+                      <td className="p-3.5 font-mono">
+                        <strong className="text-[#192E21] block">{rc.code}</strong>
+                        <span className="text-[10px] text-[#638071]">{rc.date}</span>
+                      </td>
+
+                      <td className="p-3.5 font-mono">
+                        <strong className="text-[#255237] font-black text-sm dir-ltr block">
+                          +{formatCurrency(rc.amount)}
+                        </strong>
+                      </td>
+
+                      <td className="p-3.5">
+                        <strong className="text-[#1A2E22] block">{rc.source}</strong>
+                      </td>
+
+                      <td className="p-3.5">
+                        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full neu-inset-sm text-[#275338]">
+                          {rc.type && typeLabels[rc.type] ? typeLabels[rc.type] : 'توريد سيولة للصندوق'}
+                        </span>
+                      </td>
+
+                      <td className="p-3.5 text-[#243B2E] font-medium">
+                        {rc.receivedBy}
+                      </td>
+
+                      <td className="p-3.5 text-[#556F60]">
+                        {rc.notes || '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+
+                {cashReceipts.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="text-center py-8 text-xs text-[#638071]">
+                      لا توجد مقبوضات نقدية مسجلة بعد.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: Standing Accounts (حسابات الصرف الدائمة) */}
+      {activeTab === 'standing' && (
+        <div className="neu-raised-lg rounded-3xl p-6 sm:p-7 space-y-5">
+          <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-[#C8D3CC]/50">
+            <div>
+              <h3 className="text-base sm:text-lg font-black text-[#1A2E22] font-serif-display flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-[#2E5577]" />
+                <span>حسابات الصرف الدائمة والمستمرة (Standing Accounts)</span>
+              </h3>
+              <p className="text-xs text-[#526F5E] mt-0.5">
+                بنود الصرف الدورية المتكررة (بقالة، بوفية، مواصلات، بنزين، كروت شحن) مع تحديد الموقف المالي (لنا / علينا)
+              </p>
+            </div>
+
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setIsStandingModalOpen(true)}
+              icon={<Plus className="w-3.5 h-3.5 ml-1" />}
+              className="text-xs font-bold"
+            >
+              إضافة حساب دائم جديد
+            </Button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-xs">
+              <thead className="text-[#557161] font-bold border-b border-[#C8D3CC]/50">
+                <tr>
+                  <th className="p-3.5">كود واسم الحساب</th>
+                  <th className="p-3.5">التصنيف الوظيفي</th>
+                  <th className="p-3.5">الموقف المالي (لنا / علينا)</th>
+                  <th className="p-3.5">الحد الشهري المعتمد</th>
+                  <th className="p-3.5">ملاحظات ونطاق التعامل</th>
+                  <th className="p-3.5 text-center">الحالة</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#C8D3CC]/30">
+                {standingAccounts.map((acc) => (
+                  <tr key={acc.id} className="hover:neu-inset transition">
+                    <td className="p-3.5">
+                      <span className="font-mono text-[#2B543B] neu-inset-sm px-2 py-0.5 rounded text-[11px] font-bold ml-1">
+                        {acc.code || 'STD'}
+                      </span>
+                      <strong className="text-[#1A2E22]">{acc.name}</strong>
+                    </td>
+
+                    <td className="p-3.5 text-[#3D5B4A] font-medium">
+                      {acc.category}
+                    </td>
+
+                    <td className="p-3.5">
+                      {acc.direction === 'payable' || (acc.direction as string) === 'payable_by_us' ? (
+                        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full neu-inset-sm text-[#915B1F]">
+                          علينا (مستحق سداده للطرف الآخر)
+                        </span>
+                      ) : (
+                        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full neu-raised-sm text-[#275338]">
+                          لنا (مستحق تحصيله لصالحنا)
+                        </span>
+                      )}
+                    </td>
+
+                    <td className="p-3.5 font-mono text-[#192E21] font-bold">
+                      {acc.monthlyLimit ? formatCurrency(acc.monthlyLimit) : acc.defaultAmount ? formatCurrency(acc.defaultAmount) : 'بدون سقف محدد'}
+                    </td>
+
+                    <td className="p-3.5 text-[#556F60]">
+                      {acc.notes || '—'}
+                    </td>
+
+                    <td className="p-3.5 text-center">
+                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full neu-raised-sm text-[#275338]">
+                        نشط ومفعل
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Quick Replenish Fund */}
+      {replenishModalFund && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-[#182B20]/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="neu-raised-lg bg-[#EAF0EC] rounded-3xl w-full max-w-md p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150 border-none">
+            <div className="flex items-center justify-between pb-3 border-b border-[#C8D3CC]/50">
+              <div>
+                <h3 className="font-black text-base text-[#192E21] font-serif-display">
+                  تغذية العهدة النقدية: {replenishModalFund.name}
+                </h3>
+                <p className="text-xs text-[#526F5E] mt-0.5">
+                  إضافة رصيد تعويضي لإعادة السيولة إلى مستواها المعتمد
+                </p>
+              </div>
+              <button
+                onClick={() => setReplenishModalFund(null)}
+                className="w-8 h-8 rounded-xl neu-button flex items-center justify-center text-[#3D5B4A]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmReplenish} className="space-y-4 text-xs sm:text-sm">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-[#233B2D]">المبلغ المضاف (AED) *</label>
+                <input
+                  type="number"
+                  value={replenishAmount}
+                  onChange={(e) => setReplenishAmount(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-sm"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-[#233B2D]">بيان وسند التغذية</label>
+                <input
+                  type="text"
+                  value={replenishNotes}
+                  onChange={(e) => setReplenishNotes(e.target.value)}
+                  placeholder="مثال: تحويل مصرفي سند رقم TRF-9901"
+                  className="w-full px-3.5 py-2.5 text-sm"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#C8D3CC]/50">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  onClick={() => setReplenishModalFund(null)}
+                >
+                  إلغاء
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  type="submit"
+                  icon={<RefreshCw className="w-3.5 h-3.5 ml-1" />}
+                >
+                  تأكيد التغذية
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: New Cash Receipt */}
+      {isReceiptModalOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-[#182B20]/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="neu-raised-lg bg-[#EAF0EC] rounded-3xl w-full max-w-md p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150 border-none">
+            <div className="flex items-center justify-between pb-3 border-b border-[#C8D3CC]/50">
+              <div>
+                <h3 className="font-black text-base text-[#192E21] font-serif-display">
+                  تسجيل مقبوضات نقدية بالصندوق
+                </h3>
+                <p className="text-xs text-[#526F5E] mt-0.5">
+                  إثبات مبالغ مستلمة نقدياً أو طلبيات أو تحويلات واردة
+                </p>
+              </div>
+              <button
+                onClick={() => setIsReceiptModalOpen(false)}
+                className="w-8 h-8 rounded-xl neu-button flex items-center justify-center text-[#3D5B4A]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCashReceipt} className="space-y-4 text-xs sm:text-sm">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-[#233B2D]">المبلغ المقبوض (AED) *</label>
+                <input
+                  type="number"
+                  value={receiptAmount}
+                  onChange={(e) => setReceiptAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full px-3.5 py-2.5 text-sm font-mono"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-[#233B2D]">المصدر / الجهة المسلمة للمبلغ *</label>
+                <input
+                  type="text"
+                  value={receiptSource}
+                  onChange={(e) => setReceiptSource(e.target.value)}
+                  placeholder="مثال: العميل شركة الأفق / مبيعات فرع الرياض"
+                  className="w-full px-3.5 py-2.5 text-sm"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-[#233B2D]">تصنيف المقبوض</label>
+                <select
+                  value={receiptType}
+                  onChange={(e) => setReceiptType(e.target.value as any)}
+                  className="w-full px-3.5 py-2.5 text-sm"
+                >
+                  <option value="cash_box">توريد سيولة نقدية عامة للصندوق</option>
+                  <option value="order_payment">دفعة نقدية لقيمة طلبية / مبيعات</option>
+                  <option value="purchase_advance">مبلغ مخصص لمهمة شراء ميداني</option>
+                  <option value="other">مقبوضات أخرى</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-[#233B2D]">ملاحظات وسند الاستلام</label>
+                <input
+                  type="text"
+                  value={receiptNotes}
+                  onChange={(e) => setReceiptNotes(e.target.value)}
+                  placeholder="رقم سند القبض أو تفاصيل إضافية"
+                  className="w-full px-3.5 py-2.5 text-sm"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#C8D3CC]/50">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  onClick={() => setIsReceiptModalOpen(false)}
+                >
+                  إلغاء
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  type="submit"
+                  icon={<Plus className="w-3.5 h-3.5 ml-1" />}
+                >
+                  حفظ في الصندوق
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: New Standing Account */}
+      {isStandingModalOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-[#182B20]/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="neu-raised-lg bg-[#EAF0EC] rounded-3xl w-full max-w-md p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150 border-none">
+            <div className="flex items-center justify-between pb-3 border-b border-[#C8D3CC]/50">
+              <div>
+                <h3 className="font-black text-base text-[#192E21] font-serif-display">
+                  إضافة حساب صرف دائم (Standing Account)
+                </h3>
+                <p className="text-xs text-[#526F5E] mt-0.5">
+                  لبنود الصرف المتكررة والمستمرة (بوفية، مواصلات، بقالة)
+                </p>
+              </div>
+              <button
+                onClick={() => setIsStandingModalOpen(false)}
+                className="w-8 h-8 rounded-xl neu-button flex items-center justify-center text-[#3D5B4A]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateStandingAccount} className="space-y-4 text-xs sm:text-sm">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-[#233B2D]">اسم الحساب أو المتجر *</label>
+                <input
+                  type="text"
+                  value={standingName}
+                  onChange={(e) => setStandingName(e.target.value)}
+                  placeholder="مثال: بقالة البركة / كروت مترو دبي / كافتيريا النخيل"
+                  className="w-full px-3.5 py-2.5 text-sm"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-[#233B2D]">التصنيف *</label>
+                <input
+                  type="text"
+                  value={standingCategory}
+                  onChange={(e) => setStandingCategory(e.target.value)}
+                  placeholder="ضيافة وبوفيه / نقل ومواصلات / مواد استهلاكية"
+                  className="w-full px-3.5 py-2.5 text-sm"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-[#233B2D]">الموقف المالي (لنا / علينا)</label>
+                <select
+                  value={standingDirection}
+                  onChange={(e) => setStandingDirection(e.target.value as any)}
+                  className="w-full px-3.5 py-2.5 text-sm"
+                >
+                  <option value="payable_by_us">علينا (مستحق سداده للطرف الآخر)</option>
+                  <option value="receivable_for_us">لنا (مستحق تحصيله لصالحنا)</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-[#233B2D]">الحد الشهري التقديري (AED)</label>
+                <input
+                  type="number"
+                  value={standingMonthlyLimit}
+                  onChange={(e) => setStandingMonthlyLimit(e.target.value)}
+                  placeholder="اختياري (سقف الصرف الشهري)"
+                  className="w-full px-3.5 py-2.5 text-sm font-mono"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-[#233B2D]">ملاحظات وشروط التعامل</label>
+                <input
+                  type="text"
+                  value={standingNotes}
+                  onChange={(e) => setStandingNotes(e.target.value)}
+                  placeholder="مثال: التسوية شهرياً بموجب دفتر الحسابات"
+                  className="w-full px-3.5 py-2.5 text-sm"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#C8D3CC]/50">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  onClick={() => setIsStandingModalOpen(false)}
+                >
+                  إلغاء
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  type="submit"
+                  icon={<Plus className="w-3.5 h-3.5 ml-1" />}
+                >
+                  حفظ الحساب
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

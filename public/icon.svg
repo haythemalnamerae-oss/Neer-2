@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#EAF0EC"/>
+      <stop offset="100%" stop-color="#DCE6DF"/>
+    </linearGradient>
+    <linearGradient id="primaryGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#345C47"/>
+      <stop offset="100%" stop-color="#1E372A"/>
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#D4AF37"/>
+      <stop offset="100%" stop-color="#AA820A"/>
+    </linearGradient>
+    <filter id="softShadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="6" dy="10" stdDeviation="12" flood-color="#A8B8AD" flood-opacity="0.6"/>
+      <feDropShadow dx="-6" dy="-6" stdDeviation="10" flood-color="#FFFFFF" flood-opacity="0.9"/>
+    </filter>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)"/>
+
+  <!-- Raised Emblem Card -->
+  <rect x="76" y="76" width="360" height="360" rx="72" fill="#EAF0EC" filter="url(#softShadow)"/>
+
+  <!-- Main Symbol: Smart Task & Custody Ledger -->
+  <!-- Shield Outline -->
+  <path d="M256 120 C310 120 350 140 370 160 C370 260 320 330 256 376 C192 330 142 260 142 160 C162 140 202 120 256 120 Z" fill="url(#primaryGrad)"/>
+
+  <!-- Inner Gold Check & Balance Symbol -->
+  <path d="M220 254 L244 278 L296 218" fill="none" stroke="#FFFFFF" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Coin / Custody Ring -->
+  <circle cx="256" cy="316" r="26" fill="url(#goldGrad)" stroke="#FFFFFF" stroke-width="4"/>
+  <text x="256" y="325" font-family="Arial, sans-serif" font-size="24" font-weight="900" fill="#FFFFFF" text-anchor="middle">د.إ</text>
+</svg>

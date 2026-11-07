@@ -1,0 +1,411 @@
+import React, { useState, useEffect } from 'react';
+import { dataStore } from '../../lib/storage';
+import { ExpenseCategory } from '../../types/domain';
+import { formatCurrency, EXPENSE_CATEGORY_CONFIG } from '../../lib/utils/format';
+import { Modal } from '../ui/modal';
+import { Input } from '../ui/input';
+import { Button } from '../ui/button';
+import { AlertTriangle, Layers, UploadCloud, CheckCircle2, Wallet, Tag } from 'lucide-react';
+
+interface NewExpenseModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  initialTaskId?: string;
+  preselectedTaskId?: string;
+  initialFundId?: string;
+}
+
+export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({ 
+  isOpen, 
+  onClose,
+  initialTaskId,
+  preselectedTaskId,
+  initialFundId
+}) => {
+  const currentUser = dataStore.getCurrentUser();
+  const effectiveTaskId = initialTaskId || preselectedTaskId;
+  const funds = dataStore.getFunds();
+  const tasks = dataStore.getTasks();
+  const settings = dataStore.getSettings();
+  const standingAccounts = dataStore.getStandingAccounts();
+
+  // Find best matching fund:
+  const getInitialFundId = () => {
+    if (initialFundId) return initialFundId;
+    if (effectiveTaskId) {
+      const task = tasks.find((t) => t.id === effectiveTaskId);
+      if (task?.fundId) return task.fundId;
+    }
+    const userFund = funds.find((f) => f.holderId === currentUser.id);
+    if (userFund) return userFund.id;
+    return funds[0]?.id || '';
+  };
+
+  const [fundId, setFundId] = useState(getInitialFundId());
+  const [amount, setAmount] = useState('');
+  const [category, setCategory] = useState<ExpenseCategory>('materials');
+  const [description, setDescription] = useState('');
+  const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [vendorName, setVendorName] = useState('');
+  const [taskId, setTaskId] = useState(effectiveTaskId || '');
+  const [hasReceipt, setHasReceipt] = useState(true);
+
+  // Blueprint: Standing Account & Cascade/Deficit States
+  const [selectedStandingAccId, setSelectedStandingAccId] = useState('');
+  const [coverageMethod, setCoverageMethod] = useState<'normal' | 'cascade' | 'deficit'>('normal');
+  const [secondaryFundId, setSecondaryFundId] = useState('');
+
+  // Sync when initial values change
+  useEffect(() => {
+    if (effectiveTaskId) {
+      setTaskId(effectiveTaskId);
+      const task = tasks.find((t) => t.id === effectiveTaskId);
+      if (task?.fundId && !initialFundId) {
+        setFundId(task.fundId);
+      }
+    }
+    if (initialFundId) {
+      setFundId(initialFundId);
+    } else if (!effectiveTaskId) {
+      const userFund = funds.find((f) => f.holderId === currentUser.id);
+      if (userFund) setFundId(userFund.id);
+    }
+  }, [effectiveTaskId, initialFundId, isOpen, currentUser.id]);
+
+  const numAmount = parseFloat(amount) || 0;
+  const taxAmount = Number((numAmount * (settings.taxRate / 100)).toFixed(2));
+  const totalWithTax = Number((numAmount + taxAmount).toFixed(2));
+
+  const selectedFund = funds.find((f) => f.id === fundId);
+  const exceedsLimit = totalWithTax > settings.singleExpenseLimit;
+  const availableBal = selectedFund ? selectedFund.currentBalance : 0;
+  const exceedsBalance = totalWithTax > availableBal;
+  const shortageAmount = Number((totalWithTax - availableBal).toFixed(2));
+
+  // Available secondary funds for cascade deduction
+  const otherFunds = funds.filter((f) => f.id !== fundId);
+
+  // Handle Standing Account Quick Selection
+  const handleSelectStandingAccount = (accId: string) => {
+    setSelectedStandingAccId(accId);
+    const acc = standingAccounts.find((a) => a.id === accId);
+    if (acc) {
+      setDescription(acc.name);
+      setCategory(acc.category as ExpenseCategory);
+      if (acc.defaultAmount && !amount) {
+        setAmount(String(acc.defaultAmount));
+      }
+      setVendorName(acc.direction === 'receivable' ? 'تحصيل من عميل' : 'مشتريات تشغيلية');
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fundId || numAmount <= 0 || !description.trim() || !vendorName.trim() || !invoiceNumber.trim()) {
+      alert('يرجى ملء جميع الحقول المطلوبة');
+      return;
+    }
+
+    if (exceedsBalance && coverageMethod === 'normal') {
+      alert('المبلغ المطلوب يتجاوز الرصيد الحالي المتوفر في هذه العهدة! يرجى اختيار إما "السحب المتسلسل من عهدتين" أو "تسجيل عجز سالب مؤقت".');
+      return;
+    }
+
+    if (coverageMethod === 'cascade' && !secondaryFundId) {
+      alert('يرجى تحديد العهدة الثانية لتغطية المبلغ المتبقي.');
+      return;
+    }
+
+    const task = tasks.find((t) => t.id === taskId);
+    const standingAcc = standingAccounts.find((a) => a.id === selectedStandingAccId);
+
+    dataStore.addExpense({
+      fundId,
+      fundName: selectedFund?.name || 'العهدة النقدية',
+      amount: numAmount,
+      category,
+      description,
+      invoiceNumber,
+      vendorName,
+      hasReceipt,
+      receiptUrl: hasReceipt ? 'https://images.unsplash.com/photo-1554415707-9e4c019d4536?w=500&auto=format&fit=crop&q=80' : undefined,
+      taskId: taskId || undefined,
+      taskTitle: task?.title,
+      cascadeDeduction: coverageMethod === 'cascade',
+      secondaryFundId: coverageMethod === 'cascade' ? secondaryFundId : undefined,
+      allowDeficit: coverageMethod === 'deficit',
+      standingAccountId: standingAcc?.id,
+      standingAccountName: standingAcc?.name,
+      standingDirection: standingAcc?.direction,
+    });
+
+    onClose();
+    // Reset
+    setAmount('');
+    setDescription('');
+    setInvoiceNumber('');
+    setVendorName('');
+    setSelectedStandingAccId('');
+    setCoverageMethod('normal');
+  };
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="تسجيل مصروف وفاتورة جديدة"
+      description="توثيق عملية الصرف من العهدة النقدية مع احتساب ضريبة القيمة المضافة 5% تلقائياً"
+      maxWidth="xl"
+    >
+      <form onSubmit={handleSubmit} className="space-y-4.5 text-xs sm:text-sm">
+        {/* Quick Standing Accounts Selector */}
+        {standingAccounts.length > 0 && (
+          <div className="space-y-2 p-4 neu-inset-sm rounded-2xl">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-extrabold text-slate-800 flex items-center gap-1.5">
+                <Tag className="w-4 h-4 text-emerald-700" />
+                <span>حسابات الصرف الدائمة والمتكررة (Standing Accounts):</span>
+              </span>
+              {selectedStandingAccId && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedStandingAccId('')}
+                  className="text-xs text-emerald-800 font-bold hover:underline cursor-pointer"
+                >
+                  إلغاء التحديد
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {standingAccounts.map((acc) => (
+                <button
+                  key={acc.id}
+                  type="button"
+                  onClick={() => handleSelectStandingAccount(acc.id)}
+                  className={`text-xs px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    selectedStandingAccId === acc.id
+                      ? 'neu-inset text-emerald-800 bg-[#EAF0EC] font-black'
+                      : 'neu-raised text-slate-700 hover:text-slate-900'
+                  }`}
+                >
+                  <span>{acc.name}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-extrabold ${acc.direction === 'receivable' ? 'bg-emerald-100 text-emerald-800' : 'bg-black/5 text-slate-600'}`}>
+                    {acc.direction === 'receivable' ? 'لنا' : 'علينا'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Fund Selection */}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-bold text-slate-700">العهدة النقدية المصروف منها *</label>
+          <select
+            value={fundId}
+            onChange={(e) => setFundId(e.target.value)}
+            className="w-full neu-inset px-4 py-2.5 min-h-[46px] rounded-2xl text-xs sm:text-sm text-slate-800 font-semibold focus:outline-hidden"
+            required
+          >
+            {funds.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name} (الرصيد المتاح: {formatCurrency(f.currentBalance, f.currency)} - المسؤول: {f.holderName})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Amount & Tax Live Calculation */}
+        <div className="p-4 sm:p-5 neu-raised rounded-3xl space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              type="number"
+              step="0.01"
+              label="المبلغ الأساسي قبل الضريبة (AED) *"
+              placeholder="0.00"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              required
+            />
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">تصنيف المصروف *</label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value as ExpenseCategory)}
+                className="w-full neu-inset px-4 py-2.5 min-h-[46px] rounded-2xl text-xs sm:text-sm text-slate-800 font-semibold focus:outline-hidden"
+              >
+                {Object.entries(EXPENSE_CATEGORY_CONFIG).map(([catKey, catVal]) => (
+                  <option key={catKey} value={catKey}>
+                    {catVal.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Live Calculation Display */}
+          <div className="flex items-center justify-between pt-3 border-t border-black/[0.04] text-xs sm:text-sm">
+            <span className="text-slate-600 font-bold">
+              ضريبة القيمة المضافة ({settings.taxRate}%): <span className="font-extrabold text-slate-800 dir-ltr">{formatCurrency(taxAmount)}</span>
+            </span>
+            <span className="text-sm sm:text-base font-black text-emerald-800">
+              المجموع الإجمالي: <span className="dir-ltr font-mono">{formatCurrency(totalWithTax)}</span>
+            </span>
+          </div>
+
+          {exceedsLimit && (
+            <div className="flex items-center gap-2 text-xs text-amber-800 neu-inset-sm p-3 rounded-2xl">
+              <AlertTriangle className="w-4.5 h-4.5 shrink-0 text-amber-700" />
+              <span>المصروف يتجاوز سقف الصرف الفردي المسموح به ({formatCurrency(settings.singleExpenseLimit)}). سيتطلب تدقيقاً خاصاً.</span>
+            </div>
+          )}
+
+          {/* Blueprint: Cascade Deduction & Deficit Options when balance is insufficient */}
+          {exceedsBalance && (
+            <div className="p-4 neu-inset-sm rounded-2xl space-y-3.5 text-xs sm:text-sm">
+              <div className="flex items-start gap-2.5 text-rose-900">
+                <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-rose-600" />
+                <div>
+                  <p className="font-extrabold">المبلغ المطلوب ({formatCurrency(totalWithTax)}) يتجاوز رصيد العهدة ({formatCurrency(availableBal)})!</p>
+                  <p className="text-xs text-rose-700 mt-0.5">العجز المطلوب تغطيته: <strong>{formatCurrency(shortageAmount)}</strong></p>
+                </div>
+              </div>
+
+              <div className="space-y-2.5 pt-1">
+                <p className="font-extrabold text-slate-800">اختر آلية المعالجة المالية المعتمدة:</p>
+                
+                {/* Cascade Option */}
+                <label className={`flex items-start gap-3 p-3.5 rounded-2xl transition-all cursor-pointer ${coverageMethod === 'cascade' ? 'neu-inset' : 'neu-raised hover:bg-black/[0.01]'}`}>
+                  <input
+                    type="radio"
+                    name="coverageMethod"
+                    value="cascade"
+                    checked={coverageMethod === 'cascade'}
+                    onChange={() => setCoverageMethod('cascade')}
+                    className="mt-1 accent-[#345c47] cursor-pointer"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <span className="font-extrabold text-slate-900 block">السحب المتسلسل من عهدتين (Cascade Deduction)</span>
+                    <span className="text-xs text-slate-600 block mt-1 leading-relaxed">
+                      استنزاف العهدة الحالية بالكامل ({formatCurrency(availableBal)}) ليصبح رصيدها صفراً، وسحب المتبقي ({formatCurrency(shortageAmount)}) تلقائياً من عهدة بديلة.
+                    </span>
+                    {coverageMethod === 'cascade' && (
+                      <div className="mt-3 space-y-1.5">
+                        <label className="block text-xs font-bold text-slate-700">العهدة البديلة لتغطية الفارق:</label>
+                        <select
+                          value={secondaryFundId}
+                          onChange={(e) => setSecondaryFundId(e.target.value)}
+                          className="w-full neu-inset px-3.5 py-2 min-h-[42px] rounded-xl text-xs text-slate-900 font-semibold focus:outline-hidden"
+                          required
+                        >
+                          <option value="">-- اختر العهدة الثانية --</option>
+                          {otherFunds.map((of) => (
+                            <option key={of.id} value={of.id}>
+                              {of.name} (المتاح: {formatCurrency(of.currentBalance, of.currency)} - {of.holderName})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                </label>
+
+                {/* Deficit Option */}
+                <label className={`flex items-start gap-3 p-3.5 rounded-2xl transition-all cursor-pointer ${coverageMethod === 'deficit' ? 'neu-inset' : 'neu-raised hover:bg-black/[0.01]'}`}>
+                  <input
+                    type="radio"
+                    name="coverageMethod"
+                    value="deficit"
+                    checked={coverageMethod === 'deficit'}
+                    onChange={() => setCoverageMethod('deficit')}
+                    className="mt-1 accent-[#345c47] cursor-pointer"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <span className="font-extrabold text-slate-900 block">تسجيل عجز مالي مؤقت بالسالب (Negative Balance / Deficit)</span>
+                    <span className="text-xs text-slate-600 block mt-1 leading-relaxed">
+                      السماح بالصرف للمهمة الميدانية وتسجيل عجز بقيمة ({formatCurrency(shortageAmount)}) كالتزام يظهر بالسالب لتتم تغطيته فور توريد نقد للصندوق.
+                    </span>
+                  </div>
+                </label>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Invoice & Vendor */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Input
+            label="اسم المورد / المحل التجاري *"
+            placeholder="مثال: شركة البرق للكهربائيات"
+            value={vendorName}
+            onChange={(e) => setVendorName(e.target.value)}
+            required
+          />
+          <Input
+            label="رقم الفاتورة الضريبية *"
+            placeholder="مثال: INV-2026-884"
+            value={invoiceNumber}
+            onChange={(e) => setInvoiceNumber(e.target.value)}
+            required
+          />
+        </div>
+
+        {/* Description */}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-bold text-slate-700">بيان المصروف والأصناف المشتراة *</label>
+          <textarea
+            rows={2}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="تفاصيل ما تم شراؤه وسبب الصرف الميداني..."
+            className="w-full neu-inset px-4 py-3 rounded-2xl text-xs sm:text-sm text-slate-800 focus:outline-hidden"
+            required
+          />
+        </div>
+
+        {/* Linked Task & Receipt */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-700">ربط بمهمة ميدانية (اختياري)</label>
+            <select
+              value={taskId}
+              onChange={(e) => setTaskId(e.target.value)}
+              className="w-full neu-inset px-4 py-2.5 min-h-[46px] rounded-2xl text-xs sm:text-sm text-slate-800 font-semibold focus:outline-hidden"
+            >
+              <option value="">بدون ربط بمهمة</option>
+              {tasks.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.title} ({t.location})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <label className="flex items-center gap-3 p-3 neu-inset-sm rounded-2xl cursor-pointer mt-4 sm:mt-0">
+            <input
+              type="checkbox"
+              checked={hasReceipt}
+              onChange={(e) => setHasReceipt(e.target.checked)}
+              className="w-5 h-5 accent-[#345c47] rounded cursor-pointer"
+            />
+            <span className="text-xs sm:text-sm font-bold text-slate-700">تم إرفاق صورة الفاتورة / الإيصال الأصلي</span>
+          </label>
+        </div>
+
+        <div className="pt-4 border-t border-black/[0.04] flex items-center justify-end gap-3">
+          <Button variant="outline" size="md" type="button" onClick={onClose}>
+            إلغاء
+          </Button>
+          <Button 
+            variant="primary" 
+            size="md" 
+            type="submit" 
+            disabled={Boolean(exceedsBalance && coverageMethod === 'normal')}
+          >
+            {coverageMethod === 'cascade' ? 'اعتماد الصرف المتسلسل' : coverageMethod === 'deficit' ? 'تسجيل مع إقرار العجز' : 'تسجيل المصروف'}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+};

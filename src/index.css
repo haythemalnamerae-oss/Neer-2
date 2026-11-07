@@ -1,0 +1,192 @@
+@import "tailwindcss";
+
+/* -------------------------------------------------------------
+   3D NEUMORPHISM (SOFT UI) DESIGN TOKENS & UTILITIES
+   Exact Palette:
+     - Base Background: #EAF0EC (Sage Tinted Gray)
+     - Light Source (Top-Left): #FFFFFF
+     - Shadow (Bottom-Right): #C8D3CC
+   ------------------------------------------------------------- */
+.neu-bg {
+  background-color: #EAF0EC !important;
+}
+
+.font-serif-display {
+  font-family: 'Cairo', 'Playfair Display', Georgia, serif;
+}
+
+.font-sans-inter {
+  font-family: 'Cairo', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Raised Dual Shadows (Outset) */
+.neu-raised-lg {
+  background: #EAF0EC !important;
+  box-shadow: -12px -12px 24px #FFFFFF, 12px 12px 24px #C8D3CC !important;
+  border: none !important;
+}
+
+.neu-raised {
+  background: #EAF0EC !important;
+  box-shadow: -8px -8px 16px #FFFFFF, 8px 8px 16px #C8D3CC !important;
+  border: none !important;
+}
+
+.neu-raised-sm {
+  background: #EAF0EC !important;
+  box-shadow: -4px -4px 10px #FFFFFF, 4px 4px 10px #C8D3CC !important;
+  border: none !important;
+}
+
+/* Inset Shadows (Engraved / Active / Pressed) */
+.neu-inset {
+  background: #EAF0EC !important;
+  box-shadow: inset -4px -4px 8px #FFFFFF, inset 4px 4px 8px #C8D3CC !important;
+  border: none !important;
+}
+
+.neu-inset-sm {
+  background: #EAF0EC !important;
+  box-shadow: inset -3px -3px 6px #FFFFFF, inset 3px 3px 6px #C8D3CC !important;
+  border: none !important;
+}
+
+.neu-inset-deep {
+  background: #EAF0EC !important;
+  box-shadow: inset -6px -6px 14px #FFFFFF, inset 6px 6px 14px #C8D3CC !important;
+  border: none !important;
+}
+
+/* Interactive Button Hover & Active States */
+.neu-button {
+  background: #EAF0EC !important;
+  box-shadow: -6px -6px 12px #FFFFFF, 6px 6px 12px #C8D3CC !important;
+  border: none !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.neu-button:hover {
+  box-shadow: -8px -8px 16px #FFFFFF, 8px 8px 16px #BDC8C1 !important;
+  transform: translateY(-1px);
+}
+
+.neu-button:active,
+.neu-button.active {
+  box-shadow: inset -4px -4px 8px #FFFFFF, inset 4px 4px 8px #C8D3CC !important;
+  transform: translateY(0);
+}
+
+/* Global Body & Controls Theming */
+body {
+  background-color: #EAF0EC !important;
+  color: #16281D;
+  font-family: 'Cairo', 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* System Inputs & Textareas Soft Inset Discipline */
+input[type="text"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+textarea,
+select {
+  background-color: #EAF0EC !important;
+  border: none !important;
+  box-shadow: inset -3px -3px 6px #FFFFFF, inset 3px 3px 6px #C8D3CC !important;
+  color: #14291D !important;
+  border-radius: 1rem !important;
+  padding: 0.65rem 1rem !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  outline: none !important;
+  min-height: 44px;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none !important;
+  box-shadow: inset -4px -4px 8px #FFFFFF, inset 4px 4px 8px #BDC8C1, 0 0 0 2px rgba(67, 107, 83, 0.25) !important;
+}
+
+/* Global Table Neumorphic Standards */
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+}
+
+thead th {
+  background-color: #EAF0EC !important;
+  color: #486857 !important;
+  font-weight: 700 !important;
+  font-size: 0.8125rem !important;
+  border-bottom: 1px solid rgba(200, 211, 204, 0.7) !important;
+  padding: 0.875rem 1rem !important;
+}
+
+tbody tr {
+  transition: all 0.15s ease-in-out;
+}
+
+tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.45) !important;
+}
+
+tbody td {
+  padding: 0.875rem 1rem !important;
+  border-bottom: 1px solid rgba(200, 211, 204, 0.4) !important;
+  color: #1A3123;
+  font-size: 0.875rem;
+}
+
+tbody tr:last-child td {
+  border-bottom: none !important;
+}
+
+/* Custom Scrollbars in Neumorphism */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #EAF0EC;
+  box-shadow: inset -2px -2px 4px #FFFFFF, inset 2px 2px 4px #C8D3CC;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #BCCAC0;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9FB1A4;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #printable-voucher,
+  #printable-voucher * {
+    visibility: visible;
+  }
+  #printable-voucher {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 20px;
+    border: none !important;
+    box-shadow: none !important;
+  }
+}
