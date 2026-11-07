@@ -1,0 +1,183 @@
+import type { Role } from '../../types/domain';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const apiBaseUrl = (import.meta.env.VITE_API_URL || '/api/v1').replace(/\/$/, '');
+const SESSION_KEY = 'neer_api_session_v1';
+
+export type ApiSession = {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+  userId: string;
+  email: string;
+  organizationId: string;
+  appUserId?: string;
+  role: Role;
+};
+
+type AuthResponse = {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  user: { id: string; email?: string };
+};
+
+export class SessionError extends Error {
+  constructor(message: string) { super(message); this.name = 'SessionError'; }
+}
+
+function requireConfig() {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new SessionError('أضف VITE_SUPABASE_URL وVITE_SUPABASE_ANON_KEY إلى إعدادات البيئة.');
+  }
+}
+
+async function authRequest<T>(path: string, body: unknown): Promise<T> {
+  requireConfig();
+  const response = await fetch(`${supabaseUrl}/auth/v1/${path}`, {
+    method: 'POST',
+    headers: { apikey: supabaseAnonKey!, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new SessionError(payload.msg || payload.message || payload.error_description || 'تعذر تسجيل الدخول إلى Supabase.');
+  return payload as T;
+}
+
+export function getSession(): ApiSession | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const value = JSON.parse(raw) as ApiSession;
+    if (value.expiresAt < Date.now() + 30_000) return null;
+    return value;
+  } catch { return null; }
+}
+
+function saveSession(value: ApiSession) { localStorage.setItem(SESSION_KEY, JSON.stringify(value)); }
+export function clearSession() { localStorage.removeItem(SESSION_KEY); }
+
+async function getMemberships(userId: string, token: string) {
+  requireConfig();
+  const query = new URLSearchParams({
+    select: 'organization_id,app_user_id,role,active,is_default',
+    auth_user_id: `eq.${userId}`,
+    active: 'eq.true',
+    order: 'is_default.desc',
+  });
+  const response = await fetch(`${supabaseUrl}/rest/v1/organization_members?${query}`, {
+    headers: { apikey: supabaseAnonKey!, Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new SessionError('تعذر جلب عضويات المستخدم؛ تأكد من تطبيق ترحيل قاعدة البيانات وسياسات RLS.');
+  return response.json() as Promise<Array<{ organization_id: string; app_user_id: string | null; role: Role; active: boolean; is_default: boolean }>>;
+}
+
+export async function signIn(email: string, password: string): Promise<ApiSession> {
+  const auth = await authRequest<AuthResponse>('token?grant_type=password', { email, password });
+  const memberships = await getMemberships(auth.user.id, auth.access_token);
+  const membership = memberships.find((item) => item.active && item.is_default) || memberships.find((item) => item.active);
+  if (!membership) throw new SessionError('تم تسجيل الدخول، لكن الحساب غير مرتبط بمؤسسة. اطلب من مدير النظام إضافتك.');
+  const session: ApiSession = {
+    accessToken: auth.access_token,
+    refreshToken: auth.refresh_token,
+    expiresAt: Date.now() + auth.expires_in * 1000,
+    userId: auth.user.id,
+    email: auth.user.email || email,
+    organizationId: membership.organization_id,
+    appUserId: membership.app_user_id || undefined,
+    role: membership.role,
+  };
+  saveSession(session);
+  return session;
+}
+
+export async function refreshSession(session: ApiSession): Promise<ApiSession> {
+  const auth = await authRequest<AuthResponse>('token?grant_type=refresh_token', { refresh_token: session.refreshToken });
+  const next = { ...session, accessToken: auth.access_token, refreshToken: auth.refresh_token, expiresAt: Date.now() + auth.expires_in * 1000 };
+  saveSession(next);
+  return next;
+}
+
+export async function apiRequest<T>(session: ApiSession, path: string, init: RequestInit = {}): Promise<T> {
+  const current = session.expiresAt < Date.now() + 30_000 ? await refreshSession(session) : session;
+  const response = await fetch(`${apiBaseUrl}${path.startsWith('/') ? path : `/${path}`}`, {
+    ...init,
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${current.accessToken}`,
+      'x-organization-id': current.organizationId,
+      ...init.headers,
+    },
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    if (response.status === 401) clearSession();
+    throw new SessionError(payload.error?.message || payload.message || `فشل طلب API (${response.status}).`);
+  }
+  if (response.status === 204) return undefined as T;
+  return response.json() as Promise<T>;
+}
+
+const asDomainUser = (row: Record<string, any>) => ({
+  id: row.id, name: row.name, email: row.email, role: row.role,
+  roleTitleAr: row.role_title_ar || '', phone: row.phone || '', department: row.department || '',
+  avatar: row.avatar || '', active: row.active ?? true,
+});
+
+const fromSnake = (row: Record<string, any>) => {
+  const result: Record<string, any> = {};
+  for (const [key, value] of Object.entries(row)) {
+    const camel = key.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
+    result[camel] = value;
+  }
+  return result;
+};
+
+/** Loads the initial server snapshot before importing the legacy synchronous UI store. */
+export async function loadUiSnapshot(session: ApiSession): Promise<void> {
+  const common = ['tasks','task-checklist','task-steps','task-subtasks','task-updates','task-history','task-attachments','task-comments','follow-ups','notifications'];
+  const finance = ['funds','expenses','settlements','cash-receipts','standing-accounts'];
+  const collections = session.role === 'admin' || session.role === 'finance_officer' ? [...common, ...finance, 'users'] : [...common, 'users'];
+  const values = await Promise.all(collections.map(async (name) => [name, await apiRequest<Record<string, any>[]>(session, `/${name}?limit=500`)] as const));
+  const data = Object.fromEntries(values);
+
+  const users = (data.users || []).map(asDomainUser);
+  const byId = (rows: Record<string, any>[] = []) => new Map(rows.map((row) => [row.id, fromSnake(row)]));
+  const checklist = byId(data['task-checklist']);
+  const steps = byId(data['task-steps']);
+  const subtasks = byId(data['task-subtasks']);
+  const updates = byId(data['task-updates']);
+  const histories = byId(data['task-history']);
+  const attachments = byId(data['task-attachments']);
+  const comments = byId(data['task-comments']);
+  const children = (map: Map<string, any>, taskId: string) => [...map.values()].filter((item) => item.taskId === taskId);
+
+  const tasks = (data.tasks || []).map((raw) => {
+    const task = fromSnake(raw);
+    task.checklist = children(checklist, task.id).map((item) => ({ id: item.id, text: item.text, completed: item.completed }));
+    task.steps = children(steps, task.id).map((item) => ({ id: item.id, title: item.title, status: item.status, plannedTime: item.plannedTime, completedAt: item.completedAt, notes: item.notes, order: item.sortOrder }));
+    task.subTasks = children(subtasks, task.id).map((item) => ({ id: item.id, title: item.title, assigneeId: item.assigneeId || '', assigneeName: item.assigneeName, status: item.status, requiresApproval: item.requiresApproval, isApproved: item.isApproved, approvedByManager: item.approvedByManager, dueDate: item.dueDate, notes: item.notes }));
+    task.dailyUpdates = children(updates, task.id).map((item) => ({ id: item.id, authorId: item.authorId || '', authorName: item.authorName, date: item.updateDate, text: item.text, createdAt: item.createdAt }));
+    task.history = children(histories, task.id).map((item) => ({ id: item.id, action: item.action, performedBy: item.performedBy, timestamp: item.createdAt, notes: item.notes }));
+    task.attachments = children(attachments, task.id).map((item) => ({ id: item.id, name: item.name, url: item.url, size: item.size, type: item.type, uploadedBy: item.uploadedBy, uploadedAt: item.createdAt }));
+    task.comments = children(comments, task.id).map((item) => ({ id: item.id, authorId: item.authorId || '', authorName: item.authorName, authorAvatar: item.authorAvatar, authorRole: item.authorRole, text: item.text, createdAt: item.createdAt, mentions: item.mentions, isInternal: item.isInternal }));
+    return task;
+  });
+
+  const funds = (data.funds || []).map(fromSnake);
+  const expenses = (data.expenses || []).map(fromSnake);
+  const settlements = (data.settlements || []).map((row) => ({ ...fromSnake(row), expenseIds: [], expensesCount: row.expenses_count || 0 }));
+  const followUps = (data['follow-ups'] || []).map((row) => ({ ...fromSnake(row), assignedTo: row.assigned_to, scheduledDate: row.scheduled_date, lastContactDate: row.last_contact_date }));
+  const notifications = (data.notifications || []).map(fromSnake);
+
+  const storeData: Record<string, unknown> = {
+    ops_users_v3: users, ops_tasks_v3: tasks, ops_funds_v3: funds, ops_expenses_v3: expenses,
+    ops_settlements_v3: settlements, ops_follow_ups_v3: followUps, ops_notifications_v3: notifications,
+    ops_audit_logs_v3: [], ops_cash_receipts_v3: (data['cash-receipts'] || []).map(fromSnake),
+    ops_standing_accounts_v3: (data['standing-accounts'] || []).map(fromSnake),
+  };
+  for (const [key, value] of Object.entries(storeData)) localStorage.setItem(key, JSON.stringify(value));
+  if (session.appUserId) localStorage.setItem('ops_current_user_id_v3', JSON.stringify(session.appUserId));
+}

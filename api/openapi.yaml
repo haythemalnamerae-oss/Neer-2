@@ -1,0 +1,59 @@
+# API v1 contract (OpenAPI 3.1)
+openapi: 3.1.0
+info:
+  title: Neer Operations API
+  version: 1.0.0
+  description: Versioned, tenant-scoped API gateway for the Neer identity, operations, finance and collaboration engines.
+servers:
+  - url: /api/v1
+security:
+  - SupabaseBearer: []
+  - OrganizationId: []
+components:
+  securitySchemes:
+    SupabaseBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase Auth access token. Never use a service-role key in the browser.
+    OrganizationId:
+      type: apiKey
+      in: header
+      name: x-organization-id
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: {}
+    Page:
+      type: object
+      properties:
+        limit: { type: integer, minimum: 1, maximum: 500 }
+        offset: { type: integer, minimum: 0 }
+paths:
+  /tasks:
+    get: { summary: List organization tasks, parameters: [{ in: query, name: status, schema: { type: string } }, { in: query, name: assignee_id, schema: { type: string } }, { in: query, name: limit, schema: { type: integer } }, { in: query, name: offset, schema: { type: integer } }], responses: { '200': { description: Task collection }, '401': { description: Unauthenticated }, '403': { description: Forbidden } } }
+    post: { summary: Create a task, responses: { '201': { description: Created }, '400': { description: Invalid payload } } }
+  /tasks/{id}:
+    parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+    get: { summary: Get task by ID, responses: { '200': { description: Task }, '404': { description: Not found } } }
+    patch: { summary: Update task, responses: { '200': { description: Updated } } }
+    delete: { summary: Delete task, responses: { '204': { description: Deleted } } }
+  /funds:
+    get: { summary: List petty-cash funds, responses: { '200': { description: Funds; finance role required } } }
+    post: { summary: Create a fund, responses: { '201': { description: Created } } }
+  /expenses:
+    get: { summary: List expenses, responses: { '200': { description: Expenses; finance role required } } }
+    post: { summary: Create expense record; use transaction RPC for ledger posting, responses: { '201': { description: Created } } }
+  /settlements:
+    get: { summary: List settlements, responses: { '200': { description: Settlements } } }
+    post: { summary: Create settlement; use transaction RPC for approval, responses: { '201': { description: Created } } }
+  /integrations/health:
+    get: { summary: Check integration API availability, responses: { '200': { description: Integration gateway status } } }
+  /integrations/events:
+    post: { summary: Accept an idempotent event from an authenticated connector, parameters: [{ in: header, name: Idempotency-Key, required: true, schema: { type: string } }, { in: header, name: x-integration-provider, required: true, schema: { type: string } }], responses: { '202': { description: Accepted for processing }, '409': { description: Idempotency conflict } } }
