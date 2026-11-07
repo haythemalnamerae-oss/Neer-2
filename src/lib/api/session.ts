@@ -5,6 +5,8 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const apiBaseUrl = (import.meta.env.VITE_API_URL || '/api/v1').replace(/\/$/, '');
 const SESSION_KEY = 'neer_api_session_v1';
 
+export const hasSupabaseConfig = Boolean(supabaseUrl && supabaseAnonKey);
+
 export type ApiSession = {
   accessToken: string;
   refreshToken: string;
