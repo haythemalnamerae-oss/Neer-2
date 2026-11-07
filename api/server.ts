@@ -78,7 +78,6 @@ app.get('/health', (_req, res) => res.json({ status: 'ok', api: 'neer-v1' }));
 app.use('/api/v1', authenticate);
 app.get('/api/v1', (_req, res) => res.json({ version: 'v1', resources: Object.keys(resources).map((key) => `/api/v1/${key}`), admin: ['/api/v1/admin/permissions'] }));
 
-// Admin RBAC endpoint: fixed route and validated keys; clients cannot write arbitrary catalog entries.
 app.get('/api/v1/admin/permissions', async (req, res) => {
   const auth = (req as AuthenticatedRequest).auth;
   if (auth.role !== 'admin') return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Admin role required.' } });
@@ -99,9 +98,7 @@ app.put('/api/v1/admin/permissions/:roleKey', async (req, res) => {
   const roleKey = req.params.roleKey;
   if (!['ops_manager','finance_officer','field_officer','viewer'].includes(roleKey)) return res.status(400).json({ error: { code: 'PROTECTED_ROLE', message: 'The administrator role is protected.' } });
   const grants = req.body?.grants;
-  if (!Array.isArray(grants) || grants.length > 200 || grants.some((item: any) => typeof item?.permissionKey !== 'string' || typeof item?.granted !== 'boolean')) {
-    return res.status(400).json({ error: { code: 'INVALID_GRANTS', message: 'Provide a list of { permissionKey, granted } entries.' } });
-  }
+  if (!Array.isArray(grants) || grants.length > 200 || grants.some((item: any) => typeof item?.permissionKey !== 'string' || typeof item?.granted !== 'boolean')) return res.status(400).json({ error: { code: 'INVALID_GRANTS', message: 'Provide a list of { permissionKey, granted } entries.' } });
   try {
     const catalogResponse = await supabaseFetch('/rest/v1/permission_catalog?select=permission_key', auth.token);
     if (!catalogResponse.ok) return sendDbError(res, catalogResponse.status, await catalogResponse.text());
@@ -155,4 +152,9 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   console.error('Unhandled API error:', error);
   res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'Unexpected server error.' } });
 });
-app.listen(port, '0.0.0.0', () => console.log(`Neer API listening on http://0.0.0.0:${port}`));
+
+// Vercel Functions must export the Express handler and must not start a long-lived listener.
+if (process.env.VERCEL !== '1') app.listen(port, '0.0.0.0', () => console.log(`Neer API listening on http://0.0.0.0:${port}`));
+
+export { app };
+export default app;
