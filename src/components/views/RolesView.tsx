@@ -1,149 +1,90 @@
-import React, { useState } from 'react';
-import {
-  Shield,
-  Check,
-  X,
-  Lock,
-  Eye,
-  Edit,
-  Trash,
-  PlusCircle,
-  CheckCircle2,
-} from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Check, Save, Shield, X } from 'lucide-react';
 import { Role } from '../../types/domain';
 import { ROLE_PERMISSIONS, ROLE_LABELS } from '../../lib/rbac/permissions';
-import { Card } from '../ui/card';
-import { Badge } from '../ui/badge';
+import { getSession, apiRequest } from '../../lib/api/session';
+
+type Permission = { permission_key: string; module_key: string; action_key: 'view'|'create'|'edit'|'delete'|'approve'; label_ar: string };
+type Grant = { role_key: string; permission_key: string; granted: boolean };
+const roleKeys: Role[] = ['admin','ops_manager','finance_officer','field_officer','viewer'];
+const actions = [
+  { id: 'view', label: 'عرض' }, { id: 'create', label: 'إنشاء' }, { id: 'edit', label: 'تعديل' },
+  { id: 'delete', label: 'حذف' }, { id: 'approve', label: 'اعتماد' },
+] as const;
+const fallbackModules = [
+  ['dashboard','لوحة المؤشرات والتحليلات'],['tasks','المهام الميدانية والمشاريع'],['followUps','المتابعات'],
+  ['funds','العهد النقدية والأرصدة'],['expenses','المصروفات والفواتير'],['settlements','التسويات'],
+  ['calendar','التقويم'],['reports','التقارير'],['team','الفريق'],['users','إدارة المستخدمين'],
+  ['roles','الأدوار والصلاحيات'],['audit','سجل التدقيق'],['settings','إعدادات النظام'],['aiAdvisor','المساعد الذكي'],
+] as const;
 
 export const RolesView: React.FC = () => {
-  const [selectedRole, setSelectedRole] = useState<Role>('admin');
+  const [selectedRole, setSelectedRole] = useState<Role>('ops_manager');
+  const [permissions, setPermissions] = useState<Permission[]>([]);
+  const [grants, setGrants] = useState<Grant[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const session = getSession();
+  const isAdmin = session?.role === 'admin';
 
-  const modules = [
-    { id: 'dashboard', label: 'لوحة المؤشرات والتحليلات' },
-    { id: 'tasks', label: 'المهام الميدانية والمشاريع' },
-    { id: 'funds', label: 'العهد النقدية والأرصدة' },
-    { id: 'expenses', label: 'المصروفات والفواتير (ضريبة 5%)' },
-    { id: 'settlements', label: 'التسويات وسندات الصرف' },
-    { id: 'reports', label: 'التقارير التحليلية و KPIs' },
-    { id: 'users', label: 'إدارة المستخدمين' },
-    { id: 'roles', label: 'مصفوفة الصلاحيات' },
-    { id: 'audit', label: 'سجل التدقيق الأمني' },
-    { id: 'settings', label: 'إعدادات وسياسات النظام' },
-  ];
+  useEffect(() => {
+    let cancelled = false;
+    if (!session) { setError('سجّل الدخول بجلسة Supabase لعرض الصلاحيات.'); setLoading(false); return; }
+    apiRequest<{ permissions: Permission[]; grants: Grant[] }>(session, '/admin/permissions')
+      .then((result) => { if (!cancelled) { setPermissions(result.permissions); setGrants(result.grants); setError(''); } })
+      .catch((cause) => { if (!cancelled) setError(cause instanceof Error ? cause.message : 'تعذر تحميل الصلاحيات.'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [session?.accessToken, session?.organizationId]);
 
-  const actions = [
-    { id: 'view', label: 'عرض (View)' },
-    { id: 'create', label: 'إنشاء (Create)' },
-    { id: 'edit', label: 'تعديل (Edit)' },
-    { id: 'delete', label: 'حذف (Delete)' },
-    { id: 'approve', label: 'اعتماد (Approve)' },
-  ];
+  const modules = useMemo(() => permissions.length
+    ? [...new Map(permissions.map((item) => [item.module_key, item.module_key])).keys()].map((key) => ({ id: key, label: permissions.find((p) => p.module_key === key)?.label_ar || key }))
+    : fallbackModules.map(([id,label]) => ({ id, label })), [permissions]);
 
-  const currentRolePerms = ROLE_PERMISSIONS[selectedRole] || {};
+  const hasGrant = (role: Role, module: string, action: string) => {
+    if (role === 'admin') return ROLE_PERMISSIONS.admin[module]?.[action as keyof (typeof ROLE_PERMISSIONS.admin)[string]] ?? false;
+    const key = `${module}.${action}`;
+    const saved = grants.find((grant) => grant.role_key === role && grant.permission_key === key);
+    if (saved) return saved.granted;
+    return ROLE_PERMISSIONS[role]?.[module]?.[action as 'view'|'create'|'edit'|'delete'|'approve'] ?? false;
+  };
 
-  return (
-    <div className="space-y-6 animate-in fade-in duration-150">
-      {/* Banner */}
-      <div className="neu-raised-lg p-5 sm:p-6 rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-emerald-800 font-extrabold text-xs uppercase mb-1">
-            <Shield className="w-5 h-5 text-emerald-700" />
-            <span className="tracking-wide">مصفوفة الصلاحيات القائمة على الأدوار (RBAC Matrix)</span>
-          </div>
-          <h2 className="text-xl sm:text-2xl font-black text-slate-800 font-serif">حوكمة وصلاحيات الأدوار الوظيفية</h2>
-          <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
-            التحكم الدقيق بصلاحيات العرض والإضافة والتعديل والاعتماد لكل دور تشغيلي
-          </p>
-        </div>
+  const toggle = (module: string, action: string) => {
+    if (!isAdmin || selectedRole === 'admin') return;
+    const permissionKey = `${module}.${action}`;
+    const granted = !hasGrant(selectedRole, module, action);
+    setGrants((current) => [...current.filter((item) => !(item.role_key === selectedRole && item.permission_key === permissionKey)), { role_key: selectedRole, permission_key: permissionKey, granted }]);
+    setNotice('');
+  };
 
-        {/* Role Selector Tabs */}
-        <div className="flex flex-wrap gap-2 neu-inset-sm p-2 rounded-2xl text-xs font-bold">
-          {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
-            <button
-              key={r}
-              onClick={() => setSelectedRole(r)}
-              className={`px-3.5 py-2 rounded-xl transition-all cursor-pointer font-bold ${
-                selectedRole === r
-                  ? 'neu-raised text-emerald-800 bg-[#EAF0EC] font-black'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              {ROLE_LABELS[r].titleAr}
-            </button>
-          ))}
-        </div>
-      </div>
+  const save = async () => {
+    if (!session || !isAdmin || selectedRole === 'admin') return;
+    setSaving(true); setError(''); setNotice('');
+    try {
+      const roleGrants = modules.flatMap((module) => actions.map((action) => ({ permissionKey: `${module.id}.${action.id}`, granted: hasGrant(selectedRole, module.id, action.id) })));
+      const result = await apiRequest<{ grants: Grant[] }>(session, `/admin/permissions/${selectedRole}`, { method: 'PUT', body: JSON.stringify({ grants: roleGrants }) });
+      setGrants((current) => [...current.filter((item) => item.role_key !== selectedRole), ...result.grants]);
+      setNotice('تم حفظ الصلاحيات في قاعدة البيانات.');
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'تعذر حفظ الصلاحيات.'); }
+    finally { setSaving(false); }
+  };
 
-      {/* Role Info Summary Card */}
-      <div className="neu-inset-sm p-4.5 rounded-2xl">
-        <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl neu-raised text-emerald-800 flex items-center justify-center shrink-0">
-            <Shield className="w-6 h-6 text-emerald-700" />
-          </div>
-          <div>
-            <h3 className="font-extrabold text-sm text-slate-800">
-              الدور المحدد: {ROLE_LABELS[selectedRole].titleAr} ({selectedRole})
-            </h3>
-            <p className="text-xs text-slate-600 mt-0.5">
-              {ROLE_LABELS[selectedRole].description}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Permissions Matrix Table */}
-      <div className="neu-raised-lg rounded-3xl overflow-hidden p-3 sm:p-5">
-        <div className="overflow-x-auto">
-          <table className="w-full text-right text-xs sm:text-sm">
-            <thead>
-              <tr>
-                <th className="p-3.5 w-1/3 text-slate-700 font-extrabold">الوحدة / القسم (Module)</th>
-                {actions.map((act) => (
-                  <th key={act.id} className="p-3.5 text-center text-slate-700 font-extrabold">
-                    {act.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {modules.map((mod) => {
-                const modPerm = currentRolePerms[mod.id] || {
-                  view: false,
-                  create: false,
-                  edit: false,
-                  delete: false,
-                  approve: false,
-                };
-
-                return (
-                  <tr key={mod.id} className="transition-colors hover:bg-black/[0.02]">
-                    <td className="p-3.5 font-bold text-slate-800">
-                      {mod.label}
-                    </td>
-
-                    {actions.map((act) => {
-                      const isAllowed = modPerm[act.id as keyof typeof modPerm];
-                      return (
-                        <td key={act.id} className="p-3.5 text-center">
-                          {isAllowed ? (
-                            <span className="inline-flex items-center justify-center w-7 h-7 rounded-xl neu-raised text-emerald-700">
-                              <Check className="w-4 h-4 stroke-[3]" />
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center justify-center w-7 h-7 rounded-xl neu-inset-sm text-slate-400">
-                              <X className="w-3.5 h-3.5" />
-                            </span>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+  return <div dir="rtl" className="space-y-5">
+    <header className="flex flex-col gap-4 rounded-3xl bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <div><p className="flex items-center gap-2 text-sm font-bold text-emerald-800"><Shield className="h-5 w-5"/> إدارة صلاحيات النظام</p><h2 className="mt-1 text-xl font-black text-slate-900">مصفوفة الأدوار والصلاحيات</h2><p className="mt-1 text-sm text-slate-600">الصلاحيات محفوظة في Supabase وتُفحص على الخادم عند كل طلب API.</p></div>
+      {isAdmin && selectedRole !== 'admin' && <button onClick={save} disabled={saving || loading} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-800 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"><Save className="h-4 w-4"/>{saving ? 'جارٍ الحفظ...' : 'حفظ الصلاحيات'}</button>}
+    </header>
+    {!isAdmin && <div role="status" className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">عرض فقط. يلزم دور مدير النظام لتعديل مصفوفة الأذونات.</div>}
+    {error && <div role="alert" className="rounded-2xl bg-rose-50 p-4 text-sm text-rose-800">{error}</div>}
+    {notice && <div role="status" className="rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-800">{notice}</div>}
+    <div className="flex flex-wrap gap-2 rounded-2xl bg-white p-3 shadow-sm">
+      {roleKeys.map((role) => <button key={role} onClick={() => setSelectedRole(role)} className={`rounded-xl px-4 py-2 text-sm font-bold ${selectedRole === role ? 'bg-emerald-800 text-white' : 'bg-slate-100 text-slate-700'}`}>{ROLE_LABELS[role].titleAr}</button>)}
     </div>
-  );
+    <section className="overflow-hidden rounded-3xl bg-white p-3 shadow-sm sm:p-5">
+      <div className="mb-4"><h3 className="font-black text-slate-900">{ROLE_LABELS[selectedRole].titleAr}</h3><p className="mt-1 text-sm text-slate-600">{ROLE_LABELS[selectedRole].description}</p></div>
+      {loading ? <p className="p-6 text-center text-slate-500">جارٍ تحميل الأذونات...</p> : <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-right text-sm"><thead><tr className="border-b text-slate-600"><th className="p-3">الوحدة</th>{actions.map((action) => <th key={action.id} className="p-3 text-center">{action.label}</th>)}</tr></thead><tbody>{modules.map((module) => <tr key={module.id} className="border-b last:border-0"><th className="p-3 font-semibold text-slate-800">{module.label}</th>{actions.map((action) => { const granted = hasGrant(selectedRole,module.id,action.id); return <td key={action.id} className="p-3 text-center"><button aria-label={`${granted ? 'إلغاء' : 'منح'} ${action.label}: ${module.label}`} aria-pressed={granted} disabled={!isAdmin || selectedRole === 'admin'} onClick={() => toggle(module.id,action.id)} className={`inline-flex h-9 w-9 items-center justify-center rounded-xl disabled:cursor-not-allowed ${granted ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-400'}`}>{granted ? <Check className="h-4 w-4"/> : <X className="h-4 w-4"/>}</button></td>; })}</tr>)}</tbody></table></div>}
+    </section>
+  </div>;
 };
