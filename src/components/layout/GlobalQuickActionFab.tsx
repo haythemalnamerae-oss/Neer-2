@@ -1,13 +1,7 @@
 import React, { useState } from 'react';
-import {
-  Plus,
-  CheckSquare,
-  Receipt,
-  Target,
-  FileCheck2,
-  ShieldAlert,
-} from 'lucide-react';
+import { Plus, CheckSquare, Receipt, Target, FileCheck2, ShieldAlert, X } from 'lucide-react';
 import { dataStore } from '../../lib/storage';
+import { hasPermission } from '../../lib/rbac/permissions';
 
 interface GlobalQuickActionFabProps {
   onOpenNewTask: () => void;
@@ -15,109 +9,31 @@ interface GlobalQuickActionFabProps {
   onSelectView: (view: string) => void;
 }
 
-export const GlobalQuickActionFab: React.FC<GlobalQuickActionFabProps> = ({
-  onOpenNewTask,
-  onOpenNewExpense,
-  onSelectView,
-}) => {
+export const GlobalQuickActionFab: React.FC<GlobalQuickActionFabProps> = ({ onOpenNewTask, onOpenNewExpense, onSelectView }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const currentUser = dataStore.getCurrentUser();
+  const user = dataStore.getCurrentUser();
+  const actions = [
+    { key: 'task-create', label: 'مهمة ميدانية جديدة', icon: CheckSquare, allowed: hasPermission(user.role, 'tasks', 'create'), run: onOpenNewTask },
+    { key: 'expense-create', label: 'تسجيل فاتورة ومصروف', icon: Receipt, allowed: hasPermission(user.role, 'expenses', 'create'), run: onOpenNewExpense },
+    { key: 'daily', label: 'مركز القيادة اليومي', icon: Target, allowed: hasPermission(user.role, 'dashboard', 'view'), run: () => onSelectView('daily') },
+    { key: 'approvals', label: 'مركز الاعتمادات', icon: FileCheck2, allowed: hasPermission(user.role, 'tasks', 'approve'), run: () => onSelectView('approvals') },
+    { key: 'sos', label: 'نداء استغاثة (SOS)', icon: ShieldAlert, allowed: true, run: () => {
+      const reason = window.prompt('سبب طلب الدعم الميداني الطارئ:', 'عطل طارئ / بحاجة لمساندة فورية');
+      if (reason) dataStore.addNotification({ title: 'نداء استغاثة طارئ (SOS)', message: `أرسل ${user.name} طلب مساعدة عاجل: ${reason}`, type: 'alert', targetView: 'daily' });
+    } },
+  ].filter((item) => item.allowed);
 
-  const handleSos = () => {
-    setIsOpen(false);
-    const reason = window.prompt('سبب طلب الدعم الميداني الطارئ (SOS):', 'عطل طارئ / بحاجة لمساندة فورية');
-    if (reason) {
-      dataStore.addNotification({
-        title: 'نداء استغاثة طارئ (SOS)',
-        message: `أرسل ${currentUser.name} طلب مساعدة عاجل: ${reason}`,
-        type: 'alert',
-        targetView: 'daily',
-      });
-      alert('تم إرسال إشعار استغاثة عاجل لكافة المشرفين والمدراء.');
-    }
-  };
-
-  return (
-    <div className="fixed bottom-22 left-4 sm:bottom-6 sm:left-6 z-40 flex flex-col items-start select-none">
-      {/* Expanded Menu Actions */}
-      {isOpen && (
-        <div className="mb-3.5 flex flex-col items-start gap-2.5 animate-in fade-in slide-in-from-bottom-3 duration-150">
-          <button
-            onClick={() => {
-              setIsOpen(false);
-              onOpenNewTask();
-            }}
-            className="flex items-center gap-3 px-4.5 py-3 rounded-2xl neu-raised hover:neu-inset text-[#162A1D] text-xs sm:text-sm font-bold transition cursor-pointer min-h-[48px]"
-          >
-            <div className="w-8 h-8 rounded-xl neu-inset-sm text-[#245236] flex items-center justify-center shrink-0">
-              <CheckSquare className="w-5 h-5 stroke-[2.2]" />
-            </div>
-            <span>مهمة ميدانية جديدة</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setIsOpen(false);
-              onOpenNewExpense();
-            }}
-            className="flex items-center gap-3 px-4.5 py-3 rounded-2xl neu-raised hover:neu-inset text-[#162A1D] text-xs sm:text-sm font-bold transition cursor-pointer min-h-[48px]"
-          >
-            <div className="w-8 h-8 rounded-xl neu-inset-sm text-[#245236] flex items-center justify-center shrink-0">
-              <Receipt className="w-5 h-5 stroke-[2.2]" />
-            </div>
-            <span>تسجيل فاتورة ومصروف</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setIsOpen(false);
-              onSelectView('daily');
-            }}
-            className="flex items-center gap-3 px-4.5 py-3 rounded-2xl neu-raised hover:neu-inset text-[#162A1D] text-xs sm:text-sm font-bold transition cursor-pointer min-h-[48px]"
-          >
-            <div className="w-8 h-8 rounded-xl neu-inset-sm text-[#315671] flex items-center justify-center shrink-0">
-              <Target className="w-5 h-5 stroke-[2.2]" />
-            </div>
-            <span>مركز القيادة اليومي</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setIsOpen(false);
-              onSelectView('approvals');
-            }}
-            className="flex items-center gap-3 px-4.5 py-3 rounded-2xl neu-raised hover:neu-inset text-[#162A1D] text-xs sm:text-sm font-bold transition cursor-pointer min-h-[48px]"
-          >
-            <div className="w-8 h-8 rounded-xl neu-inset-sm text-[#87541B] flex items-center justify-center shrink-0">
-              <FileCheck2 className="w-5 h-5 stroke-[2.2]" />
-            </div>
-            <span>مركز الاعتمادات</span>
-          </button>
-
-          <button
-            onClick={handleSos}
-            className="flex items-center gap-3 px-4.5 py-3 rounded-2xl neu-raised text-[#9E392E] hover:neu-inset text-xs sm:text-sm font-bold transition cursor-pointer ring-1 ring-[#9E392E]/30 min-h-[48px]"
-          >
-            <div className="w-8 h-8 rounded-xl neu-inset-sm text-[#9E392E] flex items-center justify-center shrink-0">
-              <ShieldAlert className="w-5 h-5 stroke-[2.2]" />
-            </div>
-            <span>نداء استغاثة (SOS)</span>
-          </button>
-        </div>
-      )}
-
-      {/* Main Floating Trigger Button with Prominent Size */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl sm:rounded-3xl neu-button flex items-center justify-center transition-all cursor-pointer ${
-          isOpen
-            ? 'neu-inset text-[#162B1E] rotate-45'
-            : 'text-[#285539] hover:scale-105 active:scale-95'
-        }`}
-        title="إجراءات سريعة"
-      >
-        <Plus className="w-7 h-7 sm:w-8 sm:h-8 stroke-[2.5]" />
-      </button>
-    </div>
-  );
+  return <div className="fixed bottom-[calc(6.5rem+env(safe-area-inset-bottom))] left-4 z-20 flex flex-col items-start sm:bottom-6 sm:left-6" onKeyDown={(event) => { if (event.key === 'Escape') setIsOpen(false); }}>
+    {isOpen && <>
+      <button aria-label="إغلاق قائمة الإجراءات" className="fixed inset-0 z-0 bg-slate-950/20 lg:hidden" onClick={() => setIsOpen(false)} />
+      <div className="relative z-10 mb-3 flex max-w-[calc(100vw-2rem)] flex-col items-start gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+        {actions.map(({ key, label, icon: Icon, run }) => <button key={key} onClick={() => { setIsOpen(false); run(); }} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-sm font-semibold text-slate-800 hover:bg-slate-50">
+          <Icon className="h-5 w-5 shrink-0 text-emerald-800"/><span>{label}</span>
+        </button>)}
+      </div>
+    </>}
+    <button aria-label={isOpen ? 'إغلاق الإجراءات السريعة' : 'فتح الإجراءات السريعة'} aria-expanded={isOpen} onClick={() => setIsOpen(!isOpen)} className="relative z-10 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-800 text-white shadow-lg transition hover:bg-emerald-900 sm:h-14 sm:w-14">
+      {isOpen ? <X className="h-5 w-5"/> : <Plus className="h-6 w-6"/>}
+    </button>
+  </div>;
 };

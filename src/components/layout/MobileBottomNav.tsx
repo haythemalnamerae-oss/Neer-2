@@ -1,73 +1,37 @@
 import React from 'react';
-import {
-  Target,
-  LayoutDashboard,
-  Wallet,
-  CheckSquare,
-  Settings,
-} from 'lucide-react';
+import { LayoutDashboard, Wallet, CheckSquare, Menu } from 'lucide-react';
+import { hasPermission } from '../../lib/rbac/permissions';
+import { dataStore } from '../../lib/storage';
 
 interface MobileBottomNavProps {
   currentView: string;
   onSelectView: (view: string) => void;
+  onOpenMore: () => void;
 }
 
-export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
-  currentView,
-  onSelectView,
-}) => {
+export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, onSelectView, onOpenMore }) => {
+  const user = dataStore.getCurrentUser();
   const navItems = [
-    {
-      id: 'daily',
-      label: 'الرئيسية',
-      icon: Target,
-    },
-    {
-      id: 'dashboard',
-      label: 'المؤشرات',
-      icon: LayoutDashboard,
-    },
-    {
-      id: 'funds',
-      label: 'العهد',
-      icon: Wallet,
-    },
-    {
-      id: 'tasks',
-      label: 'المهام',
-      icon: CheckSquare,
-    },
-    {
-      id: 'settings',
-      label: 'الإعدادات',
-      icon: Settings,
-    },
-  ];
+    { id: 'daily', label: 'الرئيسية', icon: LayoutDashboard, module: 'dashboard' },
+    { id: 'tasks', label: 'المهام', icon: CheckSquare, module: 'tasks' },
+    { id: 'funds', label: 'العهد', icon: Wallet, module: 'funds' },
+  ].filter((item) => hasPermission(user.role, item.module, 'view'));
+  const moreViews = ['approvals','dashboard','followUps','expenses','settlements','calendar','reports','team','users','roles','audit','settings','codeViewer'];
+  const moreSelected = moreViews.includes(currentView);
 
   return (
-    <nav className="fixed bottom-3 inset-x-3 z-30 lg:hidden select-none">
-      <div className="neu-raised-lg rounded-3xl p-2 flex items-center justify-around gap-1">
+    <nav aria-label="التنقل الرئيسي" className="fixed inset-x-0 bottom-0 z-30 px-3 pt-2 pb-[calc(.5rem+env(safe-area-inset-bottom))] lg:hidden">
+      <div className="mx-auto flex max-w-lg items-stretch gap-1 rounded-2xl border border-slate-200/90 bg-white/95 p-1.5 shadow-[0_6px_24px_rgba(20,40,26,.12)] backdrop-blur-md">
         {navItems.map((item) => {
-          const isSelected = currentView === item.id;
           const Icon = item.icon;
-
-          return (
-            <button
-              key={item.id}
-              onClick={() => onSelectView(item.id)}
-              className={`flex-1 flex flex-col items-center justify-center py-2 px-1 rounded-2xl transition-all cursor-pointer min-h-[52px] ${
-                isSelected
-                  ? 'neu-inset text-[#152D1F] font-black'
-                  : 'text-[#486856] hover:neu-raised-sm active:neu-inset'
-              }`}
-            >
-              <Icon className={`w-6 h-6 stroke-[2.2] transition-transform ${isSelected ? 'scale-110 text-[#255237]' : ''}`} />
-              <span className={`text-[11px] mt-1 font-bold ${isSelected ? 'text-[#152D1F]' : 'text-[#486856]'}`}>
-                {item.label}
-              </span>
-            </button>
-          );
+          const active = currentView === item.id;
+          return <button key={item.id} aria-current={active ? 'page' : undefined} onClick={() => onSelectView(item.id)} className={`flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl text-[11px] font-semibold ${active ? 'bg-emerald-50 text-emerald-900' : 'text-slate-600'}`}>
+            <Icon className="h-5 w-5" aria-hidden="true"/><span>{item.label}</span>
+          </button>;
         })}
+        <button aria-current={moreSelected ? 'page' : undefined} onClick={onOpenMore} className={`flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl text-[11px] font-semibold ${moreSelected ? 'bg-emerald-50 text-emerald-900' : 'text-slate-600'}`}>
+          <Menu className="h-5 w-5" aria-hidden="true"/><span>المزيد</span>
+        </button>
       </div>
     </nav>
   );
