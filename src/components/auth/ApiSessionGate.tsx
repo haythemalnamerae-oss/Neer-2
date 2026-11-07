@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { clearSession, getSession, loadUiSnapshot, signIn, type ApiSession } from '../../lib/api/session';
+import { clearSession, getSession, hasSupabaseConfig, loadUiSnapshot, signIn, type ApiSession } from '../../lib/api/session';
 
 const inputClass = 'w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100';
 
@@ -12,6 +12,7 @@ export const ApiSessionGate: React.FC<{ children: React.ReactNode }> = ({ childr
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (!hasSupabaseConfig) { setReady(true); return; }
     if (!session) { setReady(true); return; }
     loadUiSnapshot(session)
       .then(() => setReady(true))
@@ -35,6 +36,7 @@ export const ApiSessionGate: React.FC<{ children: React.ReactNode }> = ({ childr
     } finally { setBusy(false); }
   };
 
+  if (!hasSupabaseConfig) return <>{children}</>;
   if (session && ready && !error) return <>{children}</>;
 
   return (
