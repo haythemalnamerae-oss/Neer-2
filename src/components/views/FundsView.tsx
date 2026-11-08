@@ -14,7 +14,7 @@ import {
   Phone,
   Store,
 } from 'lucide-react';
-import { PettyCashFund, StandingAccount, CashReceipt, Expense } from '../../types/domain';
+import { PettyCashFund } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
 import { hasPermission } from '../../lib/rbac/permissions';
 import { formatCurrency } from '../../lib/utils/format';
@@ -209,7 +209,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
         </div>
 
         <div className="inner-white-card p-5 space-y-1">
-          <span className="text-xs font-semibold text-slate-500 block">المقبوضات في الصندوق</span>
+          <span className="text-xs font-semibold text-slate-500 block">إجمالي المقبوضات المسجلة</span>
           <span className="text-2xl font-black text-sky-800 block font-sans-inter dir-ltr">
             {formatCurrency(totalReceipts)}
           </span>
@@ -327,7 +327,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
                 </div>
 
                 {/* Info Grid Inset Card */}
-                <div className="grid grid-cols-2 gap-3 p-4 neu-inset rounded-2xl text-xs text-[#3C5747]">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 neu-inset rounded-2xl text-xs text-[#3C5747]">
                   <div>
                     <span className="text-[#648071] block text-[11px] font-semibold">أمين العهدة المسؤول</span>
                     <strong className="text-[#192E21]">{fund.holderName}</strong>
@@ -337,6 +337,11 @@ export const FundsView: React.FC<FundsViewProps> = ({
                     <span className="text-[#648071] block text-[11px] font-semibold">آخر تغذية رصيد</span>
                     <strong className="text-[#192E21] font-mono">{fund.lastReplenishedDate}</strong>
                     <span className="text-[10px] text-[#648071] block">حد التنبيه: {fund.warningThreshold}%</span>
+                  </div>
+                  <div>
+                    <span className="text-[#648071] block text-[11px] font-semibold">رصيد الصندوق النقدي</span>
+                    <strong className="text-[#192E21] font-mono">{formatCurrency(fund.cashBoxBalance || 0, fund.currency)}</strong>
+                    <span className="text-[10px] text-[#648071] block">متاح لتغطية العجز المسجل</span>
                   </div>
                 </div>
 
