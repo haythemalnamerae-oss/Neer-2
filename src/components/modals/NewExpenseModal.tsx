@@ -100,6 +100,13 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
     }
   }, [effectiveTaskId, initialFundId, isOpen, currentUser.id]);
 
+  useEffect(() => {
+    if (!taskId) return;
+    const linkedAccountId = dataStore.getTasks().find((task) => task.id === taskId)?.standingAccountId;
+    const linkedAccount = dataStore.getStandingAccounts().find((account) => account.id === linkedAccountId && account.active !== false && (account.direction === 'payable' || account.direction === 'payable_by_us'));
+    if (linkedAccount) setSelectedStandingAccId(linkedAccount.id);
+  }, [taskId]);
+
   const numAmount = parseFloat(amount) || 0;
   const taxAmount = Number((numAmount * (settings.taxRate / 100)).toFixed(2));
   const totalWithTax = Number((numAmount + taxAmount).toFixed(2));
@@ -258,7 +265,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
                 type="button"
                 onClick={() => handleSelectStandingAccount(acc.id)}
                 className={`text-xs px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                  selectedStandingAccId === acc.id
+                  (selectedStandingAccId === acc.id || (!selectedStandingAccId && selectedStandingAccount?.id === acc.id))
                     ? 'neu-inset text-emerald-800 bg-[#EAF0EC] font-black'
                     : 'neu-raised text-slate-700 hover:text-slate-900'
                 }`}
