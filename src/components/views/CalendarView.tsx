@@ -64,7 +64,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onSelectTask, onOpen
 
   const selectedDayTasks = tasks.filter((task) => task.dueDate?.slice(0, 10) === selectedDate);
   const moveMonth = (offset: number) => {
-    setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1));
+    const nextMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + offset, 1);
+    setVisibleMonth(nextMonth);
+    setSelectedDate(toDateKey(nextMonth));
   };
 
   const handleDragOver = (event: React.DragEvent) => {
