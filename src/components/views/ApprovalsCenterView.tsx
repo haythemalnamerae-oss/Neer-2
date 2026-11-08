@@ -35,7 +35,10 @@ export const ApprovalsCenterView: React.FC<ApprovalsCenterViewProps> = ({ onSele
   const totalPending = pendingExpenses.length + pendingTasks.length + pendingSettlements.length;
 
   const handleApproveExpense = (id: string) => {
-    try { dataStore.updateExpenseStatus(id, 'approved'); }
+    const expense = expenses.find((item) => item.id === id);
+    const notes = expense?.specialAuditRequired ? window.prompt('هذا المصروف تجاوز حد الصرف الفردي. أدخل ملاحظة التدقيق قبل الاعتماد:') : undefined;
+    if (expense?.specialAuditRequired && !notes?.trim()) return;
+    try { dataStore.updateExpenseStatus(id, 'approved', notes?.trim()); }
     catch (error) { alert(error instanceof Error ? error.message : 'تعذر اعتماد الفاتورة.'); }
   };
 
@@ -138,9 +141,8 @@ export const ApprovalsCenterView: React.FC<ApprovalsCenterViewProps> = ({ onSele
               {pendingExpenses.map((exp) => (
                 <div key={exp.id} className="neu-raised rounded-3xl p-5 sm:p-6 space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs font-bold text-[#1E4B33] neu-inset-sm px-3 py-1 rounded-full">
-                      {exp.code}
-                    </span>
+                    <span className="font-mono text-xs font-bold text-[#1E4B33] neu-inset-sm px-3 py-1 rounded-full">{exp.code}</span>
+                    {exp.specialAuditRequired && <Badge variant="danger" size="sm">تدقيق خاص</Badge>}
                     <span className="text-base font-black text-[#142B1D] font-mono dir-ltr">
                       {formatCurrency(exp.totalWithTax, settings.currency)}
                     </span>
