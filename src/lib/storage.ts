@@ -657,11 +657,13 @@ export class OpsDataStore {
 
   public addStandingAccountCharge(id: string, amount: number, date: string, description: string, reference?: string): StandingAccount {
     const user = this.getCurrentUser();
-    if (!hasPermission(user.role, 'funds', 'edit')) throw new Error('إضافة حركة على حساب مورد تتطلب صلاحية إدارة مالية.');
+    if (!hasPermission(user.role, 'funds', 'edit') || !hasPermission(user.role, 'expenses', 'approve')) throw new Error('إضافة فاتورة معتمدة على حساب مورد تتطلب صلاحية إدارة مالية واعتماد المصروفات.');
     if (!Number.isFinite(amount) || amount <= 0) throw new Error('مبلغ الحركة غير صالح.');
     if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || !description.trim()) throw new Error('تاريخ الحركة وبيانها مطلوبان.');
     const account = this.standingAccounts.find((item) => item.id === id);
     if (!account || account.active === false) throw new Error('الحساب غير موجود أو موقوف.');
+    const normalizedReference = reference?.trim().toLowerCase();
+    if (normalizedReference && (account.entries || []).some((entry) => entry.reference?.trim().toLowerCase() === normalizedReference)) throw new Error('رقم الفاتورة أو المرجع مسجل مسبقاً في دفتر هذا الحساب.');
     const updated = this.appendStandingAccountEntry(id, {
       type: 'charge', amount, date, description: description.trim(),
       reference: reference?.trim() || undefined,
@@ -744,6 +746,13 @@ export class OpsDataStore {
       ? this.standingAccounts.find((item) => item.id === targetExpense.standingAccountId)
       : undefined;
     if (status === 'approved' && targetExpense.standingAccountId && (!linkedAccountForApproval || linkedAccountForApproval.active === false)) throw new Error('حساب المورد المرتبط غير موجود أو موقوف؛ لا يمكن اعتماد المصروف.');
+    const existingAccountInvoice = linkedAccountForApproval
+      ? (linkedAccountForApproval.entries || []).find((entry) =>
+          entry.expenseId === targetExpense.id ||
+          (Boolean(targetExpense.invoiceNumber?.trim()) && entry.reference?.trim().toLowerCase() === targetExpense.invoiceNumber.trim().toLowerCase()))
+      : undefined;
+    if (existingAccountInvoice?.expenseId && existingAccountInvoice.expenseId !== targetExpense.id) throw new Error('الفاتورة مرتبطة مسبقاً بمصروف آخر في دفتر المورد.');
+    if (existingAccountInvoice && Math.abs(existingAccountInvoice.amount - targetExpense.totalWithTax) > 0.01) throw new Error('قيمة الفاتورة في دفتر المورد لا تطابق إجمالي المصروف؛ راجع الفاتورة قبل الاعتماد.');
     this.expenses = this.expenses.map((expense) => expense.id === expenseId ? {
       ...expense,
       status,
@@ -756,7 +765,13 @@ export class OpsDataStore {
 
     if (status === 'approved' && targetExpense.standingAccountId) {
       const account = linkedAccountForApproval!;
-      if (!(account.entries || []).some((entry) => entry.expenseId === targetExpense.id)) {
+      if (existingAccountInvoice && !existingAccountInvoice.expenseId) {
+        this.standingAccounts = this.standingAccounts.map((item) => item.id === account.id ? {
+          ...item,
+          entries: (item.entries || []).map((entry) => entry.id === existingAccountInvoice.id ? { ...entry, expenseId: targetExpense.id } : entry),
+        } : item);
+        safeSet(STORAGE_KEYS.STANDING_ACCOUNTS, this.standingAccounts);
+      } else if (!existingAccountInvoice) {
         this.appendStandingAccountEntry(account.id, {
           type: 'charge', amount: targetExpense.totalWithTax,
           date: targetExpense.expenseDate || new Date().toISOString().slice(0, 10),
