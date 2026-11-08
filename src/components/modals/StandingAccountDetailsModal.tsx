@@ -31,6 +31,7 @@ export const StandingAccountDetailsModal: React.FC<StandingAccountDetailsModalPr
   const isPayable = current.direction === 'payable' || current.direction === 'payable_by_us';
   const funds = dataStore.getFunds().filter((fund) => fund.currency === currency);
   const linkedExpenses = dataStore.getExpenses();
+  const linkedTasks = dataStore.getTasks().filter((task) => task.standingAccountId === current.id);
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -61,6 +62,12 @@ export const StandingAccountDetailsModal: React.FC<StandingAccountDetailsModalPr
   return (
     <Modal isOpen={Boolean(account)} onClose={onClose} title={current.name} description={`دفتر حركة الحساب • ${current.code || current.id}`} maxWidth="2xl">
       <div className="space-y-5" key={version}>
+        <div className="neu-inset-sm rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          <div><span className="text-slate-500 block">المورد / صاحب المحل</span><strong className="text-slate-800">{current.vendorName || current.name}</strong></div>
+          <div><span className="text-slate-500 block">رقم التواصل</span><strong className="text-slate-800">{current.contactPhone || 'غير مسجل'}</strong></div>
+          <div className="sm:col-span-2"><span className="text-slate-500 block">عنوان المورد / موقع الزيارة</span><strong className="text-slate-800">{current.address || 'غير مسجل'}</strong></div>
+          {current.notes && <div className="sm:col-span-2"><span className="text-slate-500 block">شروط التعامل وملاحظات</span><p className="text-slate-700">{current.notes}</p></div>}
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="neu-inset-sm rounded-2xl p-3">
             <span className="text-xs text-slate-500 block">الرصيد الافتتاحي</span>
@@ -148,6 +155,20 @@ export const StandingAccountDetailsModal: React.FC<StandingAccountDetailsModalPr
                   })()}
                 </tbody>
               </table>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <h4 className="font-black text-sm text-slate-800">الزيارات والمهام المرتبطة بهذا المورد ({linkedTasks.length})</h4>
+          {linkedTasks.length === 0 ? <p className="text-xs text-slate-500 neu-inset-sm rounded-xl p-4">لا توجد زيارات أو مهام مرتبطة بهذا الحساب بعد. عند إنشاء مهمة جديدة اختر هذا المورد لربطها به.</p> : (
+            <div className="space-y-2">
+              {linkedTasks.map((task) => (
+                <div key={task.id} className="neu-raised rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div><strong className="text-slate-800">{task.title}</strong><span className="block text-slate-500 mt-1">{task.assigneeName} {task.dueDate ? `• ${task.dueDate}` : ''}</span></div>
+                  <span className="px-2.5 py-1 rounded-lg neu-inset-sm text-slate-700">{task.status === 'completed' || task.status === 'approved' ? 'مكتملة' : task.status === 'in_progress' || task.status === 'started' ? 'قيد التنفيذ' : task.status === 'cancelled' ? 'ملغاة' : 'مفتوحة'}</span>
+                </div>
+              ))}
             </div>
           )}
         </div>
