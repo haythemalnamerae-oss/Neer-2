@@ -93,7 +93,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     ? dataStore.getExpenses().filter((item) => item.status === 'pending_approval').length
     : 0;
   const pendingSettlements = canReviewSettlements
-    ? dataStore.getSettlements().filter((item) => item.status === 'under_review' || item.status === 'draft').length
+    ? dataStore.getSettlements().filter((item) => item.status === 'under_review' || item.status === 'audited').length
     : 0;
   const funds = dataStore.getFunds();
   const warningFunds = funds.filter(
