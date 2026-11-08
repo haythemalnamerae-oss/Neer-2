@@ -13,21 +13,27 @@ import {
   Trash2,
 } from 'lucide-react';
 import { dataStore } from '../../lib/storage';
+import { hasPermission } from '../../lib/rbac/permissions';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { NewStandingAccountModal } from '../modals/NewStandingAccountModal';
 
 export const SettingsView: React.FC = () => {
-  const [companyName, setCompanyName] = useState('شركة الرؤية للخدمات والعمليات الميدانية ش.ذ.م.م');
-  const [taxNumber, setTaxNumber] = useState('100234567800003');
-  const [defaultCurrency, setDefaultCurrency] = useState('AED');
-  const [vatRate, setVatRate] = useState('5');
-  const [warningThreshold, setWarningThreshold] = useState('25');
-  const [autoNotify, setAutoNotify] = useState(true);
-  const [autoCaptureLocation, setAutoCaptureLocation] = useState(
-    dataStore.getSettings().autoCaptureLocationWithoutApproval
-  );
+  const initialSettings = dataStore.getSettings();
+  const currentUser = dataStore.getCurrentUser();
+  const canEditSettings = hasPermission(currentUser.role, 'settings', 'edit');
+  const [companyName, setCompanyName] = useState(initialSettings.organizationName);
+  const [taxNumber, setTaxNumber] = useState(initialSettings.taxRegistrationNumber);
+  const [headquarters, setHeadquarters] = useState(initialSettings.headquarters);
+  const [defaultCurrency, setDefaultCurrency] = useState(initialSettings.currency);
+  const [vatRate, setVatRate] = useState(String(initialSettings.taxRate));
+  const [warningThreshold, setWarningThreshold] = useState(String(initialSettings.fundWarningThresholdPercent));
+  const [singleExpenseLimit, setSingleExpenseLimit] = useState(String(initialSettings.singleExpenseLimit));
+  const [autoNotify, setAutoNotify] = useState(initialSettings.autoNotifyOnLowBalance);
+  const [requireReceipt, setRequireReceipt] = useState(initialSettings.requireReceiptForExpense);
+  const [requireDualApproval, setRequireDualApproval] = useState(initialSettings.requireDualApprovalForSettlements);
+  const [autoCaptureLocation, setAutoCaptureLocation] = useState(initialSettings.autoCaptureLocationWithoutApproval);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [accountsVersion, setAccountsVersion] = useState(0);
@@ -35,7 +41,24 @@ export const SettingsView: React.FC = () => {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    dataStore.updateSettings({ autoCaptureLocationWithoutApproval: autoCaptureLocation });
+    const tax = Number(vatRate);
+    const threshold = Number(warningThreshold);
+    const expenseLimit = Number(singleExpenseLimit);
+    if (!companyName.trim() || !taxNumber.trim() || !Number.isFinite(tax) || tax < 0 || tax > 100 || !Number.isFinite(threshold) || threshold < 0 || threshold > 100 || !Number.isFinite(expenseLimit) || expenseLimit < 0) {
+      alert('تحقق من اسم المنشأة والرقم الضريبي ونسب الضريبة والإنذار وحد الصرف.');
+      return;
+    }
+    try {
+      dataStore.updateSettings({
+        organizationName: companyName.trim(), taxRegistrationNumber: taxNumber.trim(), headquarters: headquarters.trim(),
+        currency: defaultCurrency, taxRate: tax, fundWarningThresholdPercent: threshold, singleExpenseLimit: expenseLimit,
+        autoNotifyOnLowBalance: autoNotify, requireReceiptForExpense: requireReceipt,
+        requireDualApprovalForSettlements: requireDualApproval, autoCaptureLocationWithoutApproval: autoCaptureLocation,
+      });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'تعذر حفظ الإعدادات.');
+      return;
+    }
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
   };
@@ -46,6 +69,8 @@ export const SettingsView: React.FC = () => {
       window.location.reload();
     }
   };
+
+  if (!canEditSettings) return <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">لا تملك صلاحية تعديل إعدادات النظام.</div>;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-150">
@@ -87,11 +112,12 @@ export const SettingsView: React.FC = () => {
               required
             />
             <Input
-              label="الرقم الضريبي (TRN - الهيئة الاتحادية للضرائب) *"
+              label="الرقم الضريبي / رقم التسجيل الضريبي *"
               value={taxNumber}
               onChange={(e) => setTaxNumber(e.target.value)}
               required
             />
+            <Input label="المقر / العنوان الرئيسي" value={headquarters} onChange={(e) => setHeadquarters(e.target.value)} />
           </div>
         </div>
 
@@ -134,6 +160,7 @@ export const SettingsView: React.FC = () => {
                 <option value="AED">درهم إماراتي (AED)</option>
                 <option value="SAR">ريال سعودي (SAR)</option>
                 <option value="USD">دولار أمريكي (USD)</option>
+                <option value="YER">ريال يمني (YER)</option>
               </select>
             </div>
 
@@ -147,9 +174,21 @@ export const SettingsView: React.FC = () => {
 
             <Input
               type="number"
+              min="0"
+              max="100"
+              step="1"
               label="حد الإنذار المبكر للعهد (% المتبقي)"
               value={warningThreshold}
               onChange={(e) => setWarningThreshold(e.target.value)}
+              required
+            />
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              label={`حد الصرف الفردي (${defaultCurrency})`}
+              value={singleExpenseLimit}
+              onChange={(e) => setSingleExpenseLimit(e.target.value)}
               required
             />
           </div>
@@ -189,6 +228,14 @@ export const SettingsView: React.FC = () => {
                   يتحكم بهذا الخيار مالك النظام أو المدير المخول فقط، ويُسجل التغيير في سجل التدقيق.
                 </span>
               </span>
+            </label>
+            <label className="flex items-start gap-3.5 p-3.5 rounded-2xl neu-inset-sm cursor-pointer">
+              <input type="checkbox" checked={requireReceipt} onChange={(e) => setRequireReceipt(e.target.checked)} className="w-5 h-5 rounded-md accent-[#345c47] mt-0.5 shrink-0" />
+              <span className="text-xs sm:text-sm font-bold text-slate-700">اشتراط توفر أصل الفاتورة الورقي قبل تسجيل المصروف</span>
+            </label>
+            <label className="flex items-start gap-3.5 p-3.5 rounded-2xl neu-inset-sm cursor-pointer">
+              <input type="checkbox" checked={requireDualApproval} onChange={(e) => setRequireDualApproval(e.target.checked)} className="w-5 h-5 rounded-md accent-[#345c47] mt-0.5 shrink-0" />
+              <span className="text-xs sm:text-sm font-bold text-slate-700">اشتراط مدقق أول ومعتمد نهائي مختلفين لإغلاق التسوية</span>
             </label>
 
             <div className="pt-4 border-t border-black/[0.04] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
