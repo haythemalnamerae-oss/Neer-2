@@ -71,6 +71,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
 
   // Map API Key retrieval
   const apiKey = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || '';
+  const systemSettings = dataStore.getSettings();
 
   // Calculate task coordinates
   const tasksWithCoords = useMemo(() => {
@@ -150,10 +151,28 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
     if (userLiveCoords) {
       dataStore.startTask(task.id, { lat: userLiveCoords.lat, lng: userLiveCoords.lng });
       alert(`تم بدء المهمة وتوثيق موقع التنفيذ الفعلي ووقته بالثانية والدقيقة بنجاح!`);
-    } else {
-      dataStore.startTask(task.id);
-      alert(`تم بدء المهمة وتوثيق وقت البدء الفعلي بنجاح!`);
+      return;
     }
+
+    if (!systemSettings.autoCaptureLocationWithoutApproval || !navigator.geolocation) {
+      dataStore.startTask(task.id);
+      alert('تم بدء المهمة وتوثيق وقت البدء. حفظ الموقع التلقائي غير مفعّل في سياسة المنشأة.');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const coords = { lat: position.coords.latitude, lng: position.coords.longitude };
+        dataStore.startTask(task.id, coords);
+        setUserLiveCoords({ ...coords, accuracy: Math.round(position.coords.accuracy) });
+        alert('تم بدء المهمة وحفظ موقع التنفيذ تلقائياً وفق سياسة المنشأة، دون طلب موافقة إضافية.');
+      },
+      () => {
+        dataStore.startTask(task.id);
+        alert('تم بدء المهمة، وتعذر تحديد الموقع حالياً.');
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+    );
   };
 
   const handlePauseTask = (task: Task) => {
@@ -296,7 +315,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
           <div className="inner-white-card p-3 overflow-hidden rounded-[26px]">
             <div className="relative w-full h-[540px] rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 shadow-inner">
               {apiKey ? (
-                <APIProvider apiKey={apiKey} libraries={['marker', 'places']}>
+                <APIProvider apiKey={apiKey} libraries={['marker']} reuseMaps>
                   <Map
                     mapId="DEMO_MAP_ID"
                     defaultCenter={DEFAULT_CENTER}

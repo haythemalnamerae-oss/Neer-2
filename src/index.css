@@ -10,16 +10,33 @@
     letter-spacing: 0;
   }
 
-  html, body {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    min-width: 320px;
+    min-height: 100%;
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+  }
+
+  body {
     margin: 0;
     padding: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    overflow-x: hidden;
     background-color: #E5EBE7;
     color: #17261f;
     font-family: 'Almarai', 'Tajawal', 'Readex Pro', -apple-system, BlinkMacSystemFont, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    min-height: 100vh;
     letter-spacing: 0;
+  }
+
+  button, input, textarea, select {
+    max-width: 100%;
   }
 }
 
@@ -152,4 +169,38 @@ tbody tr:last-child td {
 
 .mobile-content-safe {
   padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
+}
+
+@media (max-width: 639px) {
+  .mobile-content-safe {
+    padding-inline: 0.75rem;
+    padding-top: 1rem;
+  }
+
+  table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .fixed.inset-x-0.bottom-0 {
+    padding-inline: 0.5rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .mobile-content-safe {
+    padding-inline: 0.625rem;
+  }
+
+  .fixed.inset-x-0.bottom-0 > div {
+    gap: 0;
+    padding: 0.25rem;
+  }
+
+  .fixed.inset-x-0.bottom-0 button {
+    min-height: 3rem;
+    font-size: 0.625rem;
+  }
 }

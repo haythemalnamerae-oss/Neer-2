@@ -7,11 +7,16 @@ import {
   Database,
   RotateCcw,
   CheckCircle2,
+  Plus,
+  Store,
+  FileImage,
+  Trash2,
 } from 'lucide-react';
 import { dataStore } from '../../lib/storage';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
+import { NewStandingAccountModal } from '../modals/NewStandingAccountModal';
 
 export const SettingsView: React.FC = () => {
   const [companyName, setCompanyName] = useState('شركة الرؤية للخدمات والعمليات الميدانية ش.ذ.م.م');
@@ -20,10 +25,17 @@ export const SettingsView: React.FC = () => {
   const [vatRate, setVatRate] = useState('5');
   const [warningThreshold, setWarningThreshold] = useState('25');
   const [autoNotify, setAutoNotify] = useState(true);
+  const [autoCaptureLocation, setAutoCaptureLocation] = useState(
+    dataStore.getSettings().autoCaptureLocationWithoutApproval
+  );
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const [accountsVersion, setAccountsVersion] = useState(0);
+  const accounts = dataStore.getStandingAccounts();
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    dataStore.updateSettings({ autoCaptureLocationWithoutApproval: autoCaptureLocation });
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
   };
@@ -83,6 +95,26 @@ export const SettingsView: React.FC = () => {
           </div>
         </div>
 
+        {/* Standing accounts */}
+        <section key={accountsVersion} className="neu-raised-lg p-5 sm:p-6 rounded-3xl space-y-4" aria-labelledby="standing-accounts-title">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-black/[0.04]">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl neu-raised text-emerald-700 flex items-center justify-center"><Store className="w-5 h-5" /></div>
+              <div><h3 id="standing-accounts-title" className="text-sm sm:text-base font-extrabold text-slate-800">المنشآت والحسابات الثابتة</h3><p className="text-xs text-slate-500 mt-0.5">تظهر تلقائياً عند إنشاء المصروف أو المهمة</p></div>
+            </div>
+            <Button type="button" variant="primary" size="sm" onClick={() => setIsAccountModalOpen(true)} icon={<Plus className="w-4 h-4" />}>إضافة منشأة</Button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {accounts.map((account) => (
+              <div key={account.id} className="neu-inset-sm rounded-2xl p-3 flex items-center gap-3 min-w-0">
+                {account.imageUrl ? <img src={account.imageUrl} alt="" className="w-11 h-11 rounded-xl object-cover shrink-0" /> : <div className="w-11 h-11 rounded-xl neu-raised flex items-center justify-center shrink-0"><Store className="w-5 h-5 text-emerald-700" /></div>}
+                <div className="min-w-0 flex-1"><p className="font-extrabold text-xs text-slate-800 truncate">{account.name}</p><p className="text-[11px] text-slate-500 truncate">{account.vendorName || account.category}</p>{account.referenceImageUrl && <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-bold mt-1"><FileImage className="w-3 h-3" /> مستند مرجعي محفوظ</span>}</div>
+                <button type="button" aria-label={`حذف ${account.name}`} onClick={() => dataStore.deleteStandingAccount(account.id)} className="p-2 text-rose-600 rounded-xl neu-button"><Trash2 className="w-4 h-4" /></button>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* Financial Settings */}
         <div className="neu-raised-lg p-5 sm:p-6 rounded-3xl space-y-4">
           <div className="pb-3 border-b border-black/[0.04] flex items-center gap-2.5">
@@ -132,15 +164,30 @@ export const SettingsView: React.FC = () => {
             <h3 className="text-sm sm:text-base font-extrabold text-slate-800">التنبيهات التلقائية وصيانة النظام</h3>
           </div>
           <div className="space-y-4">
-            <label className="flex items-center gap-3.5 p-3.5 rounded-2xl neu-inset-sm cursor-pointer">
+            <label className="flex items-start gap-3.5 p-3.5 rounded-2xl neu-inset-sm cursor-pointer">
               <input
                 type="checkbox"
                 checked={autoNotify}
                 onChange={(e) => setAutoNotify(e.target.checked)}
-                className="w-5 h-5 rounded-md accent-[#345c47] cursor-pointer"
+                className="w-5 h-5 rounded-md accent-[#345c47] cursor-pointer mt-0.5 shrink-0"
               />
               <span className="text-xs sm:text-sm font-bold text-slate-700">
                 إرسال إشعارات فورية عند انخفاض رصيد أي عهدة نقدية تحت حد الإنذار المحدد
+              </span>
+            </label>
+
+            <label className="flex items-start gap-3.5 p-3.5 rounded-2xl neu-inset-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={autoCaptureLocation}
+                onChange={(e) => setAutoCaptureLocation(e.target.checked)}
+                className="w-5 h-5 rounded-md accent-[#345c47] cursor-pointer mt-0.5 shrink-0"
+              />
+              <span className="text-xs sm:text-sm font-bold text-slate-700">
+                حفظ موقع تنفيذ الخطوة تلقائياً عند بدء المهمة دون طلب موافقة الموظف
+                <span className="block text-[11px] font-normal text-slate-500 mt-1">
+                  يتحكم بهذا الخيار مالك النظام أو المدير المخول فقط، ويُسجل التغيير في سجل التدقيق.
+                </span>
               </span>
             </label>
 
@@ -169,6 +216,7 @@ export const SettingsView: React.FC = () => {
           </Button>
         </div>
       </form>
+      <NewStandingAccountModal isOpen={isAccountModalOpen} onClose={() => setIsAccountModalOpen(false)} onSuccess={() => { setIsAccountModalOpen(false); setAccountsVersion((version) => version + 1); }} />
     </div>
   );
 };

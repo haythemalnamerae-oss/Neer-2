@@ -55,6 +55,7 @@ export interface SystemSettings {
   fiscalYearStartMonth: number; // 1 = January
 
   // Field Operations
+  autoCaptureLocationWithoutApproval: boolean;
   defaultTaskDurationDays: number;
   requireFundForTaskExpenses: boolean;
   budgetOverrunTolerancePercent: number; // e.g. 10%
@@ -91,6 +92,7 @@ const DEFAULT_SETTINGS: SystemSettings = {
   requireInvoiceNumber: true,
   requireDualApprovalForSettlements: true,
   fiscalYearStartMonth: 1,
+  autoCaptureLocationWithoutApproval: true,
   defaultTaskDurationDays: 7,
   requireFundForTaskExpenses: true,
   budgetOverrunTolerancePercent: 10,

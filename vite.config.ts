@@ -28,7 +28,8 @@ export default defineConfig(() => ({
           { urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i, handler: 'CacheFirst', options: { cacheName: 'gstatic-fonts-cache', expiration: { maxEntries: 10, maxAgeSeconds: 31536000 }, cacheableResponse: { statuses: [0, 200] } } },
         ],
       },
-      devOptions: { enabled: true, type: 'module' },
+      // Service worker registration is generated during production builds; keeping it off in dev prevents stale generated-file errors.
+      devOptions: { enabled: false, type: 'module' },
     }),
   ],
   resolve: { alias: { '@': path.resolve(__dirname, '.') } },
