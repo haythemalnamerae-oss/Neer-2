@@ -613,7 +613,7 @@ export class OpsDataStore {
       createdBy: this.getCurrentUser().id,
       createdAt: new Date().toISOString(),
     };
-    const updated = { ...account, entries: [nextEntry, ...(account.entries || [])] };
+    const updated = { ...account, entries: [nextEntry, ...(account.entries || [])], updatedAt: new Date().toISOString() };
     this.standingAccounts = this.standingAccounts.map((item) => item.id === accountId ? updated : item);
     safeSet(STORAGE_KEYS.STANDING_ACCOUNTS, this.standingAccounts);
     return updated;
@@ -636,6 +636,7 @@ export class OpsDataStore {
       id: `std-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       code: acc.code || `STD-${String(this.standingAccounts.length + 1).padStart(4, '0')}`,
       active: acc.active !== undefined ? acc.active : true,
+      updatedAt: new Date().toISOString(),
     };
     this.standingAccounts = [newAcc, ...this.standingAccounts];
     safeSet(STORAGE_KEYS.STANDING_ACCOUNTS, this.standingAccounts);
@@ -652,7 +653,7 @@ export class OpsDataStore {
     if (hasFinancialHistory && updates.direction !== undefined && updates.direction !== target.direction) throw new Error('لا يمكن تغيير طبيعة حساب لنا/علينا بعد وجود حركات مالية؛ أنشئ حساباً جديداً للتصنيف الصحيح.');
     if (hasFinancialHistory && updates.currency !== undefined && updates.currency !== (target.currency || this.settings.currency)) throw new Error('لا يمكن تغيير عملة حساب له حركات مالية.');
     const { entries: _entries, currentBalance: _balance, openingBalance: _opening, totalInvoiced: _total, ...safeUpdates } = updates;
-    this.standingAccounts = this.standingAccounts.map((account) => account.id === id ? { ...account, ...safeUpdates } : account);
+    this.standingAccounts = this.standingAccounts.map((account) => account.id === id ? { ...account, ...safeUpdates, updatedAt: new Date().toISOString() } : account);
     safeSet(STORAGE_KEYS.STANDING_ACCOUNTS, this.standingAccounts);
     this.logAudit('تحديث بيانات حساب مورد', 'update', 'fund', id, 'تم تحديث البيانات التعريفية دون تعديل دفتر الحركة.');
     this.notify();
@@ -736,7 +737,7 @@ export class OpsDataStore {
     if (!hasPermission(this.getCurrentUser().role, 'funds', 'edit')) throw new Error('لا تملك صلاحية حذف الحسابات الدائمة.');
     const target = this.standingAccounts.find((account) => account.id === id);
     if (!target) throw new Error('الحساب غير موجود.');
-    this.standingAccounts = this.standingAccounts.map((account) => account.id === id ? { ...account, active: false } : account);
+    this.standingAccounts = this.standingAccounts.map((account) => account.id === id ? { ...account, active: false, updatedAt: new Date().toISOString() } : account);
     safeSet(STORAGE_KEYS.STANDING_ACCOUNTS, this.standingAccounts);
     this.logAudit('إيقاف حساب مورد', 'update', 'fund', id, `تم إيقاف الحساب ${target.name} دون حذف سجله.`);
     this.notify();
