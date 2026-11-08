@@ -315,8 +315,10 @@ export class OpsDataStore {
   ): Expense {
     if (!hasPermission(this.getCurrentUser().role, 'expenses', 'create')) throw new Error('لا تملك صلاحية تسجيل المصروفات.');
     if (!Number.isFinite(expenseData.amount) || expenseData.amount <= 0) throw new Error('مبلغ المصروف غير صالح.');
-    if (!expenseData.invoiceNumber?.trim() || !expenseData.vendorName?.trim() || !expenseData.description?.trim()) throw new Error('بيانات الفاتورة والمورد والبيان مطلوبة.');
-    const duplicateInvoice = this.expenses.some((expense) => expense.status !== 'rejected' && expense.invoiceNumber.trim().toLowerCase() === expenseData.invoiceNumber.trim().toLowerCase() && expense.vendorName.trim().toLowerCase() === expenseData.vendorName.trim().toLowerCase());
+    if (!expenseData.vendorName?.trim() || !expenseData.description?.trim()) throw new Error('بيانات المورد وبيان المصروف مطلوبة.');
+    if (this.settings.requireInvoiceNumber && !expenseData.invoiceNumber?.trim()) throw new Error('رقم الفاتورة مطلوب حسب سياسة المنشأة.');
+    if (this.settings.requireReceiptForExpense && !expenseData.hasReceipt) throw new Error('لا يمكن تسجيل المصروف قبل تأكيد توفر أصل الفاتورة الورقي.');
+    const duplicateInvoice = Boolean(expenseData.invoiceNumber?.trim()) && this.expenses.some((expense) => expense.status !== 'rejected' && expense.invoiceNumber.trim().toLowerCase() === expenseData.invoiceNumber.trim().toLowerCase() && expense.vendorName.trim().toLowerCase() === expenseData.vendorName.trim().toLowerCase());
     if (duplicateInvoice) throw new Error('رقم الفاتورة مسجل مسبقاً لهذا المورد. تحقق من الفواتير قبل إعادة الإدخال.');
     const taxRate = this.settings.taxRate / 100;
     const taxAmount = Number((expenseData.amount * taxRate).toFixed(2));
@@ -1844,7 +1846,8 @@ export class OpsDataStore {
 
   // --- Reset All Data ---
   public resetToDefault(): void {
-    localStorage.clear();
+    if (this.getCurrentUser().role !== 'admin') throw new Error('إعادة تهيئة البيانات متاحة لمدير النظام فقط.');
+    Object.values(STORAGE_KEYS).forEach((key) => localStorage.removeItem(key));
     this.users = INITIAL_USERS;
     this.currentUserId = 'usr-1';
     this.funds = INITIAL_FUNDS;
