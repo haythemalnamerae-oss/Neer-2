@@ -458,7 +458,7 @@ export class OpsDataStore {
   public coverDeficitExpenseFromCash(expenseId: string, coveredBy: string): void {
     if (!hasPermission(this.getCurrentUser().role, 'expenses', 'approve')) throw new Error('تغطية العجز تتطلب صلاحية الاعتماد المالي.');
     const expense = this.expenses.find((e) => e.id === expenseId);
-    if (!expense || !expense.isDeficit) return;
+    if (!expense || !expense.isDeficit || expense.status !== 'approved' || expense.isCoveredFromCash) throw new Error('لا يمكن تغطية العجز قبل اعتماد الفاتورة أو بعد تسويتها.');
     const fund = this.funds.find((item) => item.id === expense.fundId);
     const deficitAmount = expense.deficitAmount || 0;
     if (!fund || (fund.cashBoxBalance || 0) < deficitAmount) throw new Error('رصيد الصندوق النقدي لا يكفي لتغطية العجز. سجّل المقبوضات في الصندوق أولاً.');
