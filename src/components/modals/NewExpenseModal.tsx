@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { dataStore } from '../../lib/storage';
+import { hasPermission } from '../../lib/rbac/permissions';
 import { ExpenseCategory, StandingAccount } from '../../types/domain';
 import { formatCurrency, EXPENSE_CATEGORY_CONFIG } from '../../lib/utils/format';
 import { Modal } from '../ui/modal';
@@ -26,8 +27,12 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
 }) => {
   const currentUser = dataStore.getCurrentUser();
   const effectiveTaskId = initialTaskId || preselectedTaskId;
-  const funds = dataStore.getFunds();
-  const tasks = dataStore.getTasks();
+  const allFunds = dataStore.getFunds();
+  const funds = currentUser.role === 'field_officer' ? allFunds.filter((fund) => fund.holderId === currentUser.id) : allFunds;
+  const allTasks = dataStore.getTasks();
+  const tasks = currentUser.role === 'field_officer' ? allTasks.filter((task) => task.assigneeId === currentUser.id) : allTasks;
+  const canCreateExpense = hasPermission(currentUser.role, 'expenses', 'create');
+  const canApproveExpense = hasPermission(currentUser.role, 'expenses', 'approve');
   const settings = dataStore.getSettings();
   const standingAccounts = dataStore.getStandingAccounts();
   const expenses = dataStore.getExpenses();
@@ -42,7 +47,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
       'بقالة الحي ومستلزمات الموقع',
       'سوبرماركت المدينة',
       'شركة البرق للكهربائيات',
-      'محطة بترول أدنوك / الإمارات',
+      'محطة وقود',
       'كافتيريا واستراحة الموقع',
       'مؤسسة التوريدات المعتمدة',
     ].filter((v): v is string => Boolean(v && v.trim())))
@@ -67,7 +72,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [vendorName, setVendorName] = useState('');
   const [taskId, setTaskId] = useState(effectiveTaskId || '');
-  const [hasReceipt, setHasReceipt] = useState(true);
+  const [hasReceipt, setHasReceipt] = useState(false);
 
   // Blueprint: Standing Account & Cascade/Deficit States
   const [selectedStandingAccId, setSelectedStandingAccId] = useState('');
@@ -103,6 +108,8 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
 
   // Available secondary funds for cascade deduction
   const otherFunds = funds.filter((f) => f.id !== fundId);
+  const selectedSecondaryFund = otherFunds.find((fund) => fund.id === secondaryFundId);
+  const secondaryCanCover = Boolean(selectedSecondaryFund && selectedSecondaryFund.currentBalance >= shortageAmount);
 
   // Handle Standing Account Quick Selection
   const handleSelectStandingAccount = (accId: string) => {
@@ -130,6 +137,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canCreateExpense) { alert('لا تملك صلاحية تسجيل المصروفات.'); return; }
     if (!fundId || numAmount <= 0 || !description.trim() || !vendorName.trim() || !invoiceNumber.trim()) {
       alert('يرجى ملء جميع الحقول المطلوبة');
       return;
@@ -140,8 +148,8 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
       return;
     }
 
-    if (coverageMethod === 'cascade' && !secondaryFundId) {
-      alert('يرجى تحديد العهدة الثانية لتغطية المبلغ المتبقي.');
+    if (coverageMethod === 'cascade' && (!secondaryFundId || !secondaryCanCover)) {
+      alert('حدد عهدة بديلة برصيد كافٍ لتغطية الفرق.');
       return;
     }
 
@@ -157,12 +165,13 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
       invoiceNumber,
       vendorName,
       hasReceipt,
-      receiptUrl: hasReceipt ? 'https://images.unsplash.com/photo-1554415707-9e4c019d4536?w=500&auto=format&fit=crop&q=80' : undefined,
+      receiptUrl: undefined,
+      expenseDate: new Date().toISOString().split('T')[0],
       taskId: taskId || undefined,
       taskTitle: task?.title,
       cascadeDeduction: coverageMethod === 'cascade',
       secondaryFundId: coverageMethod === 'cascade' ? secondaryFundId : undefined,
-      allowDeficit: coverageMethod === 'deficit',
+      allowDeficit: coverageMethod === 'deficit' && canApproveExpense,
       standingAccountId: standingAcc?.id,
       standingAccountName: standingAcc?.name,
       standingDirection: standingAcc?.direction,
@@ -183,10 +192,10 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="تسجيل مصروف وفاتورة جديدة"
-      description="توثيق عملية الصرف من العهدة النقدية مع احتساب ضريبة القيمة المضافة 5% تلقائياً"
+      description={`توثيق المصروف من العهدة واحتساب الضريبة حسب إعداد المنشأة (${settings.taxRate}%)`}
       maxWidth="xl"
     >
-      <form onSubmit={handleSubmit} className="space-y-4.5 text-xs sm:text-sm">
+      {!canCreateExpense ? <div className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">لا تملك صلاحية تسجيل المصروفات.</div> : <form onSubmit={handleSubmit} className="space-y-4.5 text-xs sm:text-sm">
         {/* Quick Standing Accounts Selector */}
         <div className="space-y-2.5 p-4 neu-inset-sm rounded-2xl">
           <div className="flex items-center justify-between text-xs flex-wrap gap-2">
@@ -215,7 +224,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2 pt-1">
+          {hasPermission(currentUser.role, 'funds', 'edit') && <div className="flex flex-wrap gap-2 pt-1">
             {standingAccounts.map((acc) => (
               <button
                 key={acc.id}
@@ -233,7 +242,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
                 </span>
               </button>
             ))}
-          </div>
+          </div>}
         </div>
 
         {/* Fund Selection via SmartSelect */}
@@ -258,7 +267,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
             <Input
               type="number"
               step="0.01"
-              label="المبلغ الأساسي قبل الضريبة (AED) *"
+              label={`المبلغ الأساسي قبل الضريبة (${settings.currency}) *`}
               placeholder="0.00"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
@@ -347,7 +356,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
                 </label>
 
                 {/* Deficit Option */}
-                <label className={`flex items-start gap-3 p-3.5 rounded-2xl transition-all cursor-pointer ${coverageMethod === 'deficit' ? 'neu-inset' : 'neu-raised hover:bg-black/[0.01]'}`}>
+                {canApproveExpense && <label className={`flex items-start gap-3 p-3.5 rounded-2xl transition-all cursor-pointer ${coverageMethod === 'deficit' ? 'neu-inset' : 'neu-raised hover:bg-black/[0.01]'}`}>
                   <input
                     type="radio"
                     name="coverageMethod"
@@ -362,7 +371,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
                       السماح بالصرف للمهمة الميدانية وتسجيل عجز بقيمة ({formatCurrency(shortageAmount)}) كالتزام يظهر بالسالب لتتم تغطيته فور توريد نقد للصندوق.
                     </span>
                   </div>
-                </label>
+                </label>}
               </div>
             </div>
           )}
@@ -427,7 +436,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
               onChange={(e) => setHasReceipt(e.target.checked)}
               className="w-5 h-5 accent-[#345c47] rounded cursor-pointer"
             />
-            <span className="text-xs sm:text-sm font-bold text-slate-700">تم إرفاق صورة الفاتورة / الإيصال الأصلي</span>
+            <span className="text-xs sm:text-sm font-bold text-slate-700">أصل الفاتورة الورقي متوفر وتمت مراجعته (لا يعني رفع صورة إلكترونية)</span>
           </label>
         </div>
 
@@ -444,14 +453,14 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
             {coverageMethod === 'cascade' ? 'اعتماد الصرف المتسلسل' : coverageMethod === 'deficit' ? 'تسجيل مع إقرار العجز' : 'تسجيل المصروف'}
           </Button>
         </div>
-      </form>
+      </form>}
 
       {/* Routine / Standing Account Quick Add Modal */}
-      <NewStandingAccountModal
+      {hasPermission(currentUser.role, 'funds', 'edit') && <NewStandingAccountModal
         isOpen={isAddStandingModalOpen}
         onClose={() => setIsAddStandingModalOpen(false)}
         onSuccess={handleStandingAccountCreated}
-      />
+      />}
     </Modal>
   );
 };
