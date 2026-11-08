@@ -312,7 +312,7 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
           <SmartSelect
             label="المنشأة أو المورد المعتاد المرتبط بالمهمة"
             placeholder="ابحث باسم المنشأة أو المورد..."
-            options={[{ value: '', label: 'بدون منشأة ثابتة' }, ...standingAccounts.map((account) => ({ value: account.id, label: account.name, sublabel: account.vendorName || account.category }))]}
+            options={[{ value: '', label: 'بدون منشأة ثابتة' }, ...standingAccounts.filter((account) => account.active !== false).map((account) => ({ value: account.id, label: account.name, sublabel: [account.vendorName || account.category, account.address].filter(Boolean).join(' • ') }))]}
             value={standingAccountId}
             onChange={(value) => setStandingAccountId(value)}
             creatable={false}
