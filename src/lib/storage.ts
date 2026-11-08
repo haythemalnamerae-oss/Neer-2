@@ -21,6 +21,7 @@ import {
   SubTask,
   TaskDailyUpdate,
 } from '../types/domain';
+import { hasPermission } from './rbac/permissions';
 import { 
   INITIAL_USERS, 
   INITIAL_FUNDS, 
@@ -240,6 +241,8 @@ export class OpsDataStore {
   }
 
   public addFund(fund: Omit<PettyCashFund, 'id' | 'code' | 'spentBalance' | 'currentBalance' | 'status' | 'lastReplenishedDate'>): PettyCashFund {
+    if (!hasPermission(this.getCurrentUser().role, 'funds', 'create')) throw new Error('لا تملك صلاحية إنشاء عهدة.');
+    if (!Number.isFinite(fund.totalAllocation) || fund.totalAllocation <= 0) throw new Error('مبلغ تخصيص العهدة غير صالح.');
     const newFund: PettyCashFund = {
       ...fund,
       id: `fund-${Date.now()}`,
@@ -257,6 +260,8 @@ export class OpsDataStore {
   }
 
   public replenishFund(fundId: string, addedAmount: number, notes?: string): void {
+    if (!hasPermission(this.getCurrentUser().role, 'funds', 'edit')) throw new Error('لا تملك صلاحية تغذية العهد.');
+    if (!Number.isFinite(addedAmount) || addedAmount <= 0 || !this.funds.some((fund) => fund.id === fundId)) throw new Error('بيانات تغذية العهدة غير صالحة.');
     this.funds = this.funds.map((f) => {
       if (f.id === fundId) {
         const newBalance = f.currentBalance + addedAmount;
@@ -300,13 +305,16 @@ export class OpsDataStore {
       allowDeficit?: boolean;
     }
   ): Expense {
+    if (!hasPermission(this.getCurrentUser().role, 'expenses', 'create')) throw new Error('لا تملك صلاحية تسجيل المصروفات.');
+    if (!Number.isFinite(expenseData.amount) || expenseData.amount <= 0) throw new Error('مبلغ المصروف غير صالح.');
     const taxRate = this.settings.taxRate / 100;
     const taxAmount = Number((expenseData.amount * taxRate).toFixed(2));
     const totalWithTax = Number((expenseData.amount + taxAmount).toFixed(2));
     const currentUser = this.getCurrentUser();
 
     const primaryFund = this.funds.find((f) => f.id === expenseData.fundId);
-    const avail1 = primaryFund ? primaryFund.currentBalance : 0;
+    if (!primaryFund) throw new Error('العهدة المحددة غير موجودة.');
+    const avail1 = primaryFund.currentBalance;
 
     let cascadeSplit = expenseData.cascadeSplit;
     let isDeficit = expenseData.isDeficit || false;
@@ -315,7 +323,9 @@ export class OpsDataStore {
     // Check if cascade multi-fund deduction requested and primary fund balance is insufficient
     if (expenseData.cascadeDeduction && expenseData.secondaryFundId && totalWithTax > avail1) {
       const secondaryFund = this.funds.find((f) => f.id === expenseData.secondaryFundId);
+      if (!secondaryFund || secondaryFund.id === primaryFund.id) throw new Error('العهدة البديلة غير صالحة.');
       const neededFromSecondary = Number((totalWithTax - avail1).toFixed(2));
+      if (secondaryFund.currentBalance < neededFromSecondary) throw new Error('رصيد العهدة البديلة لا يكفي لتغطية الفرق.');
       cascadeSplit = {
         primaryFundId: primaryFund?.id || expenseData.fundId,
         primaryFundName: primaryFund?.name || 'العهدة الأولى',
@@ -350,6 +360,7 @@ export class OpsDataStore {
       });
       safeSet(STORAGE_KEYS.FUNDS, this.funds);
     } else if (expenseData.allowDeficit && totalWithTax > avail1) {
+      if (!hasPermission(currentUser.role, 'expenses', 'approve')) throw new Error('تسجيل العجز يتطلب صلاحية اعتماد مالية.');
       // Deficit scenario (Negative balance)
       isDeficit = true;
       deficitAmount = Number((totalWithTax - avail1).toFixed(2));
@@ -367,6 +378,7 @@ export class OpsDataStore {
       });
       safeSet(STORAGE_KEYS.FUNDS, this.funds);
     } else {
+      if (totalWithTax > avail1) throw new Error('رصيد العهدة غير كافٍ. اختر معالجة معتمدة قبل التسجيل.');
       // Normal single fund deduction
       this.funds = this.funds.map((f) => {
         if (f.id === expenseData.fundId) {
@@ -394,6 +406,7 @@ export class OpsDataStore {
       totalWithTax,
       status: 'pending_approval',
       submittedAt: new Date().toLocaleString('ar-AE'),
+      expenseDate: expenseData.expenseDate || new Date().toISOString().split('T')[0],
       submittedBy: currentUser.name,
       cascadeSplit,
       isDeficit,
@@ -430,6 +443,7 @@ export class OpsDataStore {
   }
 
   public coverDeficitExpenseFromCash(expenseId: string, coveredBy: string): void {
+    if (!hasPermission(this.getCurrentUser().role, 'expenses', 'approve')) throw new Error('تغطية العجز تتطلب صلاحية الاعتماد المالي.');
     const expense = this.expenses.find((e) => e.id === expenseId);
     if (!expense || !expense.isDeficit) return;
 
@@ -469,6 +483,9 @@ export class OpsDataStore {
   }
 
   public addCashReceipt(data: Omit<CashReceipt, 'id' | 'code' | 'createdAt'>): CashReceipt {
+    if (!hasPermission(this.getCurrentUser().role, 'funds', 'edit')) throw new Error('لا تملك صلاحية تسجيل المقبوضات.');
+    if (!Number.isFinite(data.amount) || data.amount <= 0) throw new Error('مبلغ المقبوض غير صالح.');
+    if (data.fundId && !this.funds.some((fund) => fund.id === data.fundId)) throw new Error('الصندوق المحدد غير موجود.');
     const newReceipt: CashReceipt = {
       ...data,
       id: `cr-${Date.now()}`,
@@ -511,6 +528,7 @@ export class OpsDataStore {
   }
 
   public addStandingAccount(acc: Omit<StandingAccount, 'id'>): StandingAccount {
+    if (!hasPermission(this.getCurrentUser().role, 'funds', 'edit')) throw new Error('لا تملك صلاحية إدارة الحسابات الدائمة.');
     const newAcc: StandingAccount = {
       ...acc,
       id: `std-${Date.now()}`,
@@ -525,6 +543,7 @@ export class OpsDataStore {
   }
 
   public updateStandingAccount(id: string, updates: Partial<StandingAccount>): void {
+    if (!hasPermission(this.getCurrentUser().role, 'funds', 'edit')) throw new Error('لا تملك صلاحية تعديل الحسابات الدائمة.');
     this.standingAccounts = this.standingAccounts.map((a) => {
       if (a.id === id) {
         return { ...a, ...updates };
@@ -537,6 +556,7 @@ export class OpsDataStore {
   }
 
   public deleteStandingAccount(id: string): void {
+    if (!hasPermission(this.getCurrentUser().role, 'funds', 'edit')) throw new Error('لا تملك صلاحية حذف الحسابات الدائمة.');
     const target = this.standingAccounts.find((a) => a.id === id);
     this.standingAccounts = this.standingAccounts.filter((a) => a.id !== id);
     safeSet(STORAGE_KEYS.STANDING_ACCOUNTS, this.standingAccounts);
@@ -546,41 +566,34 @@ export class OpsDataStore {
 
   public updateExpenseStatus(expenseId: string, status: ExpenseStatus, reason?: string): void {
     const currentUser = this.getCurrentUser();
-    let affectedFundId = '';
-    let refundAmount = 0;
-
-    this.expenses = this.expenses.map((e) => {
-      if (e.id === expenseId) {
-        affectedFundId = e.fundId;
-        if (status === 'rejected' && e.status !== 'rejected') {
-          refundAmount = e.totalWithTax;
-        }
-        return {
-          ...e,
-          status,
-          approvedBy: status === 'approved' ? currentUser.name : e.approvedBy,
-          approvedAt: status === 'approved' ? new Date().toLocaleString('ar-AE') : e.approvedAt,
-          rejectionReason: status === 'rejected' ? reason : undefined,
-        };
-      }
-      return e;
-    });
+    if (!hasPermission(currentUser.role, 'expenses', 'approve')) throw new Error('لا تملك صلاحية اعتماد أو رفض المصروفات.');
+    const targetExpense = this.expenses.find((expense) => expense.id === expenseId);
+    if (!targetExpense || targetExpense.status !== 'pending_approval' || !['approved', 'rejected'].includes(status)) throw new Error('حالة المصروف لا تسمح بهذا الإجراء.');
+    this.expenses = this.expenses.map((expense) => expense.id === expenseId ? {
+      ...expense,
+      status,
+      approvedBy: status === 'approved' ? currentUser.name : expense.approvedBy,
+      approvedAt: status === 'approved' ? new Date().toLocaleString('ar-AE') : expense.approvedAt,
+      rejectionReason: status === 'rejected' ? reason : undefined,
+    } : expense);
     safeSet(STORAGE_KEYS.EXPENSES, this.expenses);
 
-    // If rejected, return money back to fund balance!
-    if (refundAmount > 0 && affectedFundId) {
-      this.funds = this.funds.map((f) => {
-        if (f.id === affectedFundId) {
-          const newBal = f.currentBalance + refundAmount;
-          const newSpent = Math.max(0, f.spentBalance - refundAmount);
-          return {
-            ...f,
-            currentBalance: newBal,
-            spentBalance: newSpent,
-            status: (newBal / f.totalAllocation) * 100 <= f.warningThreshold ? 'warning' : 'active',
-          };
-        }
-        return f;
+    // Refund each source fund accurately, including split-funded expenses.
+    if (status === 'rejected') {
+      const refunds = targetExpense.cascadeSplit
+        ? [
+            { fundId: targetExpense.cascadeSplit.primaryFundId, amount: targetExpense.cascadeSplit.primaryAmount },
+            { fundId: targetExpense.cascadeSplit.secondaryFundId, amount: targetExpense.cascadeSplit.secondaryAmount },
+          ]
+        : [{ fundId: targetExpense.fundId, amount: targetExpense.totalWithTax }];
+      this.funds = this.funds.map((fund) => {
+        const refund = refunds.filter((item) => item.fundId === fund.id).reduce((sum, item) => sum + item.amount, 0);
+        if (refund <= 0) return fund;
+        const newBalance = fund.currentBalance + refund;
+        const newSpent = Math.max(0, fund.spentBalance - refund);
+        const percentage = fund.totalAllocation > 0 ? (newBalance / fund.totalAllocation) * 100 : 0;
+        return { ...fund, currentBalance: newBalance, spentBalance: newSpent,
+          status: newBalance <= 0 ? 'depleted' : percentage <= fund.warningThreshold ? 'warning' : 'active' };
       });
       safeSet(STORAGE_KEYS.FUNDS, this.funds);
     }
@@ -1486,6 +1499,16 @@ export class OpsDataStore {
 
   public addSettlement(settlementData: Omit<Settlement, 'id' | 'code' | 'status' | 'submittedAt' | 'settledBy'>): Settlement {
     const currentUser = this.getCurrentUser();
+    if (!hasPermission(currentUser.role, 'settlements', 'create')) throw new Error('لا تملك صلاحية إنشاء التسويات.');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(settlementData.periodStart) || !/^\d{4}-\d{2}-\d{2}$/.test(settlementData.periodEnd) || settlementData.periodStart > settlementData.periodEnd) throw new Error('فترة التسوية غير صالحة.');
+    const fund = this.funds.find((item) => item.id === settlementData.fundId);
+    if (!fund) throw new Error('العهدة المحددة غير موجودة.');
+    const selectedIds = [...new Set(settlementData.expenseIds)];
+    if (selectedIds.length === 0) throw new Error('لا توجد مصروفات معتمدة ضمن التسوية.');
+    const selectedExpenses = selectedIds.map((id) => this.expenses.find((expense) => expense.id === id));
+    if (selectedExpenses.some((expense) => !expense || expense.fundId !== fund.id || expense.status !== 'approved')) throw new Error('تحتوي التسوية على مصروف غير معتمد أو تابع لعهدة أخرى.');
+    if (selectedExpenses.some((expense) => !expense?.expenseDate || expense.expenseDate < settlementData.periodStart || expense.expenseDate > settlementData.periodEnd)) throw new Error('توجد فاتورة خارج فترة التسوية أو بلا تاريخ مصروف موثق.');
+    const verifiedTotal = selectedExpenses.reduce((sum, expense) => sum + (expense?.totalWithTax || 0), 0);
     const newSettlement: Settlement = {
       ...settlementData,
       id: `stl-${Date.now()}`,
@@ -1498,14 +1521,7 @@ export class OpsDataStore {
     this.settlements = [newSettlement, ...this.settlements];
     safeSet(STORAGE_KEYS.SETTLEMENTS, this.settlements);
 
-    // Mark matched expenses as settled
-    this.expenses = this.expenses.map((e) => {
-      if (settlementData.expenseIds.includes(e.id)) {
-        return { ...e, status: 'settled' };
-      }
-      return e;
-    });
-    safeSet(STORAGE_KEYS.EXPENSES, this.expenses);
+    // Expenses remain approved until the settlement is formally approved.
 
     this.logAudit('رفع تسوية عهدة', 'settle', 'settlement', newSettlement.id, `تسوية لعهدة ${newSettlement.fundName} بإجمالي مصروفات ${newSettlement.totalExpenses} ${this.settings.currency}`);
     this.addNotification({
@@ -1520,19 +1536,19 @@ export class OpsDataStore {
 
   public approveSettlement(settlementId: string, auditNotes?: string): void {
     const currentUser = this.getCurrentUser();
-    this.settlements = this.settlements.map((s) => {
-      if (s.id === settlementId) {
-        return {
-          ...s,
-          status: 'approved',
-          approvedBy: currentUser.name,
-          approvedAt: new Date().toLocaleString('ar-AE'),
-          auditNotes: auditNotes || s.auditNotes,
-        };
-      }
-      return s;
-    });
+    if (!hasPermission(currentUser.role, 'settlements', 'approve')) throw new Error('لا تملك صلاحية اعتماد التسويات.');
+    const settlement = this.settlements.find((item) => item.id === settlementId);
+    if (!settlement || !['under_review', 'audited'].includes(settlement.status)) throw new Error('التسوية غير موجودة أو سبق اعتمادها.');
+    const selected = settlement.expenseIds.map((id) => this.expenses.find((expense) => expense.id === id));
+    if (selected.some((expense) => !expense || expense.status !== 'approved' || expense.fundId !== settlement.fundId)) throw new Error('تعذر الاعتماد: تغيرت حالة إحدى الفواتير أو لم تعد مطابقة للتسوية.');
+    this.settlements = this.settlements.map((item) => item.id === settlementId ? {
+      ...item, status: 'approved', approvedBy: currentUser.name,
+      approvedAt: new Date().toLocaleString('ar-AE'), auditNotes: auditNotes || item.auditNotes,
+    } : item);
+    const selectedIds = new Set(settlement.expenseIds);
+    this.expenses = this.expenses.map((expense) => selectedIds.has(expense.id) ? { ...expense, status: 'settled' } : expense);
     safeSet(STORAGE_KEYS.SETTLEMENTS, this.settlements);
+    safeSet(STORAGE_KEYS.EXPENSES, this.expenses);
     this.logAudit('اعتماد تسوية عهدة', 'approve', 'settlement', settlementId, `تم اعتماد وإغلاق التسوية وطباعة السند`);
     this.notify();
   }
