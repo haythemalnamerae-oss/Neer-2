@@ -162,15 +162,19 @@ export class ReportsService {
     const receipts = dataStore.getCashReceipts();
 
     return funds.map((f) => {
-      const fundExpenses = expenses.filter((e) => e.fundId === f.id);
-      const fundReceipts = receipts.filter((r) => r.fundId === f.id);
-      const cascadeExpenses = expenses.filter((e) => e.cascadeSplit?.secondaryFundId === f.id);
+      const allFundExpenses = expenses.filter((expense) => expense.fundId === f.id);
+      const fundExpenses = allFundExpenses.filter((expense) => expense.status !== 'rejected');
+      const rejectedExpenses = allFundExpenses.filter((expense) => expense.status === 'rejected');
+      const fundReceipts = receipts.filter((receipt) => receipt.fundId === f.id);
+      const cascadeExpenses = expenses.filter((expense) => expense.cascadeSplit?.secondaryFundId === f.id && expense.status !== 'rejected');
       const openDeficitExpenses = fundExpenses.filter((e) => e.isDeficit && !e.isCoveredFromCash);
 
       return {
         fund: f,
         expensesCount: fundExpenses.length,
-        totalExpenses: fundExpenses.filter((expense) => expense.status !== 'rejected').reduce((sum, expense) => sum + expense.totalWithTax, 0),
+        rejectedExpensesCount: rejectedExpenses.length,
+        rejectedExpenses,
+        totalExpenses: fundExpenses.reduce((sum, expense) => sum + expense.totalWithTax, 0),
         receiptsCount: fundReceipts.length,
         totalReceipts: fundReceipts.reduce((sum, r) => sum + r.amount, 0),
         fundExpenses,
