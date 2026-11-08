@@ -71,7 +71,7 @@ export const ReportsView: React.FC = () => {
       </div>
 
       {/* KPI Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="neu-raised rounded-3xl p-5 space-y-1.5">
           <span className="text-xs font-semibold text-[#577262] block">معدل إنجاز المهام العام</span>
           <span className="text-2xl sm:text-3xl font-black text-[#142B1D] block font-mono">{metrics.taskCompletionRate}%</span>
@@ -94,6 +94,18 @@ export const ReportsView: React.FC = () => {
             {formatCurrency(metrics.totalExpensesAmount, settings.currency)}
           </span>
           <span className="text-xs text-[#315773] font-bold block">خاضعة لضريبة {settings.taxRate}%</span>
+        </div>
+
+        <div className="neu-raised rounded-3xl p-5 space-y-1.5">
+          <span className="text-xs font-semibold text-[#577262] block">المستحق للموردين (علينا)</span>
+          <span className="text-2xl sm:text-3xl font-black text-amber-800 block font-mono">{formatCurrency(metrics.totalSupplierPayables, settings.currency)}</span>
+          <span className="text-xs text-slate-500 block">رصيد الحسابات الدائنة النشطة</span>
+        </div>
+
+        <div className="neu-raised rounded-3xl p-5 space-y-1.5">
+          <span className="text-xs font-semibold text-[#577262] block">المستحق لنا من الأطراف</span>
+          <span className="text-2xl sm:text-3xl font-black text-emerald-800 block font-mono">{formatCurrency(metrics.totalReceivables, settings.currency)}</span>
+          <span className="text-xs text-slate-500 block">رصيد الحسابات المدينة النشطة</span>
         </div>
 
         <div className="neu-raised rounded-3xl p-5 space-y-1.5">
