@@ -118,7 +118,7 @@ export const DailyCommandCenterView: React.FC<DailyCommandCenterViewProps> = ({
   const pendingExpenses = expenses.filter((expense) => expense.status === 'pending_approval');
   const pendingExpenseApprovals = canReviewExpenses ? pendingExpenses : [];
   const pendingSettlementApprovals = canReviewSettlements
-    ? dataStore.getSettlements().filter((settlement) => settlement.status === 'under_review' || settlement.status === 'draft')
+    ? dataStore.getSettlements().filter((settlement) => settlement.status === 'under_review' || settlement.status === 'audited')
     : [];
   const totalApprovals = pendingTaskApprovals.length + pendingExpenseApprovals.length + pendingSettlementApprovals.length;
 
