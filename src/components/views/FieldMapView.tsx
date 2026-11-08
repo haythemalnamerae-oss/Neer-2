@@ -25,6 +25,7 @@ import {
 import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
 import { Task, TaskStatus } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
+import { hasPermission } from '../../lib/rbac/permissions';
 import { formatCurrency, TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG } from '../../lib/utils/format';
 import { Button } from '../ui/button';
 
@@ -34,22 +35,8 @@ interface FieldMapViewProps {
   onRecordOutcome: (task: Task) => void;
 }
 
-// Default regional center coordinates (Middle East / Gulf regional hub)
-const DEFAULT_CENTER = { lat: 24.7136, lng: 46.6753 }; // Riyadh / Regional Hub
-
-// Well-known coordinates mapping for simulated demo locations
-const KNOWN_COORDINATES: Record<string, { lat: number; lng: number }> = {
-  'المقر الرئيسي - أبوظبي': { lat: 24.4539, lng: 54.3773 },
-  'مصفح الصناعية 4B': { lat: 24.3411, lng: 54.4988 },
-  'موقع مشروع الريم': { lat: 24.4987, lng: 54.4072 },
-  'فرع دبي - القوز': { lat: 25.1384, lng: 55.2341 },
-  'مستودع الشارقة المركزي': { lat: 25.3223, lng: 55.4033 },
-  'المكتب الرئيسي / عن بعد': { lat: 24.7136, lng: 46.6753 },
-  'الرياض - حي الملز': { lat: 24.6654, lng: 46.7212 },
-  'الرياض - العليا': { lat: 24.6978, lng: 46.6844 },
-  'جدة - طريق الملك': { lat: 21.5433, lng: 39.1728 },
-  'الدمام - المدينة الصناعية': { lat: 26.4207, lng: 50.0888 },
-};
+// Coordinates are displayed only when recorded on the task or captured from the device.
+const DEFAULT_CENTER = { lat: 15.3694, lng: 44.1910 }; // Sana'a map viewport only
 
 export const FieldMapView: React.FC<FieldMapViewProps> = ({
   onSelectTask,
@@ -59,6 +46,12 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
   const tasks = dataStore.getTasks();
   const currentUser = dataStore.getCurrentUser();
   const users = dataStore.getUsers();
+  const canViewAllTasks = hasPermission(currentUser.role, 'tasks', 'view');
+  const canCreateTask = hasPermission(currentUser.role, 'tasks', 'create');
+  const canEditTask = hasPermission(currentUser.role, 'tasks', 'edit');
+  const visibleTasks = currentUser.role === 'field_officer'
+    ? tasks.filter((task) => task.assigneeId === currentUser.id)
+    : canViewAllTasks ? tasks : [];
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -74,25 +67,13 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
   const systemSettings = dataStore.getSettings();
 
   // Calculate task coordinates
-  const tasksWithCoords = useMemo(() => {
-    return tasks.map((task, index) => {
-      let coords = task.geoCoordinates;
-      if (!coords) {
-        if (KNOWN_COORDINATES[task.location]) {
-          coords = KNOWN_COORDINATES[task.location];
-        } else {
-          // Stable fallback coordinate based on index
-          const baseLat = 24.7136 + ((index % 5) - 2) * 0.045;
-          const baseLng = 46.6753 + (((index * 3) % 7) - 3) * 0.052;
-          coords = { lat: baseLat, lng: baseLng };
-        }
-      }
-      return {
-        ...task,
-        resolvedCoords: coords,
-      };
-    });
-  }, [tasks]);
+  const tasksWithCoords = useMemo(() => visibleTasks.filter((task) => {
+    const coords = task.geoCoordinates;
+    return Boolean(coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lng)
+      && coords.lat >= -90 && coords.lat <= 90 && coords.lng >= -180 && coords.lng <= 180);
+  }).map((task) => ({ ...task, resolvedCoords: task.geoCoordinates! })), [visibleTasks]);
+
+  const tasksWithoutCoords = useMemo(() => visibleTasks.filter((task) => !tasksWithCoords.some((located) => located.id === task.id)), [visibleTasks, tasksWithCoords]);
 
   // Filter tasks
   const filteredTasks = useMemo(() => {
@@ -139,8 +120,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
         setIsLocating(false);
         console.warn('Geolocation capture failed:', err);
         // Fallback default coordinates
-        setUserLiveCoords({ lat: 24.7136, lng: 46.6753, accuracy: 12 });
-        setLocationSuccessMsg('تم تعيين إحداثيات المحطة الميدانية المركزية (وضع افتراضي)');
+          setLocationSuccessMsg('تعذر تحديد موقعك. لم يتم تسجيل إحداثيات افتراضية.');
         setTimeout(() => setLocationSuccessMsg(''), 6000);
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
@@ -226,13 +206,13 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
             <span>{isLocating ? 'جاري الرصد بالـ GPS...' : 'رفع موقعي الميداني الحالي'}</span>
           </button>
 
-          <button
+          {canCreateTask && <button
             onClick={onOpenNewTask}
             className="flex items-center gap-1.5 px-5 py-2.5 rounded-2xl bg-[#F4F7F5] hover:bg-white text-[#2A443B] text-xs font-bold font-sans-inter transition-all shadow-md cursor-pointer active:scale-95"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
             <span>مهمة جديدة</span>
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -382,7 +362,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
                   </Map>
                 </APIProvider>
               ) : (
-                /* High-Fidelity Vector Interactive Map Fallback */
+                /* No API key: present real geolocated tasks without simulated map pins */
                 <div className="relative w-full h-full bg-[#EAF0EC] p-6 flex flex-col justify-between overflow-hidden">
                   {/* Subtle Map Grid Lines */}
                   <div
@@ -397,7 +377,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
                   <div className="relative z-10 flex items-center justify-between">
                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/90 backdrop-blur-sm border border-slate-200 text-xs font-bold text-slate-800 shadow-xs">
                       <Compass className="w-4 h-4 text-emerald-600" />
-                      <span>خريطة المواقع التفاعلية المباشرة</span>
+                      <span>عرض مواقع المهام المسجلة</span>
                       <span className="text-[10px] font-semibold text-slate-500">
                         ({filteredTasks.length} نقطة تنفيذ)
                       </span>
@@ -405,11 +385,11 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
 
                     <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/90 backdrop-blur-sm border border-slate-200 text-[11px] text-slate-600 font-semibold shadow-xs">
                       <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                      <span>متصل بالجي بي إس</span>
+                      <span>مواقع موثقة فقط</span>
                     </div>
                   </div>
 
-                  {/* Interactive Visual Pins Cluster */}
+                  {/* Real GPS locations only; no simulated location pins */}
                   <div className="relative z-10 flex-1 grid grid-cols-2 sm:grid-cols-3 gap-4 my-auto p-4 max-h-[420px] overflow-y-auto no-scrollbar">
                     {filteredTasks.map((task) => {
                       const isSelected = selectedTask?.id === task.id;
@@ -476,6 +456,20 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
                 </div>
               )}
             </div>
+            {tasksWithoutCoords.length > 0 && (
+              <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <div className="flex items-center gap-2 text-sm font-bold text-amber-900"><AlertTriangle className="h-4 w-4" /> مهام دون إحداثيات GPS ({tasksWithoutCoords.length})</div>
+                <p className="mt-1 text-xs text-amber-800">لم نضع لها نقاطًا تقديرية؛ تظهر هنا حتى لا تختلط المواقع الحقيقية بالمواقع الافتراضية.</p>
+                <div className="mt-3 space-y-2">
+                  {tasksWithoutCoords.slice(0, 8).map((task) => (
+                    <button key={task.id} type="button" onClick={() => setSelectedTask(task)} className="flex w-full items-center justify-between gap-2 rounded-xl bg-white/80 p-2.5 text-right text-xs hover:bg-white">
+                      <span className="min-w-0"><strong className="block truncate text-slate-800">{task.title}</strong><span className="text-slate-500">{task.location || 'موقع غير محدد'}</span></span>
+                      <span className="shrink-0 font-bold text-amber-800">عرض</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Quick Stats Grid under Map */}
