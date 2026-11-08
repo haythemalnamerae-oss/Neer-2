@@ -648,6 +648,9 @@ export class OpsDataStore {
     if (!hasPermission(this.getCurrentUser().role, 'funds', 'edit')) throw new Error('لا تملك صلاحية تعديل الحسابات الدائمة.');
     const target = this.standingAccounts.find((account) => account.id === id);
     if (!target) throw new Error('الحساب غير موجود.');
+    const hasFinancialHistory = Boolean((target.entries || []).length) || this.expenses.some((expense) => expense.standingAccountId === id);
+    if (hasFinancialHistory && updates.direction !== undefined && updates.direction !== target.direction) throw new Error('لا يمكن تغيير طبيعة حساب لنا/علينا بعد وجود حركات مالية؛ أنشئ حساباً جديداً للتصنيف الصحيح.');
+    if (hasFinancialHistory && updates.currency !== undefined && updates.currency !== (target.currency || this.settings.currency)) throw new Error('لا يمكن تغيير عملة حساب له حركات مالية.');
     const { entries: _entries, currentBalance: _balance, openingBalance: _opening, totalInvoiced: _total, ...safeUpdates } = updates;
     this.standingAccounts = this.standingAccounts.map((account) => account.id === id ? { ...account, ...safeUpdates } : account);
     safeSet(STORAGE_KEYS.STANDING_ACCOUNTS, this.standingAccounts);
@@ -682,6 +685,7 @@ export class OpsDataStore {
     const account = this.standingAccounts.find((item) => item.id === id);
     const fund = this.funds.find((item) => item.id === fundId);
     if (!account || !fund) throw new Error('الحساب أو العهدة/الصندوق المحدد غير موجود.');
+    if (user.role === 'field_officer' && fund.holderId !== user.id) throw new Error('لا يمكنك تسوية حساب مورد من عهدة غير مسندة إليك.');
     if (fund.currency !== (account.currency || this.settings.currency)) throw new Error('عملة الحساب تختلف عن عملة العهدة المختارة.');
     const normalizedSettlementReference = notes.trim().toLowerCase();
     if ((account.entries || []).some((entry) => entry.reference?.trim().toLowerCase() === normalizedSettlementReference)) throw new Error('رقم سند السداد أو التحصيل مسجل مسبقاً لهذا الحساب.');
