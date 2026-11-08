@@ -91,7 +91,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
             توثيق المصروفات والضريبة المضافة
           </h2>
           <p className="text-xs sm:text-sm text-[#4F6C5B] mt-1 font-medium">
-            إجمالي المنصرف: <strong className="text-[#152B1E] font-mono dir-ltr">{formatCurrency(totalAmount)}</strong> (بما فيها <strong className="dir-ltr font-mono">{formatCurrency(totalTax)}</strong> ضريبة {settings.taxRate}%)
+            إجمالي المبالغ المسجلة: <strong className="text-[#152B1E] font-mono dir-ltr">{formatCurrency(totalAmount)}</strong> (بما فيها <strong className="dir-ltr font-mono">{formatCurrency(totalTax)}</strong> ضريبة {settings.taxRate}%)
           </p>
         </div>
 
@@ -168,7 +168,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
                 <th className="p-4">المورد والبيان</th>
                 <th className="p-4">العهدة والمستفيد</th>
                 <th className="p-4">المبلغ الأساسي</th>
-                <th className="p-4">الضريبة (5%)</th>
+                <th className="p-4">الضريبة ({settings.taxRate}%)</th>
                 <th className="p-4">الإجمالي</th>
                 <th className="p-4">الحالة</th>
                 <th className="p-4 text-center">الإجراءات</th>
@@ -229,6 +229,8 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
                           ? 'مرفوض'
                           : exp.status === 'settled'
                           ? 'مسوّى'
+                          : exp.status === 'draft'
+                          ? 'مسودة'
                           : 'قيد الاعتماد'}
                       </Badge>
                     </td>
