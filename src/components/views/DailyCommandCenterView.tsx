@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  AlertTriangle,
   ArrowLeft,
   CalendarClock,
   CheckCircle2,
@@ -116,9 +115,8 @@ export const DailyCommandCenterView: React.FC<DailyCommandCenterViewProps> = ({
   const pendingTaskApprovals = canReviewTasks
     ? tasks.filter((task) => task.status === 'pending_approval')
     : [];
-  const pendingExpenseApprovals = canReviewExpenses
-    ? expenses.filter((expense) => expense.status === 'pending_approval')
-    : [];
+  const pendingExpenses = expenses.filter((expense) => expense.status === 'pending_approval');
+  const pendingExpenseApprovals = canReviewExpenses ? pendingExpenses : [];
   const pendingSettlementApprovals = canReviewSettlements
     ? dataStore.getSettlements().filter((settlement) => settlement.status === 'under_review' || settlement.status === 'draft')
     : [];
@@ -214,7 +212,7 @@ export const DailyCommandCenterView: React.FC<DailyCommandCenterViewProps> = ({
           <MetricCard label="متابعات مستحقة" value={dueFollowUps.length} detail={`${pendingFollowUps.length} متابعة غير مغلقة`} icon={Clock3} tone={dueFollowUps.length ? 'amber' : 'green'} onClick={() => onSelectView('followUps')} />
         )}
         {expensesPermission && (
-          <MetricCard label="فواتير بانتظار الاعتماد" value={pendingExpenseApprovals.length} detail="الفواتير التي تتطلب مراجعة مالية" icon={Receipt} tone={pendingExpenseApprovals.length ? 'amber' : 'green'} onClick={canReviewExpenses ? () => onSelectView('approvals') : () => onSelectView('expenses')} />
+          <MetricCard label="فواتير بانتظار الاعتماد" value={pendingExpenses.length} detail="فواتير بانتظار المراجعة" icon={Receipt} tone={pendingExpenses.length ? 'amber' : 'green'} onClick={canReviewExpenses ? () => onSelectView('approvals') : () => onSelectView('expenses')} />
         )}
       </section>
 
