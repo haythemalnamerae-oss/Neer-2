@@ -12,7 +12,6 @@ import {
   Shield,
   History,
   Settings,
-  Code2,
   X,
   Target,
   Sparkles,
@@ -33,35 +32,40 @@ interface SidebarProps {
 
 const navigation = [
   {
-    group: 'العمليات والمهام الميدانية',
+    group: 'الرئيسية',
     items: [
-      { id: 'daily', label: 'مركز القيادة اليومي', icon: Target, module: 'dashboard' },
-      { id: 'map', label: 'خريطة المهام والمواقع', icon: MapPin, module: 'tasks' },
+      { id: 'daily', label: 'مركز القيادة', icon: Target, module: 'dashboard' },
+      { id: 'dashboard', label: 'التحليلات والمؤشرات', icon: LayoutDashboard, module: 'dashboard' },
       { id: 'approvals', label: 'مركز الاعتمادات', icon: FileCheck2, module: 'tasks' },
-      { id: 'dashboard', label: 'مؤشرات الأداء', icon: LayoutDashboard, module: 'dashboard' },
-      { id: 'tasks', label: 'المهام والمشاريع', icon: CheckSquare, module: 'tasks' },
-      { id: 'followUps', label: 'سلاسل المتابعة', icon: Clock, module: 'followUps' },
-      { id: 'calendar', label: 'التقويم الميداني', icon: Calendar, module: 'calendar' },
     ],
   },
   {
-    group: 'المنظومة المالية والعهد',
+    group: 'التشغيل',
     items: [
-      { id: 'performance', label: 'تقييم الإنجازات والعهد', icon: Trophy, module: 'reports' },
+      { id: 'tasks', label: 'المهام والمشاريع', icon: CheckSquare, module: 'tasks' },
+      { id: 'followUps', label: 'المتابعة', icon: Clock, module: 'followUps' },
+      { id: 'calendar', label: 'التقويم', icon: Calendar, module: 'calendar' },
+      { id: 'map', label: 'الخريطة الميدانية', icon: MapPin, module: 'tasks' },
+      { id: 'team', label: 'الفريق الميداني', icon: Users, module: 'team' },
+      { id: 'performance', label: 'تقييم الإنجازات', icon: Trophy, module: 'reports' },
+    ],
+  },
+  {
+    group: 'المالية',
+    items: [
       { id: 'funds', label: 'العهد والأرصدة', icon: Wallet, module: 'funds' },
       { id: 'expenses', label: 'المصروفات والفواتير', icon: Receipt, module: 'expenses' },
-      { id: 'settlements', label: 'التسويات المحاسبية', icon: FileCheck2, module: 'settlements' },
+      { id: 'settlements', label: 'التسويات', icon: FileCheck2, module: 'settlements' },
       { id: 'reports', label: 'التقارير المالية', icon: BarChart3, module: 'reports' },
     ],
   },
   {
     group: 'الإدارة والرقابة',
     items: [
-      { id: 'team', label: 'فريق العمل الميداني', icon: Users, module: 'team' },
-      { id: 'users', label: 'إدارة المستخدمين', icon: Users, module: 'users' },
+      { id: 'users', label: 'المستخدمون', icon: Users, module: 'users' },
       { id: 'roles', label: 'الأدوار والصلاحيات', icon: Shield, module: 'roles' },
-      { id: 'audit', label: 'سجل التدقيق والرقابة', icon: History, module: 'audit' },
-      { id: 'settings', label: 'الإعدادات العامة', icon: Settings, module: 'settings' },
+      { id: 'audit', label: 'سجل التدقيق', icon: History, module: 'audit' },
+      { id: 'settings', label: 'إعدادات المنشأة', icon: Settings, module: 'settings' },
     ],
   },
 ];
@@ -195,19 +199,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             );
           })}
 
-          {/* System code viewer link */}
-          <div className="pt-2">
-            <button
-              onClick={() => {
-                onSelectView('codeViewer');
-                onCloseMobile();
-              }}
-              className="flex min-h-11 w-full items-center gap-3 rounded-2xl px-3.5 text-right text-xs font-bold text-white/70 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
-            >
-              <Code2 className="h-4.5 w-4.5 text-emerald-300" />
-              <span>مستعرض أكواد ومستندات النظام</span>
-            </button>
-          </div>
         </nav>
 
         {/* Footer info badge */}
