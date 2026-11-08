@@ -440,9 +440,13 @@ export const FundsView: React.FC<FundsViewProps> = ({
                             بواسطة {exp.coveredBy} ({exp.coveredAt})
                           </span>
                         </div>
+                      ) : exp.status === 'pending_approval' ? (
+                        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full neu-inset-sm text-amber-800">
+                          بانتظار اعتماد الفاتورة
+                        </span>
                       ) : (
                         <span className="text-[11px] font-bold px-2.5 py-1 rounded-full neu-inset-sm text-[#A03E33]">
-                          عجز معلق لم يُسوَّ بعد
+                          عجز معتمد بانتظار التغطية
                         </span>
                       )}
                     </td>
