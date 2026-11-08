@@ -22,6 +22,7 @@ export const NewStandingAccountModal: React.FC<NewStandingAccountModalProps> = (
   const [vendorName, setVendorName] = useState('');
   const [category, setCategory] = useState('materials');
   const [contactPhone, setContactPhone] = useState('');
+  const [address, setAddress] = useState('');
   const [direction, setDirection] = useState<'payable' | 'receivable'>('payable');
   const [defaultAmount, setDefaultAmount] = useState('');
   const [openingBalance, setOpeningBalance] = useState('0');
@@ -59,6 +60,7 @@ export const NewStandingAccountModal: React.FC<NewStandingAccountModalProps> = (
       vendorName: vendorName.trim() || undefined,
       category,
       contactPhone: contactPhone.trim() || undefined,
+      address: address.trim() || undefined,
       direction,
       openingBalance: openingBalance ? Number(openingBalance) : 0,
       currentBalance: openingBalance ? Number(openingBalance) : 0,
@@ -79,6 +81,7 @@ export const NewStandingAccountModal: React.FC<NewStandingAccountModalProps> = (
     setName('');
     setVendorName('');
     setContactPhone('');
+    setAddress('');
     setDefaultAmount('');
     setOpeningBalance('0');
     setMonthlyLimit('');
@@ -130,6 +133,13 @@ export const NewStandingAccountModal: React.FC<NewStandingAccountModalProps> = (
             onChange={(e) => setContactPhone(e.target.value)}
           />
         </div>
+
+        <Input
+          label="عنوان المتجر / المورد أو موقع الزيارة"
+          placeholder="الحي، الشارع، أو وصف الوصول للموقع"
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+        />
 
         {/* Financial Direction (لنا / علينا) */}
         <div className="space-y-1.5 p-3.5 neu-raised rounded-2xl">
