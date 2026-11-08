@@ -326,6 +326,8 @@ export interface Expense {
   auditedAt?: string;
   approvedBy?: string;
   approvedAt?: string;
+  approvalNotes?: string;
+  specialAuditRequired?: boolean;
   rejectionReason?: string;
   taskId?: string;
   taskTitle?: string;
