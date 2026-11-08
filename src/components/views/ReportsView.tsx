@@ -13,11 +13,13 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { ReportsService } from '../../services/reports.service';
+import { dataStore } from '../../lib/storage';
 import { formatCurrency } from '../../lib/utils/format';
 import { Button } from '../ui/button';
 import { OperationsCashFlowChart, ExpenseDonutChart } from '../charts/OperationsCharts';
 
 export const ReportsView: React.FC = () => {
+  const settings = dataStore.getSettings();
   const metrics = ReportsService.getDashboardMetrics();
   const categoryBreakdown = ReportsService.getExpenseCategoryBreakdown();
   const teamPerformance = ReportsService.getTeamPerformance();
@@ -88,7 +90,7 @@ export const ReportsView: React.FC = () => {
           <span className="text-2xl sm:text-3xl font-black text-[#142B1D] block font-mono dir-ltr">
             {formatCurrency(metrics.totalExpensesAmount)}
           </span>
-          <span className="text-xs text-[#315773] font-bold block">خاضعة لضريبة 5%</span>
+          <span className="text-xs text-[#315773] font-bold block">خاضعة لضريبة {settings.taxRate}%</span>
         </div>
 
         <div className="neu-raised rounded-3xl p-5 space-y-1.5">
