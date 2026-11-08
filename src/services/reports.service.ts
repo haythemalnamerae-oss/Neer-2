@@ -211,20 +211,31 @@ export class ReportsService {
     const expenses = dataStore.getExpenses();
     const receipts = dataStore.getCashReceipts();
 
+    const supplierAccounts = dataStore.getStandingAccounts();
     return funds.map((f) => {
       const allFundExpenses = expenses.filter((expense) => expense.fundId === f.id);
-      const fundExpenses = allFundExpenses.filter((expense) => expense.status !== 'rejected');
+      const fundExpenses = allFundExpenses.filter((expense) => expense.status !== 'rejected' && !expense.isSupplierCredit);
       const rejectedExpenses = allFundExpenses.filter((expense) => expense.status === 'rejected');
       const fundReceipts = receipts.filter((receipt) => receipt.fundId === f.id);
+      const supplierPayments = supplierAccounts
+        .filter((account) => account.direction === 'payable' || account.direction === 'payable_by_us')
+        .flatMap((account) => (account.entries || [])
+          .filter((entry) => entry.type === 'settlement' && entry.fundId === f.id)
+          .map((entry) => ({ ...entry, accountName: account.name, currency: account.currency || f.currency })));
       const cascadeExpenses = expenses.filter((expense) => expense.cascadeSplit?.secondaryFundId === f.id && expense.status !== 'rejected');
       const openDeficitExpenses = fundExpenses.filter((e) => e.isDeficit && !e.isCoveredFromCash);
+      const cashExpensesTotal = fundExpenses.reduce((sum, expense) => sum + expense.totalWithTax, 0);
+      const supplierPaymentsTotal = supplierPayments.reduce((sum, payment) => sum + payment.amount, 0);
 
       return {
         fund: f,
-        expensesCount: fundExpenses.length,
+        expensesCount: fundExpenses.length + supplierPayments.length,
         rejectedExpensesCount: rejectedExpenses.length,
         rejectedExpenses,
-        totalExpenses: fundExpenses.reduce((sum, expense) => sum + expense.totalWithTax, 0),
+        totalExpenses: cashExpensesTotal + supplierPaymentsTotal,
+        cashExpensesTotal,
+        supplierPaymentsTotal,
+        supplierPayments,
         receiptsCount: fundReceipts.length,
         totalReceipts: fundReceipts.reduce((sum, r) => sum + r.amount, 0),
         fundExpenses,
