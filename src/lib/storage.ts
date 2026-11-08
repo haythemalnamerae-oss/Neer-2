@@ -678,10 +678,13 @@ export class OpsDataStore {
     if (!hasPermission(user.role, 'funds', 'edit')) throw new Error('تسوية حساب المورد تتطلب صلاحية إدارة مالية.');
     if (!Number.isFinite(amount) || amount <= 0) throw new Error('مبلغ التسوية غير صالح.');
     if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) throw new Error('تاريخ التسوية غير صالح.');
+    if (!notes?.trim()) throw new Error('رقم سند السداد أو التحصيل مطلوب لمنع تكرار الحركة.');
     const account = this.standingAccounts.find((item) => item.id === id);
     const fund = this.funds.find((item) => item.id === fundId);
     if (!account || !fund) throw new Error('الحساب أو العهدة/الصندوق المحدد غير موجود.');
     if (fund.currency !== (account.currency || this.settings.currency)) throw new Error('عملة الحساب تختلف عن عملة العهدة المختارة.');
+    const normalizedSettlementReference = notes.trim().toLowerCase();
+    if ((account.entries || []).some((entry) => entry.reference?.trim().toLowerCase() === normalizedSettlementReference)) throw new Error('رقم سند السداد أو التحصيل مسجل مسبقاً لهذا الحساب.');
     const balance = this.calculateStandingAccountBalance(account);
     if (amount > balance) throw new Error('مبلغ التسوية أكبر من الرصيد المستحق.');
     const payable = account.direction === 'payable' || account.direction === 'payable_by_us';
