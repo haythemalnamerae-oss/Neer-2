@@ -470,7 +470,6 @@ export class OpsDataStore {
       if (e.id === expenseId) {
         return {
           ...e,
-          isDeficit: false,
           isCoveredFromCash: true,
           coveredAt: new Date().toLocaleString('ar-AE'),
           coveredBy,
