@@ -36,18 +36,8 @@ export const ApiSessionGate: React.FC<{ children: React.ReactNode }> = ({ childr
     } finally { setBusy(false); }
   };
 
-  if (!hasSupabaseConfig && import.meta.env.PROD) {
-    return (
-      <main dir="rtl" className="min-h-screen bg-slate-50 px-4 py-10 flex items-center justify-center">
-        <section role="alert" className="w-full max-w-lg rounded-2xl border border-amber-200 bg-white p-6 text-right shadow-sm">
-          <h1 className="text-lg font-black text-slate-900">إعداد الاتصال غير مكتمل</h1>
-          <p className="mt-2 text-sm leading-7 text-slate-600">
-            لم يتم ضبط VITE_SUPABASE_URL وVITE_SUPABASE_ANON_KEY. تم إيقاف الدخول إلى التطبيق بدل عرض بيانات تجريبية في بيئة الإنتاج.
-          </p>
-        </section>
-      </main>
-    );
-  }
+  // Keep the local demo experience available when Supabase is not configured.
+  // Authenticated API access remains disabled until both public variables exist.
   if (!hasSupabaseConfig) return <>{children}</>;
   if (session && ready && !error) return <>{children}</>;
 
