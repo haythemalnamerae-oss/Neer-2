@@ -7,6 +7,7 @@ import {
   CheckSquare,
 } from 'lucide-react';
 import { dataStore } from '../../lib/storage';
+import { hasPermission } from '../../lib/rbac/permissions';
 import { formatCurrency } from '../../lib/utils/format';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -18,24 +19,31 @@ interface ApprovalsCenterViewProps {
 export const ApprovalsCenterView: React.FC<ApprovalsCenterViewProps> = ({ onSelectView }) => {
   const [activeTab, setActiveTab] = useState<'all' | 'expenses' | 'tasks' | 'settlements'>('all');
 
+  const currentUser = dataStore.getCurrentUser();
+  const settings = dataStore.getSettings();
+  const canReviewExpenses = hasPermission(currentUser.role, 'expenses', 'approve');
+  const canReviewTasks = hasPermission(currentUser.role, 'tasks', 'approve');
+  const canReviewSettlements = hasPermission(currentUser.role, 'settlements', 'approve');
   const tasks = dataStore.getTasks();
   const expenses = dataStore.getExpenses();
   const settlements = dataStore.getSettlements();
 
-  const pendingExpenses = expenses.filter((e) => e.status === 'pending_approval');
-  const pendingTasks = tasks.filter((t) => t.status === 'pending_approval');
-  const pendingSettlements = settlements.filter((s) => s.status === 'under_review' || s.status === 'draft');
+  const pendingExpenses = canReviewExpenses ? expenses.filter((expense) => expense.status === 'pending_approval') : [];
+  const pendingTasks = canReviewTasks ? tasks.filter((task) => task.status === 'pending_approval') : [];
+  const pendingSettlements = canReviewSettlements ? settlements.filter((settlement) => settlement.status === 'under_review' || settlement.status === 'audited') : [];
 
   const totalPending = pendingExpenses.length + pendingTasks.length + pendingSettlements.length;
 
   const handleApproveExpense = (id: string) => {
-    dataStore.updateExpenseStatus(id, 'approved');
+    try { dataStore.updateExpenseStatus(id, 'approved'); }
+    catch (error) { alert(error instanceof Error ? error.message : 'تعذر اعتماد الفاتورة.'); }
   };
 
   const handleRejectExpense = (id: string) => {
     const reason = window.prompt('سبب رفض الفاتورة أو المستند:', 'نقص في بيانات الفاتورة الضريبية أو عدم مطابقة البنود');
-    if (reason) {
-      dataStore.updateExpenseStatus(id, 'rejected', reason);
+    if (reason?.trim()) {
+      try { dataStore.updateExpenseStatus(id, 'rejected', reason.trim()); }
+      catch (error) { alert(error instanceof Error ? error.message : 'تعذر رفض الفاتورة.'); }
     }
   };
 
@@ -51,8 +59,16 @@ export const ApprovalsCenterView: React.FC<ApprovalsCenterViewProps> = ({ onSele
   };
 
   const handleApproveSettlement = (id: string) => {
-    const notes = window.prompt('ملاحظات التدقيق والمصادقة على التسوية:', 'تم تدقيق الفواتير ومطابقة الرصيد بنجاح');
-    dataStore.approveSettlement(id, notes || undefined);
+    const notes = window.prompt('ملاحظات التدقيق والمصادقة على التسوية:', `تم تدقيق الفواتير ومطابقة الرصيد والتحقق من الضريبة ${settings.taxRate}%`);
+    try { dataStore.approveSettlement(id, notes || undefined); }
+    catch (error) { alert(error instanceof Error ? error.message : 'تعذر اعتماد التسوية.'); }
+  };
+
+  const handleRejectSettlement = (id: string) => {
+    const reason = window.prompt('سبب رفض التسوية وإعادة الفواتير إلى قائمة التسوية:', 'توجد ملاحظات تحتاج إلى تصحيح');
+    if (!reason?.trim()) return;
+    try { dataStore.rejectSettlement(id, reason.trim()); }
+    catch (error) { alert(error instanceof Error ? error.message : 'تعذر رفض التسوية.'); }
   };
 
   return (
@@ -126,7 +142,7 @@ export const ApprovalsCenterView: React.FC<ApprovalsCenterViewProps> = ({ onSele
                       {exp.code}
                     </span>
                     <span className="text-base font-black text-[#142B1D] font-mono dir-ltr">
-                      {formatCurrency(exp.totalWithTax)}
+                      {formatCurrency(exp.totalWithTax, settings.currency)}
                     </span>
                   </div>
 
@@ -145,8 +161,8 @@ export const ApprovalsCenterView: React.FC<ApprovalsCenterViewProps> = ({ onSele
                       <strong className="font-mono text-[#142B1D]">{exp.invoiceNumber}</strong>
                     </div>
                     <div className="flex justify-between">
-                      <span>الضريبة (5%):</span>
-                      <strong className="font-mono text-[#142B1D]">{formatCurrency(exp.taxAmount)}</strong>
+                      <span>الضريبة ({settings.taxRate}%):</span>
+                      <strong className="font-mono text-[#142B1D]">{formatCurrency(exp.taxAmount, settings.currency)}</strong>
                     </div>
                     <div className="flex justify-between">
                       <span>المسؤول:</span>
@@ -261,15 +277,23 @@ export const ApprovalsCenterView: React.FC<ApprovalsCenterViewProps> = ({ onSele
                   <div className="p-4 neu-inset rounded-2xl text-xs sm:text-sm space-y-1.5 text-[#3B5A47]">
                     <div className="flex justify-between">
                       <span>سلفة التخصيص:</span>
-                      <strong className="font-mono text-[#142B1D]">{formatCurrency(s.advanceAmount)}</strong>
+                      <strong className="font-mono text-[#142B1D]">{formatCurrency(s.advanceAmount, settings.currency)}</strong>
                     </div>
                     <div className="flex justify-between">
                       <span>إجمالي المصروفات المنفقة:</span>
-                      <strong className="font-mono text-[#9E392E] font-bold">{formatCurrency(s.totalExpenses)}</strong>
+                      <strong className="font-mono text-[#9E392E] font-bold">{formatCurrency(s.totalExpenses, settings.currency)}</strong>
                     </div>
                   </div>
 
                   <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#C8D3CC]/50">
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => handleRejectSettlement(s.id)}
+                      className="text-xs sm:text-sm font-bold min-h-[42px] px-4"
+                    >
+                      رفض وإعادة الفواتير
+                    </Button>
                     <Button
                       variant="success"
                       size="sm"
@@ -293,7 +317,7 @@ export const ApprovalsCenterView: React.FC<ApprovalsCenterViewProps> = ({ onSele
               لا توجد طلبات اعتماد معلقة حالياً
             </h3>
             <p className="text-xs sm:text-sm text-[#506E5E]">
-              كافة الفواتير والمهام والتسويات معتمدة ومطابقة بنسبة 100%
+              لا توجد معاملات بانتظار المراجعة ضمن نطاق صلاحياتك.
             </p>
           </div>
         )}
