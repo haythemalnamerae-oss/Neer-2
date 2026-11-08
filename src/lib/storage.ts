@@ -336,91 +336,105 @@ export class OpsDataStore {
       if (!linkedTask) throw new Error('المهمة المرتبطة بالمصروف غير موجودة.');
       if (currentUser.role === 'field_officer' && linkedTask.assigneeId !== currentUser.id) throw new Error('لا يمكنك ربط المصروف بمهمة غير مسندة إليك.');
     }
+    const linkedStandingAccount = expenseData.standingAccountId
+      ? this.standingAccounts.find((account) => account.id === expenseData.standingAccountId)
+      : undefined;
+    if (expenseData.standingAccountId && (!linkedStandingAccount || linkedStandingAccount.active === false)) throw new Error('الحساب المرتبط بالمصروف غير موجود أو موقوف.');
+    if (linkedStandingAccount && (linkedStandingAccount.currency || this.settings.currency) !== primaryFund.currency) throw new Error('عملة حساب المورد تختلف عن عملة العهدة.');
+    if (linkedStandingAccount && linkedStandingAccount.direction !== 'payable' && linkedStandingAccount.direction !== 'payable_by_us') throw new Error('المصروفات لا تُسجل على حساب من نوع «لنا»؛ استخدم حساب مورد من نوع «علينا».');
+    const isSupplierCredit = Boolean(linkedStandingAccount);
+    if (isSupplierCredit && (expenseData.cascadeDeduction || expenseData.allowDeficit)) throw new Error('شراء الآجل على حساب المورد لا يستخدم السحب المتسلسل أو تسجيل العجز؛ تتم التسوية عند السداد.');
     const avail1 = primaryFund.currentBalance;
 
     let cascadeSplit: Expense['cascadeSplit'] = undefined;
     let isDeficit = false;
     let deficitAmount = 0;
 
-    // Check if cascade multi-fund deduction requested and primary fund balance is insufficient
-    if (expenseData.cascadeDeduction && expenseData.secondaryFundId && totalWithTax > avail1) {
-      const secondaryFund = this.funds.find((f) => f.id === expenseData.secondaryFundId);
-      if (!secondaryFund || secondaryFund.id === primaryFund.id) throw new Error('العهدة البديلة غير صالحة.');
-      if (secondaryFund.currency !== primaryFund.currency) throw new Error('لا يمكن السحب المتسلسل بين عهدتين بعملتين مختلفتين.');
-      if (currentUser.role === 'field_officer' && secondaryFund.holderId !== currentUser.id) throw new Error('لا يمكنك استخدام عهدة بديلة غير مسندة إليك.');
-      const neededFromSecondary = Number((totalWithTax - avail1).toFixed(2));
-      if (secondaryFund.currentBalance < neededFromSecondary) throw new Error('رصيد العهدة البديلة لا يكفي لتغطية الفرق.');
-      cascadeSplit = {
-        primaryFundId: primaryFund?.id || expenseData.fundId,
-        primaryFundName: primaryFund?.name || 'العهدة الأولى',
-        primaryAmount: avail1,
-        secondaryFundId: secondaryFund?.id || expenseData.secondaryFundId,
-        secondaryFundName: secondaryFund?.name || 'العهدة البديلة',
-        secondaryAmount: neededFromSecondary,
-      };
-
-      // Update primary fund (depleted to 0)
-      this.funds = this.funds.map((f) => {
-        if (f.id === expenseData.fundId) {
-          return {
-            ...f,
-            currentBalance: 0,
-            spentBalance: f.spentBalance + avail1,
-            status: 'depleted',
-          };
-        }
-        if (f.id === expenseData.secondaryFundId) {
-          const newBal = Math.max(0, f.currentBalance - neededFromSecondary);
-          const newSpent = f.spentBalance + neededFromSecondary;
-          const pct = (newBal / f.totalAllocation) * 100;
-          return {
-            ...f,
-            currentBalance: newBal,
-            spentBalance: newSpent,
-            status: newBal <= 0 ? 'depleted' : pct <= f.warningThreshold ? 'warning' : 'active',
-          };
-        }
-        return f;
-      });
-      safeSet(STORAGE_KEYS.FUNDS, this.funds);
-    } else if (expenseData.allowDeficit && totalWithTax > avail1) {
-      if (!hasPermission(currentUser.role, 'expenses', 'approve')) throw new Error('تسجيل العجز يتطلب صلاحية اعتماد مالية.');
-      // Deficit scenario (Negative balance)
-      isDeficit = true;
-      deficitAmount = Number((totalWithTax - avail1).toFixed(2));
-
-      this.funds = this.funds.map((f) => {
-        if (f.id === expenseData.fundId) {
-          return {
-            ...f,
-            currentBalance: 0,
-            spentBalance: f.spentBalance + totalWithTax,
-            status: 'depleted',
-          };
-        }
-        return f;
-      });
-      safeSet(STORAGE_KEYS.FUNDS, this.funds);
-    } else {
-      if (totalWithTax > avail1) throw new Error('رصيد العهدة غير كافٍ. اختر معالجة معتمدة قبل التسجيل.');
-      // Normal single fund deduction
-      this.funds = this.funds.map((f) => {
-        if (f.id === expenseData.fundId) {
-          const newBalance = Math.max(0, f.currentBalance - totalWithTax);
-          const newSpent = f.spentBalance + totalWithTax;
-          const percent = (newBalance / f.totalAllocation) * 100;
-          const status = newBalance <= 0 ? 'depleted' : percent <= f.warningThreshold ? 'warning' : 'active';
-          return {
-            ...f,
-            currentBalance: newBalance,
-            spentBalance: newSpent,
-            status,
-          };
-        }
-        return f;
-      });
-      safeSet(STORAGE_KEYS.FUNDS, this.funds);
+    // Credit purchases are posted to the supplier ledger only after approval.
+    // Do not consume petty-cash balance until an actual settlement is recorded.
+    if (!isSupplierCredit) {
+      // Check if cascade multi-fund deduction requested and primary fund balance is insufficient
+      if (expenseData.cascadeDeduction && expenseData.secondaryFundId && totalWithTax > avail1) {
+        const secondaryFund = this.funds.find((f) => f.id === expenseData.secondaryFundId);
+        if (!secondaryFund || secondaryFund.id === primaryFund.id) throw new Error('العهدة البديلة غير صالحة.');
+        if (secondaryFund.currency !== primaryFund.currency) throw new Error('لا يمكن السحب المتسلسل بين عهدتين بعملتين مختلفتين.');
+        if (currentUser.role === 'field_officer' && secondaryFund.holderId !== currentUser.id) throw new Error('لا يمكنك استخدام عهدة بديلة غير مسندة إليك.');
+        const neededFromSecondary = Number((totalWithTax - avail1).toFixed(2));
+        if (secondaryFund.currentBalance < neededFromSecondary) throw new Error('رصيد العهدة البديلة لا يكفي لتغطية الفرق.');
+        cascadeSplit = {
+          primaryFundId: primaryFund?.id || expenseData.fundId,
+          primaryFundName: primaryFund?.name || 'العهدة الأولى',
+          primaryAmount: avail1,
+          secondaryFundId: secondaryFund?.id || expenseData.secondaryFundId,
+          secondaryFundName: secondaryFund?.name || 'العهدة البديلة',
+          secondaryAmount: neededFromSecondary,
+        };
+  
+        // Update primary fund (depleted to 0)
+        this.funds = this.funds.map((f) => {
+          if (f.id === expenseData.fundId) {
+            return {
+              ...f,
+              currentBalance: 0,
+              spentBalance: f.spentBalance + avail1,
+              status: 'depleted',
+            };
+          }
+          if (f.id === expenseData.secondaryFundId) {
+            const newBal = Math.max(0, f.currentBalance - neededFromSecondary);
+            const newSpent = f.spentBalance + neededFromSecondary;
+            const pct = (newBal / f.totalAllocation) * 100;
+            return {
+              ...f,
+              currentBalance: newBal,
+              spentBalance: newSpent,
+              status: newBal <= 0 ? 'depleted' : pct <= f.warningThreshold ? 'warning' : 'active',
+            };
+          }
+          return f;
+        });
+        safeSet(STORAGE_KEYS.FUNDS, this.funds);
+      } else if (expenseData.allowDeficit && totalWithTax > avail1) {
+        if (!hasPermission(currentUser.role, 'expenses', 'approve')) throw new Error('تسجيل العجز يتطلب صلاحية اعتماد مالية.');
+        // Deficit scenario (Negative balance)
+        isDeficit = true;
+        deficitAmount = Number((totalWithTax - avail1).toFixed(2));
+  
+        this.funds = this.funds.map((f) => {
+          if (f.id === expenseData.fundId) {
+            return {
+              ...f,
+              currentBalance: 0,
+              spentBalance: f.spentBalance + totalWithTax,
+              status: 'depleted',
+            };
+          }
+          return f;
+        });
+        safeSet(STORAGE_KEYS.FUNDS, this.funds);
+      } else {
+        if (totalWithTax > avail1) throw new Error('رصيد العهدة غير كافٍ. اختر معالجة معتمدة قبل التسجيل.');
+        // Normal single fund deduction
+        this.funds = this.funds.map((f) => {
+          if (f.id === expenseData.fundId) {
+            const newBalance = Math.max(0, f.currentBalance - totalWithTax);
+            const newSpent = f.spentBalance + totalWithTax;
+            const percent = (newBalance / f.totalAllocation) * 100;
+            const status = newBalance <= 0 ? 'depleted' : percent <= f.warningThreshold ? 'warning' : 'active';
+            return {
+              ...f,
+              currentBalance: newBalance,
+              spentBalance: newSpent,
+              status,
+            };
+          }
+          return f;
+        });
+        safeSet(STORAGE_KEYS.FUNDS, this.funds);
+      }
+  
     }
+
 
     const newExpense: Expense = {
       ...expenseData,
@@ -444,14 +458,12 @@ export class OpsDataStore {
       cascadeSplit,
       isDeficit,
       deficitAmount: isDeficit ? deficitAmount : undefined,
+      isSupplierCredit,
     };
 
-    if (newExpense.standingAccountId) {
-      const linkedAccount = this.standingAccounts.find((account) => account.id === newExpense.standingAccountId);
-      if (!linkedAccount || linkedAccount.active === false) throw new Error('الحساب المرتبط بالمصروف غير موجود أو موقوف.');
-      if ((linkedAccount.currency || this.settings.currency) !== primaryFund.currency) throw new Error('عملة حساب المورد تختلف عن عملة العهدة.');
-      newExpense.standingAccountName = linkedAccount.name;
-      newExpense.standingDirection = linkedAccount.direction;
+    if (linkedStandingAccount) {
+      newExpense.standingAccountName = linkedStandingAccount.name;
+      newExpense.standingDirection = linkedStandingAccount.direction;
     }
 
     this.expenses = [newExpense, ...this.expenses];
@@ -643,6 +655,22 @@ export class OpsDataStore {
     this.notify();
   }
 
+  public addStandingAccountCharge(id: string, amount: number, date: string, description: string, reference?: string): StandingAccount {
+    const user = this.getCurrentUser();
+    if (!hasPermission(user.role, 'funds', 'edit')) throw new Error('إضافة حركة على حساب مورد تتطلب صلاحية إدارة مالية.');
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error('مبلغ الحركة غير صالح.');
+    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || !description.trim()) throw new Error('تاريخ الحركة وبيانها مطلوبان.');
+    const account = this.standingAccounts.find((item) => item.id === id);
+    if (!account || account.active === false) throw new Error('الحساب غير موجود أو موقوف.');
+    const updated = this.appendStandingAccountEntry(id, {
+      type: 'charge', amount, date, description: description.trim(),
+      reference: reference?.trim() || undefined,
+    });
+    this.logAudit('إضافة فاتورة / مستحق على حساب', 'create', 'fund', id, `إضافة مبلغ ${amount} ${account.currency || this.settings.currency} إلى حساب ${account.name}`);
+    this.notify();
+    return { ...updated, currentBalance: this.calculateStandingAccountBalance(updated) };
+  }
+
   public settleStandingAccount(id: string, amount: number, fundId: string, date: string, notes?: string): StandingAccount {
     const user = this.getCurrentUser();
     if (!hasPermission(user.role, 'funds', 'edit')) throw new Error('تسوية حساب المورد تتطلب صلاحية إدارة مالية.');
@@ -715,6 +743,10 @@ export class OpsDataStore {
     if (!targetExpense || targetExpense.status !== 'pending_approval' || !['approved', 'rejected'].includes(status)) throw new Error('حالة المصروف لا تسمح بهذا الإجراء.');
     if (status === 'rejected' && !reason?.trim()) throw new Error('يجب تسجيل سبب رفض المصروف.');
     if (status === 'approved' && targetExpense.specialAuditRequired && !reason?.trim()) throw new Error('هذا المصروف تجاوز حد الصرف الفردي؛ أضف ملاحظة التدقيق قبل الاعتماد.');
+    const linkedAccountForApproval = status === 'approved' && targetExpense.standingAccountId
+      ? this.standingAccounts.find((item) => item.id === targetExpense.standingAccountId)
+      : undefined;
+    if (status === 'approved' && targetExpense.standingAccountId && (!linkedAccountForApproval || linkedAccountForApproval.active === false)) throw new Error('حساب المورد المرتبط غير موجود أو موقوف؛ لا يمكن اعتماد المصروف.');
     this.expenses = this.expenses.map((expense) => expense.id === expenseId ? {
       ...expense,
       status,
@@ -726,8 +758,7 @@ export class OpsDataStore {
     safeSet(STORAGE_KEYS.EXPENSES, this.expenses);
 
     if (status === 'approved' && targetExpense.standingAccountId) {
-      const account = this.standingAccounts.find((item) => item.id === targetExpense.standingAccountId);
-      if (!account || account.active === false) throw new Error('حساب المورد المرتبط غير موجود أو موقوف؛ لا يمكن اعتماد المصروف.');
+      const account = linkedAccountForApproval!;
       if (!(account.entries || []).some((entry) => entry.expenseId === targetExpense.id)) {
         this.appendStandingAccountEntry(account.id, {
           type: 'charge', amount: targetExpense.totalWithTax,
@@ -741,7 +772,7 @@ export class OpsDataStore {
     }
 
     // Refund each source fund accurately, including split-funded expenses.
-    if (status === 'rejected') {
+    if (status === 'rejected' && !targetExpense.isSupplierCredit) {
       const refunds = targetExpense.cascadeSplit
         ? [
             { fundId: targetExpense.cascadeSplit.primaryFundId, amount: targetExpense.cascadeSplit.primaryAmount, spentAmount: targetExpense.cascadeSplit.primaryAmount },
