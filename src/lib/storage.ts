@@ -632,6 +632,8 @@ export class OpsDataStore {
     if (!acc.name?.trim()) throw new Error('اسم الحساب مطلوب.');
     const openingBalance = Number(acc.openingBalance ?? acc.currentBalance ?? 0);
     if (!Number.isFinite(openingBalance) || openingBalance < 0) throw new Error('الرصيد الافتتاحي غير صالح.');
+    if (acc.defaultAmount !== undefined && (!Number.isFinite(acc.defaultAmount) || acc.defaultAmount < 0)) throw new Error('المبلغ الاعتيادي غير صالح.');
+    if (acc.monthlyLimit !== undefined && (!Number.isFinite(acc.monthlyLimit) || acc.monthlyLimit <= 0)) throw new Error('الحد الشهري يجب أن يكون أكبر من صفر.');
     const currency = acc.currency || this.settings.currency;
     const newAcc: StandingAccount = {
       ...acc,
@@ -676,6 +678,12 @@ export class OpsDataStore {
     if (!account || account.active === false) throw new Error('الحساب غير موجود أو موقوف.');
     const normalizedReference = reference?.trim().toLowerCase();
     if (normalizedReference && (account.entries || []).some((entry) => entry.reference?.trim().toLowerCase() === normalizedReference)) throw new Error('رقم الفاتورة أو المرجع مسجل مسبقاً في دفتر هذا الحساب.');
+    const monthlyKey = date.slice(0, 7);
+    const monthlyTotal = this.expenses.filter((expense) => expense.standingAccountId === id && expense.status !== 'rejected' && (expense.expenseDate || '').startsWith(monthlyKey))
+      .reduce((sum, expense) => sum + expense.totalWithTax, 0) +
+      (account.entries || []).filter((entry) => entry.type === 'charge' && !entry.expenseId && entry.date.startsWith(monthlyKey))
+        .reduce((sum, entry) => sum + entry.amount, 0);
+    if (account.monthlyLimit && monthlyTotal + amount > account.monthlyLimit) throw new Error('الحركة ستتجاوز الحد الشهري للحساب؛ سجّلها عبر نموذج المصروف لتخضع لمسار التدقيق والاعتماد.');
     const updated = this.appendStandingAccountEntry(id, {
       type: 'charge', amount, date, description: description.trim(),
       reference: reference?.trim() || undefined,
