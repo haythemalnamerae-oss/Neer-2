@@ -113,13 +113,19 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
   const selectedSecondaryFund = otherFunds.find((fund) => fund.id === secondaryFundId);
   const secondaryCanCover = Boolean(selectedSecondaryFund && selectedSecondaryFund.currentBalance >= shortageAmount);
 
+  const mapAccountCategory = (value: string): ExpenseCategory => {
+    const supported: ExpenseCategory[] = ['transport', 'materials', 'hospitality', 'maintenance', 'government', 'fuel', 'tools', 'other'];
+    if (supported.includes(value as ExpenseCategory)) return value as ExpenseCategory;
+    return value === 'vendor' ? 'materials' : 'other';
+  };
+
   // Handle Standing Account Quick Selection
   const handleSelectStandingAccount = (accId: string) => {
     setSelectedStandingAccId(accId);
     const acc = standingAccounts.find((a) => a.id === accId);
     if (acc) {
       setDescription(acc.name);
-      setCategory(acc.category as ExpenseCategory);
+      setCategory(mapAccountCategory(acc.category));
       if (acc.defaultAmount && !amount) {
         setAmount(String(acc.defaultAmount));
       }
@@ -130,7 +136,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
   const handleStandingAccountCreated = (newAcc: StandingAccount) => {
     setSelectedStandingAccId(newAcc.id);
     setDescription(newAcc.name);
-    setCategory(newAcc.category as ExpenseCategory);
+    setCategory(mapAccountCategory(newAcc.category));
     if (newAcc.defaultAmount && !amount) {
       setAmount(String(newAcc.defaultAmount));
     }
