@@ -327,6 +327,7 @@ export class OpsDataStore {
 
     const primaryFund = this.funds.find((f) => f.id === expenseData.fundId);
     if (!primaryFund) throw new Error('العهدة المحددة غير موجودة.');
+    const previousFundStatuses = new Map(this.funds.map((fund) => [fund.id, fund.status]));
     if (primaryFund.currency !== this.settings.currency) throw new Error('عملة العهدة تختلف عن عملة المنشأة؛ لا يمكن تسجيل مصروف دون تسوية إعداد العملة.');
     if (currentUser.role === 'field_officer' && primaryFund.holderId !== currentUser.id) throw new Error('لا يمكنك تسجيل مصروف على عهدة غير مسندة إليك.');
     if (expenseData.taskId) {
@@ -427,6 +428,7 @@ export class OpsDataStore {
       taxAmount,
       totalWithTax,
       status: 'pending_approval',
+      specialAuditRequired: totalWithTax > this.settings.singleExpenseLimit,
       submittedAt: new Date().toLocaleString('ar-AE'),
       expenseDate: expenseData.expenseDate || new Date().toISOString().split('T')[0],
       submittedBy: currentUser.name,
@@ -437,6 +439,15 @@ export class OpsDataStore {
 
     this.expenses = [newExpense, ...this.expenses];
     safeSet(STORAGE_KEYS.EXPENSES, this.expenses);
+
+    if (this.settings.autoNotifyOnLowBalance) {
+      this.funds.filter((fund) => (fund.status === 'warning' || fund.status === 'depleted') && previousFundStatuses.get(fund.id) !== fund.status)
+        .forEach((fund) => this.addNotification({
+          title: fund.status === 'depleted' ? 'نفاد رصيد العهدة' : 'انخفاض رصيد العهدة',
+          message: `وصل رصيد عهدة ${fund.name} إلى ${fund.currentBalance} ${fund.currency}، وهي الآن في حالة ${fund.status === 'depleted' ? 'نفاد' : 'إنذار'}.`,
+          type: 'warning', targetView: 'funds',
+        }));
+    }
 
     // If attached to a task, update task's spentAmount
     if (newExpense.taskId) {
@@ -597,11 +608,13 @@ export class OpsDataStore {
     const targetExpense = this.expenses.find((expense) => expense.id === expenseId);
     if (!targetExpense || targetExpense.status !== 'pending_approval' || !['approved', 'rejected'].includes(status)) throw new Error('حالة المصروف لا تسمح بهذا الإجراء.');
     if (status === 'rejected' && !reason?.trim()) throw new Error('يجب تسجيل سبب رفض المصروف.');
+    if (status === 'approved' && targetExpense.specialAuditRequired && !reason?.trim()) throw new Error('هذا المصروف تجاوز حد الصرف الفردي؛ أضف ملاحظة التدقيق قبل الاعتماد.');
     this.expenses = this.expenses.map((expense) => expense.id === expenseId ? {
       ...expense,
       status,
       approvedBy: status === 'approved' ? currentUser.name : expense.approvedBy,
       approvedAt: status === 'approved' ? new Date().toLocaleString('ar-AE') : expense.approvedAt,
+      approvalNotes: status === 'approved' ? reason?.trim() : expense.approvalNotes,
       rejectionReason: status === 'rejected' ? reason : undefined,
     } : expense);
     safeSet(STORAGE_KEYS.EXPENSES, this.expenses);
