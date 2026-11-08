@@ -69,13 +69,21 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
   };
 
   const handleApprove = (id: string) => {
-    dataStore.updateExpenseStatus(id, 'approved');
+    try {
+      dataStore.updateExpenseStatus(id, 'approved');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'تعذر اعتماد الفاتورة.');
+    }
   };
 
   const handleReject = (id: string) => {
     const reason = window.prompt('سبب رفض الفاتورة:', 'نقص في بيانات الفاتورة');
-    if (reason) {
-      dataStore.updateExpenseStatus(id, 'rejected', reason);
+    if (reason?.trim()) {
+      try {
+        dataStore.updateExpenseStatus(id, 'rejected', reason.trim());
+      } catch (error) {
+        alert(error instanceof Error ? error.message : 'تعذر رفض الفاتورة.');
+      }
     }
   };
 
