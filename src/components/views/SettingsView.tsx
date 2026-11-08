@@ -23,6 +23,7 @@ export const SettingsView: React.FC = () => {
   const initialSettings = dataStore.getSettings();
   const currentUser = dataStore.getCurrentUser();
   const canEditSettings = hasPermission(currentUser.role, 'settings', 'edit');
+  const canResetData = currentUser.role === 'admin';
   const [companyName, setCompanyName] = useState(initialSettings.organizationName);
   const [taxNumber, setTaxNumber] = useState(initialSettings.taxRegistrationNumber);
   const [headquarters, setHeadquarters] = useState(initialSettings.headquarters);
@@ -32,6 +33,7 @@ export const SettingsView: React.FC = () => {
   const [singleExpenseLimit, setSingleExpenseLimit] = useState(String(initialSettings.singleExpenseLimit));
   const [autoNotify, setAutoNotify] = useState(initialSettings.autoNotifyOnLowBalance);
   const [requireReceipt, setRequireReceipt] = useState(initialSettings.requireReceiptForExpense);
+  const [requireInvoiceNumber, setRequireInvoiceNumber] = useState(initialSettings.requireInvoiceNumber);
   const [requireDualApproval, setRequireDualApproval] = useState(initialSettings.requireDualApprovalForSettlements);
   const [autoCaptureLocation, setAutoCaptureLocation] = useState(initialSettings.autoCaptureLocationWithoutApproval);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -52,7 +54,7 @@ export const SettingsView: React.FC = () => {
       dataStore.updateSettings({
         organizationName: companyName.trim(), taxRegistrationNumber: taxNumber.trim(), headquarters: headquarters.trim(),
         currency: defaultCurrency, taxRate: tax, fundWarningThresholdPercent: threshold, singleExpenseLimit: expenseLimit,
-        autoNotifyOnLowBalance: autoNotify, requireReceiptForExpense: requireReceipt,
+        autoNotifyOnLowBalance: autoNotify, requireReceiptForExpense: requireReceipt, requireInvoiceNumber,
         requireDualApprovalForSettlements: requireDualApproval, autoCaptureLocationWithoutApproval: autoCaptureLocation,
       });
     } catch (error) {
@@ -64,9 +66,11 @@ export const SettingsView: React.FC = () => {
   };
 
   const handleResetData = () => {
-    if (window.confirm('هل أنت متأكد من إعادة تعيين كافة البيانات إلى الحالة الافتراضية الأولية؟')) {
-      dataStore.resetToDefault();
-      window.location.reload();
+    if (!canResetData) return;
+    const confirmation = window.prompt('تحذير: سيؤدي هذا الإجراء إلى حذف جميع بيانات Neer-2 المحلية وإعادة البيانات التجريبية. اكتب RESET للمتابعة:');
+    if (confirmation === 'RESET') {
+      try { dataStore.resetToDefault(); window.location.reload(); }
+      catch (error) { alert(error instanceof Error ? error.message : 'تعذر إعادة تهيئة البيانات.'); }
     }
   };
 
@@ -234,11 +238,15 @@ export const SettingsView: React.FC = () => {
               <span className="text-xs sm:text-sm font-bold text-slate-700">اشتراط توفر أصل الفاتورة الورقي قبل تسجيل المصروف</span>
             </label>
             <label className="flex items-start gap-3.5 p-3.5 rounded-2xl neu-inset-sm cursor-pointer">
+              <input type="checkbox" checked={requireInvoiceNumber} onChange={(e) => setRequireInvoiceNumber(e.target.checked)} className="w-5 h-5 rounded-md accent-[#345c47] mt-0.5 shrink-0" />
+              <span className="text-xs sm:text-sm font-bold text-slate-700">اشتراط إدخال رقم الفاتورة لكل مصروف</span>
+            </label>
+            <label className="flex items-start gap-3.5 p-3.5 rounded-2xl neu-inset-sm cursor-pointer">
               <input type="checkbox" checked={requireDualApproval} onChange={(e) => setRequireDualApproval(e.target.checked)} className="w-5 h-5 rounded-md accent-[#345c47] mt-0.5 shrink-0" />
               <span className="text-xs sm:text-sm font-bold text-slate-700">اشتراط مدقق أول ومعتمد نهائي مختلفين لإغلاق التسوية</span>
             </label>
 
-            <div className="pt-4 border-t border-black/[0.04] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            {canResetData && <div className="pt-4 border-t border-black/[0.04] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                 <span className="text-xs sm:text-sm font-extrabold text-rose-700 block">إعادة تهيئة البيانات الافتراضية</span>
                 <p className="text-xs text-slate-500 mt-0.5">
@@ -253,7 +261,7 @@ export const SettingsView: React.FC = () => {
                 <RotateCcw className="w-4 h-4 text-rose-600" />
                 <span>إعادة تعيين البيانات</span>
               </button>
-            </div>
+            </div>}
           </div>
         </div>
 
