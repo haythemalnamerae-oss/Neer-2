@@ -29,6 +29,8 @@ const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}
 const idPattern = /^[a-zA-Z0-9_-]{1,120}$/;
 const allowedFilters = new Set(['id','status','priority','assignee_id','fund_id','task_id','user_id','is_read','category','urgency','active','holder_id','scheduled_date','due_date','created_at']);
 const permissionActions = new Set(['view','create','edit','delete','approve']);
+// Financial balances and approvals must only change through atomic, audited database workflows.
+const transactionOnlyResources = new Set(['funds','expenses','settlements','settlement-expenses','cash-receipts','standing-accounts']);
 
 async function supabaseFetch(path: string, token: string, init: RequestInit = {}) {
   return fetch(`${supabaseUrl}${path}`, { ...init, headers: { apikey: supabaseAnonKey!, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...init.headers } });
@@ -118,6 +120,9 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
   if (!resource) return res.status(404).json({ error: { code: 'RESOURCE_NOT_FOUND', message: 'Unknown API resource.' } });
   if (req.params.id && !idPattern.test(req.params.id)) return res.status(400).json({ error: { code: 'INVALID_ID', message: 'Invalid record id.' } });
   const action = req.method === 'GET' ? 'view' : req.method === 'POST' ? 'create' : req.method === 'PATCH' ? 'edit' : req.method === 'DELETE' ? 'delete' : '';
+  if (action !== 'view' && transactionOnlyResources.has(req.params.resource)) {
+    return res.status(409).json({ error: { code: 'FINANCIAL_TRANSACTION_REQUIRED', message: 'Financial records are read-only through generic CRUD. Use a dedicated transactional workflow so balances, approvals, and audit records remain atomic.' } });
+  }
   if (!permissionActions.has(action)) { res.setHeader('Allow', 'GET, POST, PATCH, DELETE'); return res.status(405).json({ error: { code: 'METHOD_NOT_ALLOWED' } }); }
   try {
     if (!(await allowed(auth, resource.module, action))) return res.status(403).json({ error: { code: 'FORBIDDEN', message: `Missing permission ${resource.module}.${action}.` } });
