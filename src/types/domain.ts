@@ -302,6 +302,7 @@ export interface StandingAccount {
   currency?: string;
   notes?: string;
   active?: boolean;
+  updatedAt?: string;
   invoices?: StandingAccountInvoice[];
   entries?: StandingAccountEntry[];
   totalInvoiced?: number;
