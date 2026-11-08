@@ -14,6 +14,7 @@ export class ReportsService {
     const funds = dataStore.getFunds();
     const expenses = dataStore.getExpenses();
     const settlements = dataStore.getSettlements();
+    const standingAccounts = dataStore.getStandingAccounts().filter((account) => (account.currency || dataStore.getSettings().currency) === dataStore.getSettings().currency && account.active !== false);
     const currency = dataStore.getSettings().currency;
     const currencyFundIds = new Set(funds.filter((fund) => fund.currency === currency).map((fund) => fund.id));
     const currencyExpenses = expenses.filter((expense) => currencyFundIds.has(expense.fundId));
@@ -34,6 +35,12 @@ export class ReportsService {
     const pendingExpensesAmount = currencyExpenses
       .filter((e) => e.status === 'pending_approval')
       .reduce((sum, e) => sum + e.totalWithTax, 0);
+    const totalSupplierPayables = standingAccounts
+      .filter((account) => account.direction === 'payable' || account.direction === 'payable_by_us')
+      .reduce((sum, account) => sum + Math.max(0, account.currentBalance || 0), 0);
+    const totalReceivables = standingAccounts
+      .filter((account) => account.direction === 'receivable' || account.direction === 'receivable_for_us')
+      .reduce((sum, account) => sum + Math.max(0, account.currentBalance || 0), 0);
 
     const taskCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
     const fundLiquidityRate = totalAllocatedFunds > 0 ? Math.round((totalRemainingFunds / totalAllocatedFunds) * 100) : 0;
@@ -52,6 +59,9 @@ export class ReportsService {
       totalExpensesAmount,
       pendingExpensesCount,
       pendingExpensesAmount,
+      totalSupplierPayables,
+      totalReceivables,
+      activeStandingAccountsCount: standingAccounts.length,
       settlementsCount: settlements.length,
     };
   }
