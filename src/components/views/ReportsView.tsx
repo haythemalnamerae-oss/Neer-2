@@ -84,14 +84,14 @@ export const ReportsView: React.FC = () => {
           <span className="text-xs font-semibold text-[#577262] block">معدل السيولة النقدية الحالية</span>
           <span className="text-2xl sm:text-3xl font-black text-[#265338] block font-mono">{metrics.fundLiquidityRate}%</span>
           <span className="text-xs text-[#527060] block font-medium">
-            رصيد متاح {formatCurrency(metrics.totalRemainingFunds)}
+            رصيد متاح {formatCurrency(metrics.totalRemainingFunds, settings.currency)}
           </span>
         </div>
 
         <div className="neu-raised rounded-3xl p-5 space-y-1.5">
           <span className="text-xs font-semibold text-[#577262] block">إجمالي المصروفات المسجلة</span>
           <span className="text-2xl sm:text-3xl font-black text-[#142B1D] block font-mono dir-ltr">
-            {formatCurrency(metrics.totalExpensesAmount)}
+            {formatCurrency(metrics.totalExpensesAmount, settings.currency)}
           </span>
           <span className="text-xs text-[#315773] font-bold block">خاضعة لضريبة {settings.taxRate}%</span>
         </div>
@@ -183,7 +183,7 @@ export const ReportsView: React.FC = () => {
                       </div>
                     </td>
                     <td className="p-3.5 font-mono font-black text-[#142B1D] dir-ltr text-xs sm:text-sm">
-                      {formatCurrency(tp.totalSpent)}
+                      {formatCurrency(tp.totalSpent, settings.currency)}
                     </td>
                   </tr>
                 );
@@ -243,9 +243,9 @@ export const ReportsView: React.FC = () => {
                       </span>
                     </div>
                     <div className="flex items-center gap-4 text-xs text-slate-600 flex-wrap">
-                      <span>التخصيص: <strong className="font-mono text-slate-800">{formatCurrency(item.fund.totalAllocation)}</strong></span>
-                      <span>المنصرف: <strong className="font-mono text-rose-700">{formatCurrency(item.totalExpenses)}</strong> ({item.expensesCount} فاتورة)</span>
-                      <span>المقبوضات المودعة: <strong className="font-mono text-emerald-800">{formatCurrency(item.totalReceipts)}</strong></span>
+                      <span>التخصيص: <strong className="font-mono text-slate-800">{formatCurrency(item.fund.totalAllocation, item.fund.currency)}</strong></span>
+                      <span>المنصرف: <strong className="font-mono text-rose-700">{formatCurrency(item.totalExpenses, item.fund.currency)}</strong> ({item.expensesCount} فاتورة)</span>
+                      <span>المقبوضات المودعة: <strong className="font-mono text-emerald-800">{formatCurrency(item.totalReceipts, item.fund.currency)}</strong></span>
                       {item.openDeficitExpenses.length > 0 && (
                         <span className="text-rose-700 font-black animate-pulse">
                           ⚠️ يوجد {item.openDeficitExpenses.length} عجز غير مسوى
@@ -258,7 +258,7 @@ export const ReportsView: React.FC = () => {
                     <div className="text-left">
                       <span className="text-[11px] text-slate-500 block font-semibold">الرصيد المتاح حالياً</span>
                       <strong className="text-base sm:text-lg font-black text-emerald-800 font-mono dir-ltr">
-                        {formatCurrency(item.fund.currentBalance)}
+                        {formatCurrency(item.fund.currentBalance, item.fund.currency)}
                       </strong>
                     </div>
                     <div className="w-8 h-8 rounded-xl neu-raised flex items-center justify-center text-slate-600">
@@ -292,7 +292,7 @@ export const ReportsView: React.FC = () => {
                                   </span>
                                   {exp.isDeficit && !exp.isCoveredFromCash && (
                                     <span className="text-[10px] bg-rose-100 text-rose-800 border border-rose-300 px-2 py-0.5 rounded-md font-bold">
-                                      عجز غير مسوى ({formatCurrency(exp.deficitAmount || 0)})
+                                      عجز غير مسوى ({formatCurrency(exp.deficitAmount || 0, settings.currency)})
                                     </span>
                                   )}
                                   {exp.isDeficit && exp.isCoveredFromCash && (
@@ -315,7 +315,7 @@ export const ReportsView: React.FC = () => {
                               </div>
 
                               <div className="text-left font-mono font-black text-sm text-slate-900 dir-ltr">
-                                {formatCurrency(exp.totalWithTax)}
+                                {formatCurrency(exp.totalWithTax, settings.currency)}
                               </div>
                             </div>
                           ))}
@@ -350,7 +350,7 @@ export const ReportsView: React.FC = () => {
                                 <div className="text-[11px] text-slate-500">{rec.notes || 'سند قبض معتمد'} - {rec.date}</div>
                               </div>
                               <span className="font-mono font-black text-sm text-emerald-800 dir-ltr">
-                                +{formatCurrency(rec.amount)}
+                                +{formatCurrency(rec.amount, settings.currency)}
                               </span>
                             </div>
                           ))}
