@@ -677,6 +677,8 @@ export const FundsView: React.FC<FundsViewProps> = ({
                     return (
                       acc.name.toLowerCase().includes(q) ||
                       (acc.vendorName && acc.vendorName.toLowerCase().includes(q)) ||
+                      (acc.contactPhone && acc.contactPhone.toLowerCase().includes(q)) ||
+                      (acc.address && acc.address.toLowerCase().includes(q)) ||
                       acc.category.toLowerCase().includes(q) ||
                       (acc.notes && acc.notes.toLowerCase().includes(q))
                     );
