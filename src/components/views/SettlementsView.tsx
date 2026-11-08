@@ -165,8 +165,7 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
                   اعتماد التسوية
                 </Button>
                 <Button
-                  variant="outline"
-                  color="danger"
+                  variant="danger"
                   size="sm"
                   onClick={() => handleReject(st.id)}
                   icon={<X className="w-4 h-4" />}
