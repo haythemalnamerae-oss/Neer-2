@@ -103,15 +103,15 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
             <div className="p-4 sm:p-5 neu-inset rounded-2xl space-y-2.5 text-xs sm:text-sm">
               <div className="flex justify-between text-[#446251]">
                 <span>سلفة التخصيص الأساسية:</span>
-                <strong className="font-mono text-[#142B1D] font-bold">{formatCurrency(st.advanceAmount)}</strong>
+                <strong className="font-mono text-[#142B1D] font-bold">{formatCurrency(st.advanceAmount, settings.currency)}</strong>
               </div>
               <div className="flex justify-between text-[#446251]">
                 <span>إجمالي المصروفات المنفقة:</span>
-                <strong className="font-mono text-[#9E392E] font-bold">{formatCurrency(st.totalExpenses)}</strong>
+                <strong className="font-mono text-[#9E392E] font-bold">{formatCurrency(st.totalExpenses, settings.currency)}</strong>
               </div>
               <div className="flex justify-between text-[#142B1D] font-black pt-2.5 border-t border-[#C8D3CC]/50">
                 <span>الرصيد المتبقي لإعادة التغذية:</span>
-                <strong className="font-mono text-[#235337]">{formatCurrency(st.remainingAmount)}</strong>
+                <strong className="font-mono text-[#235337]">{formatCurrency(st.remainingAmount, settings.currency)}</strong>
               </div>
             </div>
 
@@ -225,11 +225,11 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
                   <tbody>
                     <tr>
                       <td className="p-3 font-medium">سلفة التخصيص الأساسية للعهدة (Advance Allocation)</td>
-                      <td className="p-3 text-center font-mono font-bold text-[#142B1D]">{formatCurrency(previewSettlement.advanceAmount)}</td>
+                      <td className="p-3 text-center font-mono font-bold text-[#142B1D]">{formatCurrency(previewSettlement.advanceAmount, settings.currency)}</td>
                     </tr>
                     <tr>
                       <td className="p-3 font-medium">إجمالي المصروفات والفواتير الميدانية المنفقة والمدققة</td>
-                      <td className="p-3 text-center font-mono font-bold text-[#9E392E]">{formatCurrency(previewSettlement.totalExpenses)}</td>
+                      <td className="p-3 text-center font-mono font-bold text-[#9E392E]">{formatCurrency(previewSettlement.totalExpenses, settings.currency)}</td>
                     </tr>
                     <tr className="font-bold">
                       <td className="p-3">صافي الرصيد المستحق لإعادة التعويض والتغذية (Reimbursement Due)</td>
