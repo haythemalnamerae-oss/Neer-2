@@ -36,7 +36,7 @@ export const ApprovalsCenterView: React.FC<ApprovalsCenterViewProps> = ({ onSele
 
   const handleApproveExpense = (id: string) => {
     const expense = expenses.find((item) => item.id === id);
-    const notes = expense?.specialAuditRequired ? window.prompt('هذا المصروف تجاوز حد الصرف الفردي. أدخل ملاحظة التدقيق قبل الاعتماد:') : undefined;
+    const notes = expense?.specialAuditRequired ? window.prompt('هذا المصروف تجاوز حد الصرف الفردي أو الشهري. أدخل ملاحظة التدقيق قبل الاعتماد:') : undefined;
     if (expense?.specialAuditRequired && !notes?.trim()) return;
     try { dataStore.updateExpenseStatus(id, 'approved', notes?.trim()); }
     catch (error) { alert(error instanceof Error ? error.message : 'تعذر اعتماد الفاتورة.'); }
