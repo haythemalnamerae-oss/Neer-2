@@ -31,8 +31,8 @@ export const NewSettlementModal: React.FC<NewSettlementModalProps> = ({ isOpen, 
   const eligibleExpenses = useMemo(() => expenses.filter((expense) =>
     expense.fundId === fundId &&
     expense.status === 'approved' &&
-    (expense.expenseDate || expense.submittedAt.match(/^\\d{4}-\\d{2}-\\d{2}/)?.[0] || '') >= periodStart &&
-    (expense.expenseDate || expense.submittedAt.match(/^\\d{4}-\\d{2}-\\d{2}/)?.[0] || '') <= periodEnd &&
+    (expense.expenseDate || expense.submittedAt.match(/^\d{4}-\\d{2}-\\d{2}/)?.[0] || '') >= periodStart &&
+    (expense.expenseDate || expense.submittedAt.match(/^\d{4}-\\d{2}-\\d{2}/)?.[0] || '') <= periodEnd &&
     !alreadyIncludedIds.has(expense.id)
   ), [expenses, fundId, periodStart, periodEnd, alreadyIncludedIds]);
   const totalExpensesAmount = eligibleExpenses.reduce((sum, expense) => sum + expense.totalWithTax, 0);
