@@ -217,7 +217,7 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
               <div className="border-b-2 border-[#1E3B29] pb-4 flex justify-between items-start">
                 <div>
                   <h1 className="text-xl sm:text-2xl font-black text-[#132A1C] font-serif-display">
-                    منظومة العمليات الميدانية والعهد - OpsPlatform
+                    {settings.organizationName}
                   </h1>
                   <h2 className="text-base font-bold text-[#4E2B68] mt-1">سند تصفية وتسوية عهدة نقدية رسمية</h2>
                   <p className="text-xs text-[#527060] mt-0.5 font-mono">رقم السند: {previewSettlement.voucherNumber || previewSettlement.code}</p>
