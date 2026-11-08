@@ -39,8 +39,6 @@ export const FundsView: React.FC<FundsViewProps> = ({
   const [replenishAmount, setReplenishAmount] = useState('10000');
   const [replenishNotes, setReplenishNotes] = useState('');
 
-  // Direct Spend from Fund State ("الضغط على عهدة معينة وإضافة صرف من العهدة ويكتب السبب")
-
   // New Cash Receipt State
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [receiptAmount, setReceiptAmount] = useState('');
@@ -81,7 +79,6 @@ export const FundsView: React.FC<FundsViewProps> = ({
   // Financial aggregates
   const totalAllocated = funds.reduce((s, f) => s + f.totalAllocation, 0);
   const totalBalance = funds.reduce((s, f) => s + f.currentBalance, 0);
-  const totalSpent = funds.reduce((s, f) => s + f.spentBalance, 0);
   const totalReceipts = cashReceipts.reduce((s, r) => s + r.amount, 0);
   const totalPendingDeficit = pendingDeficitExpenses.reduce((s, e) => s + (e.deficitAmount || e.totalWithTax), 0);
 
@@ -113,7 +110,8 @@ export const FundsView: React.FC<FundsViewProps> = ({
       return;
     }
 
-    dataStore.addCashReceipt({
+    try {
+      dataStore.addCashReceipt({
       amount: amt,
       source: receiptSource.trim(),
       type: receiptType,
@@ -122,7 +120,11 @@ export const FundsView: React.FC<FundsViewProps> = ({
       notes: receiptNotes || undefined,
       fundId: receiptType === 'cash_box' ? receiptFundId : undefined,
       fundName: receiptType === 'cash_box' ? funds.find((fund) => fund.id === receiptFundId)?.name : undefined,
-    });
+      });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'تعذر تسجيل المقبوض.');
+      return;
+    }
 
     setIsReceiptModalOpen(false);
     setReceiptAmount('');
