@@ -76,20 +76,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpenMobile,
   onCloseMobile,
 }) => {
-  const tasks = dataStore.getTasks();
+  const allTasks = dataStore.getTasks();
+  const tasks = currentUser.role === 'field_officer'
+    ? allTasks.filter((task) => task.assigneeId === currentUser.id)
+    : allTasks;
   const pendingTasksCount = tasks.filter(
     (task) => task.status === 'in_progress' || task.status === 'started'
   ).length;
-  const expenses = dataStore.getExpenses();
-  const pendingExpenses = expenses.filter((item) => item.status === 'pending_approval').length;
+  const canReviewTasks = hasPermission(currentUser.role, 'tasks', 'approve');
+  const canReviewExpenses = hasPermission(currentUser.role, 'expenses', 'approve');
+  const canReviewSettlements = hasPermission(currentUser.role, 'settlements', 'approve');
+  const pendingTaskApprovals = canReviewTasks
+    ? allTasks.filter((task) => task.status === 'pending_approval').length
+    : 0;
+  const pendingExpenses = canReviewExpenses
+    ? dataStore.getExpenses().filter((item) => item.status === 'pending_approval').length
+    : 0;
+  const pendingSettlements = canReviewSettlements
+    ? dataStore.getSettlements().filter((item) => item.status === 'under_review' || item.status === 'draft').length
+    : 0;
   const funds = dataStore.getFunds();
   const warningFunds = funds.filter(
-    (fund) => fund.status === 'warning' || fund.status === 'depleted'
+    (fund) => (currentUser.role !== 'field_officer' || fund.holderId === currentUser.id)
+      && (fund.status === 'warning' || fund.status === 'depleted')
   ).length;
+  const totalPendingApprovals = pendingTaskApprovals + pendingExpenses + pendingSettlements;
 
   const badges: Record<string, { count: number; alert?: boolean }> = {
     tasks: pendingTasksCount ? { count: pendingTasksCount } : { count: 0 },
-    approvals: pendingExpenses ? { count: pendingExpenses, alert: true } : { count: 0 },
+    approvals: totalPendingApprovals ? { count: totalPendingApprovals, alert: true } : { count: 0 },
     funds: warningFunds ? { count: warningFunds, alert: true } : { count: 0 },
   };
 
