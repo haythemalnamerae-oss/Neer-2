@@ -290,6 +290,7 @@ export interface StandingAccount {
   category: string;
   vendorName?: string; // اسم المورد المعتاد أو صاحب المحل
   contactPhone?: string; // رقم هاتف التواصل المباشر
+  address?: string; // عنوان المتجر أو المورد
   imageUrl?: string; // صورة تعريف المنشأة أو شعارها
   referenceImageUrl?: string; // صورة فاتورة أو سند أو طلبية مرجعية
   accountType?: 'grocery' | 'vendor' | 'transport' | 'hospitality' | 'utility' | 'maintenance' | 'other';
