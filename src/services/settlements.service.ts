@@ -81,7 +81,7 @@ export class SettlementsService {
     const totalSettledAmount = settlements
       .filter((s) => s.status === 'approved' || s.status === 'closed')
       .reduce((sum, s) => sum + s.totalExpenses, 0);
-    const underReviewCount = settlements.filter((s) => s.status === 'under_review' || s.status === 'draft').length;
+    const underReviewCount = settlements.filter((s) => s.status === 'under_review' || s.status === 'audited').length;
 
     return {
       totalCount: settlements.length,
