@@ -68,6 +68,10 @@ export class SettlementsService {
     dataStore.approveSettlement(id, auditNotes);
   }
 
+  public static reject(id: string, reason: string): void {
+    dataStore.rejectSettlement(id, reason);
+  }
+
   public static finalize(id: string): void {
     dataStore.approveSettlement(id, 'تم الإغلاق النهائي للأرشفة وتصفية الرصيد');
   }
