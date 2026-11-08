@@ -34,7 +34,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 }) => {
   const [metrics, setMetrics] = useState(ReportsService.getDashboardMetrics());
   const [aiAnalysis, setAiAnalysis] = useState<AIOperationsAnalysis | null>(null);
-  const [timeRange, setTimeRange] = useState<'1W' | '1M' | '3M' | '1Y' | 'ALL'>('1M');
 
   useEffect(() => {
     setMetrics(ReportsService.getDashboardMetrics());
@@ -81,77 +80,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </span>
               <div className="flex items-center gap-3 mt-2 flex-wrap">
                 <span className="text-3xl sm:text-5xl font-black text-[#132A1C] font-mono tracking-tight">
-                  {formatCurrency(totalFundsBalance || 24680.50)}
+                  {formatCurrency(totalFundsBalance)}
                 </span>
-                <span className="neu-inset-sm text-[#204E32] text-xs sm:text-sm font-bold px-3.5 py-1.5 rounded-full flex items-center gap-1.5">
-                  <span className="font-mono">+12.8%</span>
-                  <span className="text-xs text-[#486857]">هذا الشهر</span>
-                </span>
+                <span className="neu-inset-sm text-[#486857] text-xs sm:text-sm font-bold px-3.5 py-1.5 rounded-full">الرصيد الحالي</span>
               </div>
             </div>
 
-            {/* Time Range Filter Buttons (with Inset Active state & comfortable touch size) */}
-            <div className="flex items-center gap-2 neu-inset-sm p-1.5 rounded-2xl flex-wrap">
-              {(['1W', '1M', '3M', '1Y', 'ALL'] as const).map((range) => (
-                <button
-                  key={range}
-                  onClick={() => setTimeRange(range)}
-                  className={`text-xs sm:text-sm px-3.5 py-2 rounded-xl font-bold transition cursor-pointer min-h-[40px] ${
-                    timeRange === range
-                      ? 'neu-button text-[#142B1E] font-black'
-                      : 'text-[#587565] hover:text-[#183122]'
-                  }`}
-                >
-                  {range}
-                </button>
-              ))}
-            </div>
+
           </div>
 
-          {/* Neumorphic Glowing Line Chart (SVG) */}
-          <div className="my-6 sm:my-8 relative w-full h-36 sm:h-44">
-            <svg
-              className="w-full h-full overflow-visible"
-              viewBox="0 0 500 120"
-              preserveAspectRatio="none"
-            >
-              <defs>
-                <linearGradient id="sageLineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#436F55" stopOpacity="0.4" />
-                  <stop offset="100%" stopColor="#EAF0EC" stopOpacity="0.0" />
-                </linearGradient>
-                <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feGaussianBlur stdDeviation="3.5" result="blur" />
-                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                </filter>
-              </defs>
-
-              {/* Shaded Area under Curve */}
-              <path
-                d="M 0 95 C 70 85, 120 100, 180 65 C 240 30, 290 75, 360 45 C 420 20, 460 35, 500 15 L 500 120 L 0 120 Z"
-                fill="url(#sageLineGradient)"
-              />
-
-              {/* The Smooth Sage Stroke Line */}
-              <path
-                d="M 0 95 C 70 85, 120 100, 180 65 C 240 30, 290 75, 360 45 C 420 20, 460 35, 500 15"
-                fill="none"
-                stroke="#325F45"
-                strokeWidth="4"
-                strokeLinecap="round"
-              />
-
-              {/* Glowing End Point */}
-              <circle
-                cx="500"
-                cy="15"
-                r="7"
-                fill="#FFFFFF"
-                stroke="#325F45"
-                strokeWidth="3.5"
-                filter="url(#glow)"
-              />
-            </svg>
+          <div className="my-6 sm:my-8 rounded-2xl neu-inset-sm p-4">
+            <p className="text-sm font-bold text-[#284C36]">إجمالي الأرصدة المتاحة في العهد</p>
+            <p className="text-xs text-[#587565] mt-1">يعرض الرصيد الفعلي المسجل حالياً، دون نسب نمو أو منحنى تاريخي غير مستند إلى سجل مالي.</p>
+            <div className="mt-3 flex items-center justify-between text-xs text-[#486857]">
+              <span>عدد العهد المسجلة</span><strong className="font-mono">{funds.length}</strong>
+            </div>
           </div>
 
           {/* Quick Action Circles: Send / Receive / More (Enlarged for Mobile Ease of Use) */}
@@ -243,7 +186,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                   <span className="text-xs text-[#4F6E5E] font-semibold">إجمالي المصروفات</span>
                   <span className="text-base sm:text-lg font-black text-[#142B1D] font-mono mt-1">
-                    {formatCurrency(totalExpenses || 12450)}
+                    {formatCurrency(totalExpenses)}
                   </span>
                 </div>
               </div>
@@ -265,7 +208,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div className="w-full neu-inset-sm h-3 rounded-full overflow-hidden p-0.5">
                   <div
                     className="bg-[#325F45] h-full rounded-full transition-all"
-                    style={{ width: `${Math.max(calcPercent(categorySpending.shopping), 45)}%` }}
+                    style={{ width: `${calcPercent(categorySpending.shopping)}%` }}
                   />
                 </div>
               </div>
@@ -284,7 +227,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div className="w-full neu-inset-sm h-3 rounded-full overflow-hidden p-0.5">
                   <div
                     className="bg-[#4F7E64] h-full rounded-full transition-all"
-                    style={{ width: `${Math.max(calcPercent(categorySpending.food), 30)}%` }}
+                    style={{ width: `${calcPercent(categorySpending.food)}%` }}
                   />
                 </div>
               </div>
@@ -303,7 +246,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div className="w-full neu-inset-sm h-3 rounded-full overflow-hidden p-0.5">
                   <div
                     className="bg-[#6B967E] h-full rounded-full transition-all"
-                    style={{ width: `${Math.max(calcPercent(categorySpending.transport), 25)}%` }}
+                    style={{ width: `${calcPercent(categorySpending.transport)}%` }}
                   />
                 </div>
               </div>
