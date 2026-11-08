@@ -373,6 +373,7 @@ export interface Expense {
   standingAccountName?: string;
   standingDirection?: 'receivable' | 'payable' | 'receivable_for_us' | 'payable_by_us';
   standingAccountEntryIds?: string[];
+  isSupplierCredit?: boolean;
   isStandingAccountPayment?: boolean;
 }
 
