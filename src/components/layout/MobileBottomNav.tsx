@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Wallet, CheckSquare, Menu, FileCheck2 } from 'lucide-react';
+import { LayoutDashboard, CheckSquare, Menu, FileCheck2 } from 'lucide-react';
 import { hasPermission } from '../../lib/rbac/permissions';
 import { dataStore } from '../../lib/storage';
 
