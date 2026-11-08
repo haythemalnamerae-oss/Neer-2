@@ -106,7 +106,7 @@ export class ReportsService {
       });
       return [openingRow, ...entries];
     });
-    return '\\uFEFF' + [headers, ...rows].map((row) => row.map(toCsvCell).join(',')).join('\\n');
+    return '\uFEFF' + [headers, ...rows].map((row) => row.map(toCsvCell).join(',')).join('\n');
   }
 
   public static exportExpensesToCSV(): string {
