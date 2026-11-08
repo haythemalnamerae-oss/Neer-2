@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Task, TaskStatus } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
+import { hasPermission } from '../../lib/rbac/permissions';
 import { TASK_PRIORITY_CONFIG, TASK_STATUS_CONFIG, formatCurrency } from '../../lib/utils/format';
 import { Button } from '../ui/button';
 
@@ -32,7 +33,14 @@ export const TasksView: React.FC<TasksViewProps> = ({
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
 
-  const tasks = dataStore.getTasks();
+  const currentUser = dataStore.getCurrentUser();
+  const canCreateTask = hasPermission(currentUser.role, 'tasks', 'create');
+  const canDeleteTask = hasPermission(currentUser.role, 'tasks', 'delete');
+  const canRecordOutcome = hasPermission(currentUser.role, 'tasks', 'edit');
+  const allTasks = dataStore.getTasks();
+  const tasks = currentUser.role === 'field_officer'
+    ? allTasks.filter((task) => task.assigneeId === currentUser.id)
+    : allTasks;
   const users = dataStore.getUsers();
 
   const filteredTasks = tasks.filter((task) => {
@@ -54,6 +62,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
 
   const handleDeleteTask = (e: React.MouseEvent, taskId: string) => {
     e.stopPropagation();
+    if (!canDeleteTask) return;
     if (window.confirm('هل أنت متأكد من حذف هذه المهمة نهائياً؟')) {
       dataStore.deleteTask(taskId);
     }
@@ -102,7 +111,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
             </button>
           </div>
 
-          <Button
+          {canCreateTask && <Button
             variant="primary"
             size="md"
             onClick={onOpenNewTask}
@@ -110,7 +119,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
             className="text-xs sm:text-sm font-bold min-h-[44px]"
           >
             مهمة جديدة
-          </Button>
+          </Button>}
         </div>
       </div>
 
@@ -292,21 +301,21 @@ export const TasksView: React.FC<TasksViewProps> = ({
                               <Layers className="w-5 h-5 stroke-[2.2]" />
                             </button>
                           )}
-                          <Button
+                          {canRecordOutcome && <Button
                             variant="success"
                             size="sm"
                             onClick={() => onRecordOutcome(task)}
                             className="text-xs font-bold min-h-[38px] px-3.5"
                           >
                             النتيجة
-                          </Button>
-                          <button
+                          </Button>}
+                          {canDeleteTask && <button
                             onClick={(e) => handleDeleteTask(e, task.id)}
                             className="w-10 h-10 rounded-xl neu-button flex items-center justify-center text-[#96372B] cursor-pointer"
                             title="حذف المهمة"
                           >
                             <Trash2 className="w-4.5 h-4.5 stroke-[2.2]" />
-                          </button>
+                          </button>}
                         </div>
                       </td>
                     </tr>
