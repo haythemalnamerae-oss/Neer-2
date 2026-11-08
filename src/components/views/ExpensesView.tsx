@@ -10,6 +10,7 @@ import {
   X,
 } from 'lucide-react';
 import { dataStore } from '../../lib/storage';
+import { hasPermission } from '../../lib/rbac/permissions';
 import { ReportsService } from '../../services/reports.service';
 import { formatCurrency, EXPENSE_CATEGORY_CONFIG } from '../../lib/utils/format';
 import { Button } from '../ui/button';
@@ -25,7 +26,16 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [previewReceiptUrl, setPreviewReceiptUrl] = useState<string | null>(null);
 
-  const expenses = dataStore.getExpenses();
+  const currentUser = dataStore.getCurrentUser();
+  const settings = dataStore.getSettings();
+  const canCreateExpense = hasPermission(currentUser.role, 'expenses', 'create');
+  const canApproveExpense = hasPermission(currentUser.role, 'expenses', 'approve');
+  const canExportExpenses = currentUser.role === 'admin' || currentUser.role === 'finance_officer';
+  const allExpenses = dataStore.getExpenses();
+  const funds = dataStore.getFunds();
+  const expenses = currentUser.role === 'field_officer'
+    ? allExpenses.filter((expense) => expense.submittedBy === currentUser.name || funds.some((fund) => fund.id === expense.fundId && fund.holderId === currentUser.id))
+    : allExpenses;
 
   const totalAmount = expenses.reduce((s, e) => s + e.totalWithTax, 0);
   const totalTax = expenses.reduce((s, e) => s + e.taxAmount, 0);
@@ -75,18 +85,18 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
         <div>
           <div className="flex items-center gap-2 text-[#2F5A3E] font-bold text-xs uppercase mb-1">
             <Receipt className="w-5 h-5 stroke-[2.2]" />
-            <span>سجل الفواتير والمصروفات اليومية والضريبة (VAT 5%)</span>
+            <span>سجل الفواتير والمصروفات اليومية والضريبة (VAT {settings.taxRate}%)</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-[#142B1D] font-serif-display">
             توثيق المصروفات والضريبة المضافة
           </h2>
           <p className="text-xs sm:text-sm text-[#4F6C5B] mt-1 font-medium">
-            إجمالي المنصرف: <strong className="text-[#152B1E] font-mono dir-ltr">{formatCurrency(totalAmount)}</strong> (بما فيها <strong className="dir-ltr font-mono">{formatCurrency(totalTax)}</strong> ضريبة 5%)
+            إجمالي المنصرف: <strong className="text-[#152B1E] font-mono dir-ltr">{formatCurrency(totalAmount)}</strong> (بما فيها <strong className="dir-ltr font-mono">{formatCurrency(totalTax)}</strong> ضريبة {settings.taxRate}%)
           </p>
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
-          <Button
+          {canExportExpenses && <Button
             variant="outline"
             size="md"
             onClick={handleExportCSV}
@@ -94,8 +104,8 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
             className="text-xs sm:text-sm font-bold min-h-[44px]"
           >
             تصدير تقرير CSV
-          </Button>
-          <Button
+          </Button>}
+          {canCreateExpense && <Button
             variant="primary"
             size="md"
             onClick={onOpenNewExpense}
@@ -103,7 +113,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
             className="text-xs sm:text-sm font-bold min-h-[44px]"
           >
             فاتورة جديدة
-          </Button>
+          </Button>}
         </div>
       </div>
 
@@ -234,7 +244,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
                             <Eye className="w-5 h-5 stroke-[2.2]" />
                           </button>
                         )}
-                        {exp.status === 'pending_approval' && (
+                        {canApproveExpense && exp.status === 'pending_approval' && (
                           <>
                             <button
                               onClick={() => handleApprove(exp.id)}
