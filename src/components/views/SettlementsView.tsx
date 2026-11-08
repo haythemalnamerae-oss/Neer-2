@@ -41,7 +41,11 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
 
   const handleApprove = (id: string) => {
     const notes = window.prompt('ملاحظات التدقيق والمطابقة:', `تمت مراجعة الفواتير والتحقق من الضريبة ${settings.taxRate}%`);
-    SettlementsService.approve(id, notes || undefined);
+    try {
+      SettlementsService.approve(id, notes || undefined);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'تعذر اعتماد التسوية.');
+    }
   };
 
   return (
