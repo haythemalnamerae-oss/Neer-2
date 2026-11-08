@@ -1,5 +1,6 @@
 import { dataStore } from '../lib/storage';
 import { EXPENSE_CATEGORY_CONFIG } from '../lib/utils/format';
+import { hasPermission } from '../lib/rbac/permissions';
 
 export class ReportsService {
   public static getDashboardMetrics() {
@@ -68,6 +69,8 @@ export class ReportsService {
   }
 
   public static exportExpensesToCSV(): string {
+    const currentUser = dataStore.getCurrentUser();
+    if (!hasPermission(currentUser.role, 'reports', 'create')) throw new Error('لا تملك صلاحية تصدير التقارير المالية.');
     const expenses = dataStore.getExpenses();
     const settings = dataStore.getSettings();
     const headers = [
