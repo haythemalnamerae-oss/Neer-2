@@ -14,20 +14,24 @@ export class ReportsService {
     const funds = dataStore.getFunds();
     const expenses = dataStore.getExpenses();
     const settlements = dataStore.getSettlements();
+    const currency = dataStore.getSettings().currency;
+    const currencyFundIds = new Set(funds.filter((fund) => fund.currency === currency).map((fund) => fund.id));
+    const currencyExpenses = expenses.filter((expense) => currencyFundIds.has(expense.fundId));
+    const currencyFunds = funds.filter((fund) => fund.currency === currency);
 
     const totalTasks = tasks.length;
     const completedTasks = tasks.filter((t) => t.status === 'completed' || t.status === 'approved').length;
     const inProgressTasks = tasks.filter((t) => t.status === 'in_progress' || t.status === 'started').length;
     const urgentTasks = tasks.filter((t) => t.priority === 'urgent' && t.status !== 'completed' && t.status !== 'approved').length;
 
-    const totalAllocatedFunds = funds.reduce((sum, f) => sum + f.totalAllocation, 0);
-    const totalRemainingFunds = funds.reduce((sum, f) => sum + f.currentBalance, 0);
-    const totalSpentFunds = funds.reduce((sum, f) => sum + f.spentBalance, 0);
-    const fundsWarningCount = funds.filter((f) => f.status === 'warning' || f.status === 'depleted').length;
+    const totalAllocatedFunds = currencyFunds.reduce((sum, f) => sum + f.totalAllocation, 0);
+    const totalRemainingFunds = currencyFunds.reduce((sum, f) => sum + f.currentBalance, 0);
+    const totalSpentFunds = currencyFunds.reduce((sum, f) => sum + f.spentBalance, 0);
+    const fundsWarningCount = currencyFunds.filter((f) => f.status === 'warning' || f.status === 'depleted').length;
 
-    const totalExpensesAmount = expenses.filter((expense) => expense.status !== 'rejected').reduce((sum, expense) => sum + expense.totalWithTax, 0);
-    const pendingExpensesCount = expenses.filter((e) => e.status === 'pending_approval').length;
-    const pendingExpensesAmount = expenses
+    const totalExpensesAmount = currencyExpenses.filter((expense) => expense.status !== 'rejected').reduce((sum, expense) => sum + expense.totalWithTax, 0);
+    const pendingExpensesCount = currencyExpenses.filter((e) => e.status === 'pending_approval').length;
+    const pendingExpensesAmount = currencyExpenses
       .filter((e) => e.status === 'pending_approval')
       .reduce((sum, e) => sum + e.totalWithTax, 0);
 
@@ -53,7 +57,9 @@ export class ReportsService {
   }
 
   public static getExpenseCategoryBreakdown() {
-    const expenses = dataStore.getExpenses().filter((expense) => expense.status !== 'rejected');
+    const currency = dataStore.getSettings().currency;
+    const funds = new Map(dataStore.getFunds().map((fund) => [fund.id, fund]));
+    const expenses = dataStore.getExpenses().filter((expense) => expense.status !== 'rejected' && funds.get(expense.fundId)?.currency === currency);
     const totals: Record<string, { label: string; amount: number; count: number }> = {};
 
     expenses.forEach((exp) => {
@@ -82,9 +88,10 @@ export class ReportsService {
     const headers = [
       'رمز المصروف',
       'العهدة النقدية',
-      `المبلغ الأساسي (${settings.currency})`,
+      'المبلغ الأساسي',
       `ضريبة القيمة المضافة (${settings.taxRate}%)`,
-      `الإجمالي شامل الضريبة (${settings.currency})`,
+      'الإجمالي شامل الضريبة',
+      'العملة',
       'التصنيف',
       'المورد / المحل',
       'رقم الفاتورة الضريبية',
@@ -101,6 +108,7 @@ export class ReportsService {
       e.amount,
       e.taxAmount,
       e.totalWithTax,
+      dataStore.getFundById(e.fundId)?.currency || settings.currency,
       EXPENSE_CATEGORY_CONFIG[e.category]?.label || e.category,
       e.vendorName,
       e.invoiceNumber,
