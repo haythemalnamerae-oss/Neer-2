@@ -17,6 +17,7 @@ import {
   TaskComment,
   CashReceipt,
   StandingAccount,
+  StandingAccountEntry,
   TaskStep,
   SubTask,
   TaskDailyUpdate,
@@ -445,6 +446,14 @@ export class OpsDataStore {
       deficitAmount: isDeficit ? deficitAmount : undefined,
     };
 
+    if (newExpense.standingAccountId) {
+      const linkedAccount = this.standingAccounts.find((account) => account.id === newExpense.standingAccountId);
+      if (!linkedAccount || linkedAccount.active === false) throw new Error('الحساب المرتبط بالمصروف غير موجود أو موقوف.');
+      if ((linkedAccount.currency || this.settings.currency) !== primaryFund.currency) throw new Error('عملة حساب المورد تختلف عن عملة العهدة.');
+      newExpense.standingAccountName = linkedAccount.name;
+      newExpense.standingDirection = linkedAccount.direction;
+    }
+
     this.expenses = [newExpense, ...this.expenses];
     safeSet(STORAGE_KEYS.EXPENSES, this.expenses);
 
@@ -570,43 +579,132 @@ export class OpsDataStore {
 
   // --- Standing Recurring Accounts (حسابات المصروفات الاعتيادية والموردين) ---
   public getStandingAccounts(): StandingAccount[] {
-    return [...this.standingAccounts];
+    return this.standingAccounts.map((account) => ({
+      ...account,
+      entries: account.entries || [],
+      currentBalance: this.calculateStandingAccountBalance(account),
+    }));
+  }
+
+  private calculateStandingAccountBalance(account: StandingAccount): number {
+    const opening = Number(account.openingBalance ?? account.currentBalance ?? 0);
+    return Number(((account.entries || []).reduce((balance, entry) =>
+      balance + (entry.type === 'charge' ? entry.amount : -entry.amount), opening)).toFixed(2));
+  }
+
+  private appendStandingAccountEntry(accountId: string, entry: Omit<StandingAccountEntry, 'id' | 'createdBy' | 'createdAt'>): StandingAccount {
+    const account = this.standingAccounts.find((item) => item.id === accountId);
+    if (!account) throw new Error('الحساب المرتبط غير موجود.');
+    const nextEntry: StandingAccountEntry = {
+      ...entry,
+      id: `sae-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      createdBy: this.getCurrentUser().id,
+      createdAt: new Date().toISOString(),
+    };
+    const updated = { ...account, entries: [nextEntry, ...(account.entries || [])] };
+    this.standingAccounts = this.standingAccounts.map((item) => item.id === accountId ? updated : item);
+    safeSet(STORAGE_KEYS.STANDING_ACCOUNTS, this.standingAccounts);
+    return updated;
   }
 
   public addStandingAccount(acc: Omit<StandingAccount, 'id'>): StandingAccount {
     if (!hasPermission(this.getCurrentUser().role, 'funds', 'edit')) throw new Error('لا تملك صلاحية إدارة الحسابات الدائمة.');
+    if (!acc.name?.trim()) throw new Error('اسم الحساب مطلوب.');
+    const openingBalance = Number(acc.openingBalance ?? acc.currentBalance ?? 0);
+    if (!Number.isFinite(openingBalance) || openingBalance < 0) throw new Error('الرصيد الافتتاحي غير صالح.');
+    const currency = acc.currency || this.settings.currency;
     const newAcc: StandingAccount = {
       ...acc,
-      id: `std-${Date.now()}`,
-      code: acc.code || `STD-${Math.floor(100 + Math.random() * 900)}`,
+      name: acc.name.trim(),
+      vendorName: acc.vendorName?.trim() || undefined,
+      openingBalance,
+      currentBalance: openingBalance,
+      currency,
+      entries: acc.entries || [],
+      id: `std-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      code: acc.code || `STD-${String(this.standingAccounts.length + 1).padStart(4, '0')}`,
       active: acc.active !== undefined ? acc.active : true,
     };
     this.standingAccounts = [newAcc, ...this.standingAccounts];
     safeSet(STORAGE_KEYS.STANDING_ACCOUNTS, this.standingAccounts);
-    this.logAudit('إضافة حساب مصروف اعتيادي / مورد', 'create', 'fund', newAcc.id, `تم إنشاء حساب ${newAcc.name}`);
+    this.logAudit('إضافة حساب مورد / تعامل مستمر', 'create', 'fund', newAcc.id, `تم إنشاء حساب ${newAcc.name} برصيد افتتاحي ${openingBalance} ${currency}`);
     this.notify();
     return newAcc;
   }
 
   public updateStandingAccount(id: string, updates: Partial<StandingAccount>): void {
     if (!hasPermission(this.getCurrentUser().role, 'funds', 'edit')) throw new Error('لا تملك صلاحية تعديل الحسابات الدائمة.');
-    this.standingAccounts = this.standingAccounts.map((a) => {
-      if (a.id === id) {
-        return { ...a, ...updates };
-      }
-      return a;
-    });
+    const target = this.standingAccounts.find((account) => account.id === id);
+    if (!target) throw new Error('الحساب غير موجود.');
+    const { entries: _entries, currentBalance: _balance, openingBalance: _opening, totalInvoiced: _total, ...safeUpdates } = updates;
+    this.standingAccounts = this.standingAccounts.map((account) => account.id === id ? { ...account, ...safeUpdates } : account);
     safeSet(STORAGE_KEYS.STANDING_ACCOUNTS, this.standingAccounts);
-    this.logAudit('تحديث حساب مصروف اعتيادي', 'update', 'fund', id, `تم تحديث بيانات الحساب`);
+    this.logAudit('تحديث بيانات حساب مورد', 'update', 'fund', id, 'تم تحديث البيانات التعريفية دون تعديل دفتر الحركة.');
     this.notify();
+  }
+
+  public settleStandingAccount(id: string, amount: number, fundId: string, date: string, notes?: string): StandingAccount {
+    const user = this.getCurrentUser();
+    if (!hasPermission(user.role, 'funds', 'edit')) throw new Error('تسوية حساب المورد تتطلب صلاحية إدارة مالية.');
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error('مبلغ التسوية غير صالح.');
+    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) throw new Error('تاريخ التسوية غير صالح.');
+    const account = this.standingAccounts.find((item) => item.id === id);
+    const fund = this.funds.find((item) => item.id === fundId);
+    if (!account || !fund) throw new Error('الحساب أو العهدة/الصندوق المحدد غير موجود.');
+    if (fund.currency !== (account.currency || this.settings.currency)) throw new Error('عملة الحساب تختلف عن عملة العهدة المختارة.');
+    const balance = this.calculateStandingAccountBalance(account);
+    if (amount > balance) throw new Error('مبلغ التسوية أكبر من الرصيد المستحق.');
+    const payable = account.direction === 'payable' || account.direction === 'payable_by_us';
+    if (payable && amount > fund.currentBalance) throw new Error('رصيد العهدة لا يكفي لسداد المورد.');
+    if (!payable && amount + (fund.cashBoxBalance || 0) > Number.MAX_SAFE_INTEGER) throw new Error('قيمة التحصيل غير صالحة.');
+
+    if (payable) {
+      this.funds = this.funds.map((item) => item.id === fundId ? {
+        ...item,
+        currentBalance: Number((item.currentBalance - amount).toFixed(2)),
+        spentBalance: Number((item.spentBalance + amount).toFixed(2)),
+        status: item.currentBalance - amount <= 0 ? 'depleted' : ((item.currentBalance - amount) / Math.max(item.totalAllocation, 1)) * 100 <= item.warningThreshold ? 'warning' : 'active',
+      } : item);
+      safeSet(STORAGE_KEYS.FUNDS, this.funds);
+    } else {
+      this.funds = this.funds.map((item) => item.id === fundId ? { ...item, cashBoxBalance: Number(((item.cashBoxBalance || 0) + amount).toFixed(2)) } : item);
+      safeSet(STORAGE_KEYS.FUNDS, this.funds);
+      const receipt: CashReceipt = {
+        id: `cr-${Date.now()}`,
+        code: `REC-${new Date().getFullYear()}-${String(this.cashReceipts.length + 1).padStart(6, '0')}`,
+        amount,
+        source: `تحصيل من حساب ${account.name}`,
+        type: 'cash_box',
+        receivedBy: user.name,
+        date,
+        notes,
+        fundId,
+        fundName: fund.name,
+        createdAt: new Date().toISOString(),
+      };
+      this.cashReceipts = [receipt, ...this.cashReceipts];
+      safeSet(STORAGE_KEYS.CASH_RECEIPTS, this.cashReceipts);
+    }
+
+    const updated = this.appendStandingAccountEntry(id, {
+      type: 'settlement', amount, date,
+      description: payable ? 'سداد للمورد' : 'تحصيل من الطرف المدين',
+      reference: notes?.trim() || undefined, fundId, fundName: fund.name,
+    });
+    this.logAudit(payable ? 'سداد حساب مورد' : 'تحصيل رصيد حساب', 'create', 'fund', id, `مبلغ ${amount} ${account.currency || this.settings.currency} عبر ${fund.name}`);
+    this.notify();
+    return { ...updated, currentBalance: this.calculateStandingAccountBalance(updated) };
   }
 
   public deleteStandingAccount(id: string): void {
     if (!hasPermission(this.getCurrentUser().role, 'funds', 'edit')) throw new Error('لا تملك صلاحية حذف الحسابات الدائمة.');
-    const target = this.standingAccounts.find((a) => a.id === id);
-    this.standingAccounts = this.standingAccounts.filter((a) => a.id !== id);
+    const target = this.standingAccounts.find((account) => account.id === id);
+    if (!target) throw new Error('الحساب غير موجود.');
+    const hasHistory = Boolean((target.entries || []).length) || this.expenses.some((expense) => expense.standingAccountId === id);
+    if (hasHistory) throw new Error('لا يمكن حذف حساب له حركات مالية؛ يمكنك إيقافه مع الاحتفاظ بسجله.');
+    this.standingAccounts = this.standingAccounts.map((account) => account.id === id ? { ...account, active: false } : account);
     safeSet(STORAGE_KEYS.STANDING_ACCOUNTS, this.standingAccounts);
-    this.logAudit('حذف حساب مصروف اعتيادي', 'delete', 'fund', id, `تم حذف الحساب ${target?.name || ''}`);
+    this.logAudit('إيقاف حساب مورد', 'update', 'fund', id, `تم إيقاف الحساب ${target.name} دون حذف سجله.`);
     this.notify();
   }
 
@@ -626,6 +724,21 @@ export class OpsDataStore {
       rejectionReason: status === 'rejected' ? reason : undefined,
     } : expense);
     safeSet(STORAGE_KEYS.EXPENSES, this.expenses);
+
+    if (status === 'approved' && targetExpense.standingAccountId) {
+      const account = this.standingAccounts.find((item) => item.id === targetExpense.standingAccountId);
+      if (!account || account.active === false) throw new Error('حساب المورد المرتبط غير موجود أو موقوف؛ لا يمكن اعتماد المصروف.');
+      if (!(account.entries || []).some((entry) => entry.expenseId === targetExpense.id)) {
+        this.appendStandingAccountEntry(account.id, {
+          type: 'charge', amount: targetExpense.totalWithTax,
+          date: targetExpense.expenseDate || new Date().toISOString().slice(0, 10),
+          description: targetExpense.description,
+          reference: targetExpense.invoiceNumber || targetExpense.code,
+          fundId: targetExpense.fundId, fundName: targetExpense.fundName,
+          expenseId: targetExpense.id,
+        });
+      }
+    }
 
     // Refund each source fund accurately, including split-funded expenses.
     if (status === 'rejected') {
