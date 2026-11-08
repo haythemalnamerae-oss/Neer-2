@@ -31,9 +31,8 @@ export const NewSettlementModal: React.FC<NewSettlementModalProps> = ({ isOpen, 
   const eligibleExpenses = useMemo(() => expenses.filter((expense) =>
     expense.fundId === fundId &&
     expense.status === 'approved' &&
-    Boolean(expense.expenseDate) &&
-    expense.expenseDate! >= periodStart &&
-    expense.expenseDate! <= periodEnd &&
+    (expense.expenseDate || expense.submittedAt.match(/^\\d{4}-\\d{2}-\\d{2}/)?.[0] || '') >= periodStart &&
+    (expense.expenseDate || expense.submittedAt.match(/^\\d{4}-\\d{2}-\\d{2}/)?.[0] || '') <= periodEnd &&
     !alreadyIncludedIds.has(expense.id)
   ), [expenses, fundId, periodStart, periodEnd, alreadyIncludedIds]);
   const totalExpensesAmount = eligibleExpenses.reduce((sum, expense) => sum + expense.totalWithTax, 0);
@@ -122,7 +121,7 @@ export const NewSettlementModal: React.FC<NewSettlementModalProps> = ({ isOpen, 
             required
           />
         </div>
-        <p className="text-xs text-slate-500">تُضمّن الفواتير المعتمدة فقط التي لها تاريخ مصروف داخل الفترة، وتُستبعد الفواتير المرفوضة أو المعلقة أو المحجوزة في تسوية أخرى.</p>
+        <p className="text-xs text-slate-500">تُضمّن الفواتير المعتمدة فقط التي يقع تاريخ تسجيلها أو تاريخ مصروفها داخل الفترة، وتُستبعد الفواتير المرفوضة أو المعلقة أو المحجوزة في تسوية أخرى.</p>
 
         <div className="space-y-1.5">
           <label className="block text-xs font-bold text-slate-700">ملاحظات التدقيق والمطابقة</label>
