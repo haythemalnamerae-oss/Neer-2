@@ -14,7 +14,6 @@ import {
   Settings,
   X,
   Target,
-  Sparkles,
   MapPin,
   Trophy,
 } from 'lucide-react';
