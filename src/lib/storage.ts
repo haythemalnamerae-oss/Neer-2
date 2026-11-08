@@ -446,6 +446,9 @@ export class OpsDataStore {
     if (!hasPermission(this.getCurrentUser().role, 'expenses', 'approve')) throw new Error('تغطية العجز تتطلب صلاحية الاعتماد المالي.');
     const expense = this.expenses.find((e) => e.id === expenseId);
     if (!expense || !expense.isDeficit) return;
+    const fund = this.funds.find((item) => item.id === expense.fundId);
+    const deficitAmount = expense.deficitAmount || 0;
+    if (!fund || (fund.cashBoxBalance || 0) < deficitAmount) throw new Error('رصيد الصندوق النقدي لا يكفي لتغطية العجز. سجّل المقبوضات في الصندوق أولاً.');
 
     this.expenses = this.expenses.map((e) => {
       if (e.id === expenseId) {
@@ -463,10 +466,10 @@ export class OpsDataStore {
 
     // Also deduct from fund's cashBoxBalance if available
     this.funds = this.funds.map((f) => {
-      if (f.id === expense.fundId && f.cashBoxBalance) {
+      if (f.id === expense.fundId) {
         return {
           ...f,
-          cashBoxBalance: Math.max(0, f.cashBoxBalance - (expense.deficitAmount || 0)),
+          cashBoxBalance: Math.max(0, (f.cashBoxBalance || 0) - deficitAmount),
         };
       }
       return f;
@@ -496,7 +499,7 @@ export class OpsDataStore {
     safeSet(STORAGE_KEYS.CASH_RECEIPTS, this.cashReceipts);
 
     // Increase target fund's cashBoxBalance
-    if (data.fundId) {
+    if (data.fundId && data.type === 'cash_box') {
       this.funds = this.funds.map((f) => {
         if (f.id === data.fundId) {
           const newCashBox = (f.cashBoxBalance || 0) + data.amount;
@@ -569,6 +572,7 @@ export class OpsDataStore {
     if (!hasPermission(currentUser.role, 'expenses', 'approve')) throw new Error('لا تملك صلاحية اعتماد أو رفض المصروفات.');
     const targetExpense = this.expenses.find((expense) => expense.id === expenseId);
     if (!targetExpense || targetExpense.status !== 'pending_approval' || !['approved', 'rejected'].includes(status)) throw new Error('حالة المصروف لا تسمح بهذا الإجراء.');
+    if (status === 'rejected' && !reason?.trim()) throw new Error('يجب تسجيل سبب رفض المصروف.');
     this.expenses = this.expenses.map((expense) => expense.id === expenseId ? {
       ...expense,
       status,
@@ -1504,6 +1508,8 @@ export class OpsDataStore {
     const fund = this.funds.find((item) => item.id === settlementData.fundId);
     if (!fund) throw new Error('العهدة المحددة غير موجودة.');
     const selectedIds = [...new Set(settlementData.expenseIds)];
+    const alreadyReserved = new Set(this.settlements.filter((item) => item.status !== 'rejected').flatMap((item) => item.expenseIds));
+    if (selectedIds.some((id) => alreadyReserved.has(id))) throw new Error('إحدى الفواتير مرتبطة بطلب تسوية قائم بالفعل.');
     if (selectedIds.length === 0) throw new Error('لا توجد مصروفات معتمدة ضمن التسوية.');
     const selectedExpenses = selectedIds.map((id) => this.expenses.find((expense) => expense.id === id));
     if (selectedExpenses.some((expense) => !expense || expense.fundId !== fund.id || expense.status !== 'approved')) throw new Error('تحتوي التسوية على مصروف غير معتمد أو تابع لعهدة أخرى.');
@@ -1511,6 +1517,9 @@ export class OpsDataStore {
     const verifiedTotal = selectedExpenses.reduce((sum, expense) => sum + (expense?.totalWithTax || 0), 0);
     const newSettlement: Settlement = {
       ...settlementData,
+      totalExpenses: verifiedTotal,
+      expensesCount: selectedIds.length,
+      expenseIds: selectedIds,
       id: `stl-${Date.now()}`,
       code: `STL-2026-0${this.settlements.length + 1}`,
       status: 'under_review',
