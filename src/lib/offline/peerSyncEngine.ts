@@ -267,32 +267,69 @@ export class PeerSyncEngine {
     const mergedReceiptsList = Array.from(receiptMap.values());
 
     const localFunds = dataStore.getFunds();
+    const localStandingAccounts = localStanding;
+    const mergedStandingAccounts = Array.from(standingMap.values());
+    const calculateFundOutflows = (fundId: string, expenseList: Expense[], accountList: StandingAccount[]) => {
+      const relevantExpenses = expenseList.filter((expense) => expense.status !== 'rejected' && !expense.isSupplierCredit);
+      const cashExpenseTotal = relevantExpenses.reduce((sum, expense) => {
+        if (expense.cascadeSplit) {
+          return sum
+            + (expense.cascadeSplit.primaryFundId === fundId ? expense.cascadeSplit.primaryAmount : 0)
+            + (expense.cascadeSplit.secondaryFundId === fundId ? expense.cascadeSplit.secondaryAmount : 0);
+        }
+        if (expense.fundId !== fundId) return sum;
+        return sum + (expense.isDeficit ? Math.max(0, expense.totalWithTax - (expense.deficitAmount || 0)) : expense.totalWithTax);
+      }, 0);
+      const spentExpenseTotal = relevantExpenses.reduce((sum, expense) => {
+        if (expense.cascadeSplit) {
+          return sum
+            + (expense.cascadeSplit.primaryFundId === fundId ? expense.cascadeSplit.primaryAmount : 0)
+            + (expense.cascadeSplit.secondaryFundId === fundId ? expense.cascadeSplit.secondaryAmount : 0);
+        }
+        return sum + (expense.fundId === fundId ? expense.totalWithTax : 0);
+      }, 0);
+      const supplierPayments = accountList
+        .filter((account) => account.direction === 'payable' || account.direction === 'payable_by_us')
+        .flatMap((account) => account.entries || [])
+        .filter((entry) => entry.type === 'settlement' && entry.fundId === fundId)
+        .reduce((sum, entry) => sum + entry.amount, 0);
+      return {
+        cash: Number((cashExpenseTotal + supplierPayments).toFixed(2)),
+        spent: Number((spentExpenseTotal + supplierPayments).toFixed(2)),
+      };
+    };
     const updatedFunds: PettyCashFund[] = localFunds.map((fund) => {
       // Find matching remote fund if any
       const remoteFund = payload.data.funds?.find((f) => f.id === fund.id);
       const totalAlloc = remoteFund ? Math.max(fund.totalAllocation, remoteFund.totalAllocation) : fund.totalAllocation;
 
-      // Cash purchases reduce custody immediately; supplier-credit purchases reduce it only when paid.
-      const fundExpenses = mergedExpensesList.filter((e) => e.fundId === fund.id && e.status !== 'rejected' && !e.isSupplierCredit);
-      const cashExpenseTotal = fundExpenses.reduce((sum, e) => sum + (e.totalWithTax || e.amount), 0);
-      const supplierPayments = Array.from(standingMap.values())
-        .filter((account) => account.direction === 'payable' || account.direction === 'payable_by_us')
-        .flatMap((account) => account.entries || [])
-        .filter((entry) => entry.type === 'settlement' && entry.fundId === fund.id)
-        .reduce((sum, entry) => sum + entry.amount, 0);
-      const totalSpent = Number((cashExpenseTotal + supplierPayments).toFixed(2));
+      // Reconcile real custody outflows, including split expenses and supplier settlements.
+      const mergedOutflows = calculateFundOutflows(fund.id, mergedExpensesList, mergedStandingAccounts);
+      const localOutflows = calculateFundOutflows(fund.id, localExpenses, localStandingAccounts);
+      const remoteOutflows = remoteFund
+        ? calculateFundOutflows(fund.id, payload.data.expenses || [], payload.data.standingAccounts || [])
+        : localOutflows;
+      const localReplenishments = fund.currentBalance - (fund.totalAllocation - localOutflows.cash);
+      const remoteReplenishments = remoteFund
+        ? remoteFund.currentBalance - (remoteFund.totalAllocation - remoteOutflows.cash)
+        : localReplenishments;
+      // Replenishments have no independent transaction IDs yet; use the larger known cumulative amount to avoid double counting.
+      const mergedReplenishments = Math.max(localReplenishments, remoteReplenishments);
+      const totalSpent = mergedOutflows.spent;
 
-      // Add verified receipts allocated to this fund
-      const fundReceipts = mergedReceiptsList.filter((r) => r.fundId === fund.id);
-      const totalReceipts = fundReceipts.reduce((sum, r) => sum + r.amount, 0);
+      // Cash-box receipts are separate from the petty-cash allocation balance.
       const localCashReceipts = localReceipts.filter((r) => r.fundId === fund.id && r.type === 'cash_box').reduce((sum, r) => sum + r.amount, 0);
       const mergedCashReceipts = mergedReceiptsList.filter((r) => r.fundId === fund.id && r.type === 'cash_box').reduce((sum, r) => sum + r.amount, 0);
       const localCoveredDeficits = localExpenses.filter((e) => e.fundId === fund.id && e.isCoveredFromCash).reduce((sum, e) => sum + (e.deficitAmount || 0), 0);
       const mergedCoveredDeficits = mergedExpensesList.filter((e) => e.fundId === fund.id && e.isCoveredFromCash).reduce((sum, e) => sum + (e.deficitAmount || 0), 0);
       const cashBoxBase = fund.cashBoxBalance === undefined ? 0 : fund.cashBoxBalance - localCashReceipts + localCoveredDeficits;
       const cashBoxBalance = Number((cashBoxBase + mergedCashReceipts - mergedCoveredDeficits).toFixed(2));
-
-      const netCurrent = Number((totalAlloc + totalReceipts - totalSpent).toFixed(2));
+      const calculatedBalance = Number((totalAlloc + mergedReplenishments - mergedOutflows.cash).toFixed(2));
+      if (calculatedBalance < -0.01) {
+        report.hasConflicts = true;
+        report.conflictDetails.push(`تجاوزت الحركات المدمجة الرصيد النقدي المتاح للعهدة ${fund.name}؛ تم ضبط الرصيد إلى صفر ويتطلب الأمر مراجعة يدوية.`);
+      }
+      const netCurrent = Math.max(0, calculatedBalance);
 
       report.updatedFundsCount++;
 
