@@ -337,9 +337,9 @@ export class OpsDataStore {
     }
     const avail1 = primaryFund.currentBalance;
 
-    let cascadeSplit = expenseData.cascadeSplit;
-    let isDeficit = expenseData.isDeficit || false;
-    let deficitAmount = expenseData.deficitAmount || 0;
+    let cascadeSplit: Expense['cascadeSplit'] = undefined;
+    let isDeficit = false;
+    let deficitAmount = 0;
 
     // Check if cascade multi-fund deduction requested and primary fund balance is insufficient
     if (expenseData.cascadeDeduction && expenseData.secondaryFundId && totalWithTax > avail1) {
@@ -423,6 +423,14 @@ export class OpsDataStore {
 
     const newExpense: Expense = {
       ...expenseData,
+      fundName: primaryFund.name,
+      taskTitle: expenseData.taskId ? this.tasks.find((task) => task.id === expenseData.taskId)?.title : undefined,
+      receiptUrl: undefined,
+      approvalNotes: undefined,
+      rejectionReason: undefined,
+      isCoveredFromCash: false,
+      coveredBy: undefined,
+      coveredAt: undefined,
       id: `exp-${Date.now()}`,
       code: `EXP-${new Date().getFullYear()}-${String(this.expenses.length + 1).padStart(6, '0')}`,
       taxAmount,
