@@ -73,7 +73,15 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
       && coords.lat >= -90 && coords.lat <= 90 && coords.lng >= -180 && coords.lng <= 180);
   }).map((task) => ({ ...task, resolvedCoords: task.geoCoordinates! })), [visibleTasks]);
 
-  const tasksWithoutCoords = useMemo(() => visibleTasks.filter((task) => !tasksWithCoords.some((located) => located.id === task.id)), [visibleTasks, tasksWithCoords]);
+  const tasksWithoutCoords = useMemo(() => visibleTasks.filter((task) => {
+    if (tasksWithCoords.some((located) => located.id === task.id)) return false;
+    if (statusFilter !== 'all' && task.status !== statusFilter) return false;
+    if (assigneeFilter !== 'all' && task.assigneeId !== assigneeFilter) return false;
+    if (typeFilter !== 'all' && task.taskTypeCategory !== typeFilter) return false;
+    const query = searchQuery.trim().toLowerCase();
+    return !query || [task.title, task.location, task.code || '', task.assigneeName]
+      .some((value) => value.toLowerCase().includes(query));
+  }), [visibleTasks, tasksWithCoords, statusFilter, assigneeFilter, typeFilter, searchQuery]);
 
   // Filter tasks
   const filteredTasks = useMemo(() => {
@@ -252,7 +260,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
             onChange={(e) => setStatusFilter(e.target.value)}
             className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold focus:outline-none focus:border-[#2A443B]"
           >
-            <option value="all">كافة الحالات الميدانية ({tasks.length})</option>
+            <option value="all">كافة الحالات الميدانية ({visibleTasks.length})</option>
             <option value="in_progress">قيد التنفيذ النشط الآن</option>
             <option value="scheduled">مجدولة للتنفيذ</option>
             <option value="paused">متوقفة مؤقتاً</option>
@@ -273,7 +281,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
           </select>
 
           {/* Assignee Filter */}
-          <select
+          {currentUser.role !== 'field_officer' && <select
             value={assigneeFilter}
             onChange={(e) => setAssigneeFilter(e.target.value)}
             className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold focus:outline-none focus:border-[#2A443B]"
@@ -284,7 +292,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
                 {u.name} ({u.roleTitleAr})
               </option>
             ))}
-          </select>
+          </select>}
         </div>
       </div>
 
@@ -477,25 +485,25 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
             <div className="inner-white-card p-3.5">
               <span className="text-slate-500 block mb-0.5">المهام الميدانية النشطة</span>
               <span className="text-lg font-black text-emerald-700">
-                {tasks.filter((t) => t.status === 'in_progress' || t.status === 'started').length}
+                {visibleTasks.filter((t) => t.status === 'in_progress' || t.status === 'started').length}
               </span>
             </div>
             <div className="inner-white-card p-3.5">
               <span className="text-slate-500 block mb-0.5">زيارات اليوم المجدولة</span>
               <span className="text-lg font-black text-blue-700">
-                {tasks.filter((t) => t.status === 'scheduled').length}
+                {visibleTasks.filter((t) => t.status === 'scheduled').length}
               </span>
             </div>
             <div className="inner-white-card p-3.5">
               <span className="text-slate-500 block mb-0.5">المعلقة والمؤجلة</span>
               <span className="text-lg font-black text-amber-700">
-                {tasks.filter((t) => t.status === 'paused' || t.status === 'deferred').length}
+                {visibleTasks.filter((t) => t.status === 'paused' || t.status === 'deferred').length}
               </span>
             </div>
             <div className="inner-white-card p-3.5">
               <span className="text-slate-500 block mb-0.5">المكتملة اليوم</span>
               <span className="text-lg font-black text-slate-800">
-                {tasks.filter((t) => t.status === 'completed' || t.status === 'approved').length}
+                {visibleTasks.filter((t) => t.status === 'completed' || t.status === 'approved').length}
               </span>
             </div>
           </div>
