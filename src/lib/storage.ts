@@ -728,8 +728,6 @@ export class OpsDataStore {
     if (!hasPermission(this.getCurrentUser().role, 'funds', 'edit')) throw new Error('لا تملك صلاحية حذف الحسابات الدائمة.');
     const target = this.standingAccounts.find((account) => account.id === id);
     if (!target) throw new Error('الحساب غير موجود.');
-    const hasHistory = Boolean((target.entries || []).length) || this.expenses.some((expense) => expense.standingAccountId === id);
-    if (hasHistory) throw new Error('لا يمكن حذف حساب له حركات مالية؛ يمكنك إيقافه مع الاحتفاظ بسجله.');
     this.standingAccounts = this.standingAccounts.map((account) => account.id === id ? { ...account, active: false } : account);
     safeSet(STORAGE_KEYS.STANDING_ACCOUNTS, this.standingAccounts);
     this.logAudit('إيقاف حساب مورد', 'update', 'fund', id, `تم إيقاف الحساب ${target.name} دون حذف سجله.`);
