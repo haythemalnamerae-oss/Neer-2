@@ -488,6 +488,7 @@ export class OpsDataStore {
   public addCashReceipt(data: Omit<CashReceipt, 'id' | 'code' | 'createdAt'>): CashReceipt {
     if (!hasPermission(this.getCurrentUser().role, 'funds', 'edit')) throw new Error('لا تملك صلاحية تسجيل المقبوضات.');
     if (!Number.isFinite(data.amount) || data.amount <= 0) throw new Error('مبلغ المقبوض غير صالح.');
+    if (data.type === 'cash_box' && !data.fundId) throw new Error('يجب تحديد الصندوق المستلم للمقبوض.');
     if (data.fundId && !this.funds.some((fund) => fund.id === data.fundId)) throw new Error('الصندوق المحدد غير موجود.');
     const newReceipt: CashReceipt = {
       ...data,
@@ -589,7 +590,7 @@ export class OpsDataStore {
             { fundId: targetExpense.cascadeSplit.primaryFundId, amount: targetExpense.cascadeSplit.primaryAmount },
             { fundId: targetExpense.cascadeSplit.secondaryFundId, amount: targetExpense.cascadeSplit.secondaryAmount },
           ]
-        : [{ fundId: targetExpense.fundId, amount: targetExpense.totalWithTax }];
+        : [{ fundId: targetExpense.fundId, amount: targetExpense.isDeficit ? Math.max(0, targetExpense.totalWithTax - (targetExpense.deficitAmount || 0)) : targetExpense.totalWithTax }];
       this.funds = this.funds.map((fund) => {
         const refund = refunds.filter((item) => item.fundId === fund.id).reduce((sum, item) => sum + item.amount, 0);
         if (refund <= 0) return fund;
@@ -600,6 +601,12 @@ export class OpsDataStore {
           status: newBalance <= 0 ? 'depleted' : percentage <= fund.warningThreshold ? 'warning' : 'active' };
       });
       safeSet(STORAGE_KEYS.FUNDS, this.funds);
+      if (targetExpense.taskId) {
+        this.tasks = this.tasks.map((task) => task.id === targetExpense.taskId
+          ? { ...task, spentAmount: Math.max(0, (task.spentAmount || 0) - targetExpense.totalWithTax) }
+          : task);
+        safeSet(STORAGE_KEYS.TASKS, this.tasks);
+      }
     }
 
     this.logAudit(
@@ -1521,11 +1528,11 @@ export class OpsDataStore {
       expensesCount: selectedIds.length,
       expenseIds: selectedIds,
       id: `stl-${Date.now()}`,
-      code: `STL-2026-0${this.settlements.length + 1}`,
+      code: `STL-${new Date().getFullYear()}-${String(this.settlements.length + 1).padStart(5, '0')}`,
       status: 'under_review',
       submittedAt: new Date().toLocaleString('ar-AE'),
       settledBy: currentUser.name,
-      settlementVoucherNumber: `VCH-STL-${Date.now().toString().slice(-4)}`,
+      settlementVoucherNumber: `VCH-STL-${new Date().getFullYear()}-${String(this.settlements.length + 1).padStart(5, '0')}`,
     };
     this.settlements = [newSettlement, ...this.settlements];
     safeSet(STORAGE_KEYS.SETTLEMENTS, this.settlements);
