@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Code2, Menu, Plus, Shield, CheckCircle2, AlertTriangle, Info, LogOut, Type } from 'lucide-react';
+import { Bell, Menu, Plus, Shield, CheckCircle2, AlertTriangle, Info, LogOut, Type } from 'lucide-react';
 import { dataStore } from '../../lib/storage';
 import { User } from '../../types/domain';
 import { ROLE_LABELS } from '../../lib/rbac/permissions';
@@ -45,21 +45,21 @@ export const Header: React.FC<HeaderProps> = ({
 
   const getTitle = () =>
     ({
-      daily: 'مركز القيادة اليومي',
+      daily: 'مركز القيادة',
       approvals: 'مركز الاعتمادات',
-      dashboard: 'مؤشرات الأداء',
+      dashboard: 'التحليلات والمؤشرات',
       tasks: 'إدارة المهام والمشاريع',
-      followUps: 'سلاسل المتابعة',
-      funds: 'إدارة العهد والأرصدة',
+      followUps: 'المتابعة',
+      funds: 'العهد والأرصدة',
       expenses: 'المصروفات والفواتير',
       settlements: 'التسويات المحاسبية',
       calendar: 'التقويم الميداني',
       reports: 'التقارير المالية والتشغيلية',
-      team: 'فريق العمل الميداني',
+      team: 'الفريق الميداني',
       users: 'إدارة المستخدمين',
       roles: 'الصلاحيات والوصول',
       audit: 'سجل التدقيق والرقابة',
-      settings: 'إعدادات النظام',
+      settings: 'إعدادات المنشأة',
       codeViewer: 'أكواد ومستندات النظام',
     }[currentView] || 'منظومة نير');
 
@@ -109,16 +109,6 @@ export const Header: React.FC<HeaderProps> = ({
               <span>مهمة جديدة</span>
             </button>
           </div>
-
-          {/* Code Viewer Shortcut */}
-          <button
-            onClick={() => onSelectView('codeViewer')}
-            title="أكواد ومستندات النظام"
-            className="hidden sm:flex h-10 items-center gap-2 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 px-3 text-xs font-bold text-white transition-all cursor-pointer"
-          >
-            <Code2 className="h-4 w-4 text-emerald-300" />
-            <span className="hidden md:inline">أكواد النظام</span>
-          </button>
 
           {/* Official Font Selector Dropdown */}
           <div className="relative">
