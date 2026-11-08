@@ -99,7 +99,7 @@ export class ReportsService {
       const currency = account.currency || dataStore.getSettings().currency;
       let balance = account.openingBalance ?? ((account.currentBalance || 0) - (account.entries || []).reduce((sum, entry) => sum + (entry.type === 'charge' ? entry.amount : -entry.amount), 0));
       const openingRow = [account.code || account.id, account.name, account.vendorName || '', account.direction, currency, balance, '', 'رصيد افتتاحي', 'رصيد مرحل', '', '', balance, '', ''];
-      const entries = (account.entries || []).slice().reverse().map((entry) => {
+      const entries = (account.entries || []).slice().sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt)).map((entry) => {
         balance += entry.type === 'charge' ? entry.amount : -entry.amount;
         const expense = entry.expenseId ? dataStore.getExpenses().find((item) => item.id === entry.expenseId) : undefined;
         return [account.code || account.id, account.name, account.vendorName || '', account.direction, currency, '', entry.date, entry.type === 'charge' ? 'إضافة مستحق' : 'سداد / تحصيل', entry.description, entry.reference || '', entry.amount, balance, entry.fundName || '', expense?.code || ''];
