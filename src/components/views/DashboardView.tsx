@@ -51,7 +51,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const matchingCurrencyFunds = funds.filter((fund) => fund.currency === settings.currency);
   const otherCurrencyFundCount = funds.length - matchingCurrencyFunds.length;
   const totalFundsBalance = matchingCurrencyFunds.reduce((sum, fund) => sum + fund.currentBalance, 0);
-  const activeExpenses = expenses.filter((expense) => expense.status !== 'rejected');
+  const matchingFundIds = new Set(matchingCurrencyFunds.map((fund) => fund.id));
+  const activeExpenses = expenses.filter((expense) => expense.status !== 'rejected' && matchingFundIds.has(expense.fundId));
   const totalExpenses = activeExpenses.reduce((sum, expense) => sum + expense.totalWithTax, 0);
 
   // Spending categories percentages
@@ -396,7 +397,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </td>
 
                   <td className="p-4 font-mono font-black text-[#132A1C] text-base">
-                    {formatCurrency(exp.totalWithTax)}
+                    {formatCurrency(exp.totalWithTax, dataStore.getFundById(exp.fundId)?.currency || settings.currency)}
                   </td>
 
                   <td className="p-4 text-center">
