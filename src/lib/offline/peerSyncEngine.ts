@@ -237,17 +237,17 @@ export class PeerSyncEngine {
         if (refKey) referenceEntries.set(refKey, remoteEntry);
       }
 
+      const localUpdatedAt = Date.parse(localStand.updatedAt || '') || 0;
+      const remoteUpdatedAt = Date.parse(remoteStand.updatedAt || '') || 0;
+      const metadataSource = remoteUpdatedAt > localUpdatedAt ? remoteStand : localStand;
       const mergedAccount: StandingAccount = {
-        ...remoteStand,
         ...localStand,
-        vendorName: localStand.vendorName || remoteStand.vendorName,
-        contactPhone: localStand.contactPhone || remoteStand.contactPhone,
-        address: localStand.address || remoteStand.address,
-        notes: localStand.notes || remoteStand.notes,
+        ...metadataSource,
         currency: localStand.currency || remoteStand.currency,
         direction: localStand.direction,
         openingBalance: getOpeningBalance(localStand),
-        active: localStand.active === false || remoteStand.active === false ? false : true,
+        active: metadataSource.active !== false,
+        updatedAt: metadataSource.updatedAt || localStand.updatedAt || remoteStand.updatedAt,
         entries: mergedEntries.sort((a, b) => (b.createdAt || b.date).localeCompare(a.createdAt || a.date)),
       };
       standingMap.set(localStand.id, mergedAccount);
