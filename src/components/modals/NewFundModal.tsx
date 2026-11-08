@@ -10,7 +10,7 @@ interface NewFundModalProps {
 }
 
 export const NewFundModal: React.FC<NewFundModalProps> = ({ isOpen, onClose }) => {
-  const users = dataStore.getUsers();
+  const users = dataStore.getUsers().filter((user) => user.active);
   const settings = dataStore.getSettings();
 
   const [name, setName] = useState('');
@@ -21,7 +21,7 @@ export const NewFundModal: React.FC<NewFundModalProps> = ({ isOpen, onClose }) =
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !holderId || parseFloat(totalAllocation) <= 0) {
+    if (!name.trim() || !holderId || !Number.isFinite(Number(totalAllocation)) || Number(totalAllocation) <= 0 || !Number.isFinite(Number(warningThreshold)) || Number(warningThreshold) < 0 || Number(warningThreshold) > 100) {
       alert('يرجى ملء جميع الحقول المطلوبة');
       return;
     }
@@ -29,16 +29,21 @@ export const NewFundModal: React.FC<NewFundModalProps> = ({ isOpen, onClose }) =
     const holder = users.find((u) => u.id === holderId);
     if (!holder) return;
 
-    dataStore.addFund({
-      name,
-      holderId: holder.id,
-      holderName: holder.name,
-      holderDepartment: holder.department,
-      totalAllocation: parseFloat(totalAllocation),
-      currency: settings.currency,
-      warningThreshold: parseInt(warningThreshold) || 25,
-      purpose,
-    });
+    try {
+      dataStore.addFund({
+        name,
+        holderId: holder.id,
+        holderName: holder.name,
+        holderDepartment: holder.department,
+        totalAllocation: Number(totalAllocation),
+        currency: settings.currency,
+        warningThreshold: Number(warningThreshold),
+        purpose,
+      });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'تعذر إنشاء العهدة.');
+      return;
+    }
 
     onClose();
     setName('');
@@ -56,7 +61,7 @@ export const NewFundModal: React.FC<NewFundModalProps> = ({ isOpen, onClose }) =
       <form onSubmit={handleSubmit} className="space-y-4.5 text-xs sm:text-sm">
         <Input
           label="اسم العهدة *"
-          placeholder="مثال: عهدة طوارئ فرع رأس الخيمة"
+          placeholder="مثال: عهدة تشغيلية للموقع أو الفرع"
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
@@ -82,13 +87,18 @@ export const NewFundModal: React.FC<NewFundModalProps> = ({ isOpen, onClose }) =
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
             type="number"
-            label="سقف التخصيص الإجمالي (AED) *"
+            min="0.01"
+            step="0.01"
+            label={`سقف التخصيص الإجمالي (${settings.currency}) *`}
             value={totalAllocation}
             onChange={(e) => setTotalAllocation(e.target.value)}
             required
           />
           <Input
             type="number"
+            min="0"
+            max="100"
+            step="1"
             label="نسبة تنبيه انخفاض الرصيد (%)"
             value={warningThreshold}
             onChange={(e) => setWarningThreshold(e.target.value)}
