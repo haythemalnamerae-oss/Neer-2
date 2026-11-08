@@ -321,6 +321,8 @@ export interface Expense {
   status: ExpenseStatus;
   submittedBy: string;
   submittedAt: string;
+  auditedBy?: string;
+  auditedAt?: string;
   approvedBy?: string;
   approvedAt?: string;
   rejectionReason?: string;
