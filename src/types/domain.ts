@@ -266,6 +266,21 @@ export interface StandingAccountInvoice {
   uploadedBy?: string;
   uploadedAt?: string;
   notes?: string;
+  expenseId?: string;
+}
+
+export interface StandingAccountEntry {
+  id: string;
+  type: 'charge' | 'settlement';
+  amount: number;
+  date: string;
+  description: string;
+  reference?: string;
+  fundId?: string;
+  fundName?: string;
+  expenseId?: string;
+  createdBy: string;
+  createdAt: string;
 }
 
 export interface StandingAccount {
@@ -282,9 +297,12 @@ export interface StandingAccount {
   monthlyLimit?: number;
   defaultAmount?: number;
   currentBalance?: number;
+  openingBalance?: number;
+  currency?: string;
   notes?: string;
   active?: boolean;
   invoices?: StandingAccountInvoice[];
+  entries?: StandingAccountEntry[];
   totalInvoiced?: number;
 }
 
@@ -354,6 +372,8 @@ export interface Expense {
   standingAccountId?: string;
   standingAccountName?: string;
   standingDirection?: 'receivable' | 'payable' | 'receivable_for_us' | 'payable_by_us';
+  standingAccountEntryIds?: string[];
+  isStandingAccountPayment?: boolean;
 }
 
 export type SettlementStatus = 'draft' | 'under_review' | 'audited' | 'approved' | 'closed' | 'rejected';
