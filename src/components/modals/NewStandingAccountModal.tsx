@@ -55,7 +55,9 @@ export const NewStandingAccountModal: React.FC<NewStandingAccountModalProps> = (
       return;
     }
 
-    const created = dataStore.addStandingAccount({
+    let created: StandingAccount;
+    try {
+      created = dataStore.addStandingAccount({
       name: name.trim(),
       vendorName: vendorName.trim() || undefined,
       category,
@@ -72,7 +74,11 @@ export const NewStandingAccountModal: React.FC<NewStandingAccountModalProps> = (
       imageUrl: imageUrl || undefined,
       referenceImageUrl: referenceImageUrl || undefined,
       active: true,
-    });
+      });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'تعذر إنشاء الحساب. تحقق من البيانات والصلاحيات.');
+      return;
+    }
 
     onSuccess?.(created);
     onClose();
