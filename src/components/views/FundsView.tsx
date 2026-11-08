@@ -13,7 +13,6 @@ import {
   Trash2,
   Phone,
   Store,
-  Minus,
 } from 'lucide-react';
 import { PettyCashFund, StandingAccount, CashReceipt, Expense } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
@@ -437,8 +436,8 @@ export const FundsView: React.FC<FundsViewProps> = ({
                     </td>
 
                     <td className="p-3.5 text-center">
-                      {!exp.isCoveredFromCash ? (
-                        {canApproveExpense && <Button
+                      {!exp.isCoveredFromCash && canApproveExpense ? (
+                        <Button
                           variant="success"
                           size="sm"
                           onClick={() => handleCoverDeficit(exp.id)}
@@ -446,9 +445,11 @@ export const FundsView: React.FC<FundsViewProps> = ({
                           className="text-xs sm:text-sm font-bold min-h-[42px] px-4"
                         >
                           تغطية المبلغ من الصندوق
-                        </Button>}
-                      ) : (
+                        </Button>
+                      ) : exp.isCoveredFromCash ? (
                         <span className="text-[#597565] text-xs font-medium">الحساب مسوّى</span>
+                      ) : (
+                        <span className="text-slate-500 text-xs">بانتظار المراجعة المالية</span>
                       )}
                     </td>
                   </tr>
