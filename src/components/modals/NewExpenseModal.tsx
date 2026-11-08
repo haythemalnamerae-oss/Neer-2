@@ -35,9 +35,11 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
   const canApproveExpense = hasPermission(currentUser.role, 'expenses', 'approve');
   const settings = dataStore.getSettings();
   const standingAccounts = dataStore.getStandingAccounts();
+  void standingAccountsVersion;
   const expenses = dataStore.getExpenses();
 
   const [isAddStandingModalOpen, setIsAddStandingModalOpen] = useState(false);
+  const [standingAccountsVersion, setStandingAccountsVersion] = useState(0);
 
   // Extract past vendors + routine vendors for smart search & autocomplete
   const pastVendors = Array.from(
@@ -134,6 +136,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
   };
 
   const handleStandingAccountCreated = (newAcc: StandingAccount) => {
+    setStandingAccountsVersion((version) => version + 1);
     setSelectedStandingAccId(newAcc.id);
     setDescription(newAcc.name);
     setCategory(mapAccountCategory(newAcc.category));
