@@ -268,7 +268,7 @@ export const ReportsView: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-4 text-xs text-slate-600 flex-wrap">
                       <span>التخصيص: <strong className="font-mono text-slate-800">{formatCurrency(item.fund.totalAllocation, item.fund.currency)}</strong></span>
-                      <span>المنصرف: <strong className="font-mono text-rose-700">{formatCurrency(item.totalExpenses, item.fund.currency)}</strong> ({item.expensesCount} فاتورة)</span>
+                      <span>المنصرف: <strong className="font-mono text-rose-700">{formatCurrency(item.totalExpenses, item.fund.currency)}</strong> ({item.expensesCount} حركة صرف)</span>
                       <span>المقبوضات المودعة: <strong className="font-mono text-emerald-800">{formatCurrency(item.totalReceipts, item.fund.currency)}</strong></span>
                       {item.openDeficitExpenses.length > 0 && (
                         <span className="text-rose-700 font-black animate-pulse">
@@ -350,6 +350,25 @@ export const ReportsView: React.FC = () => {
                         </div>
                       )}
                     </div>
+
+                    {item.supplierPayments.length > 0 && (
+                      <div className="space-y-2 pt-2 border-t border-black/[0.04]">
+                        <h5 className="text-xs font-black text-amber-800 uppercase tracking-wide flex items-center gap-1.5">
+                          <Wallet className="w-4 h-4" />
+                          <span>سداد الموردين من هذه العهدة:</span>
+                        </h5>
+                        {item.supplierPayments.map((payment) => (
+                          <div key={payment.id} className="p-3.5 neu-raised rounded-xl flex items-center justify-between flex-wrap gap-2 text-xs">
+                            <div className="space-y-0.5">
+                              <strong className="text-slate-800">{payment.accountName}</strong>
+                              <p className="text-slate-500">{payment.description} {payment.reference ? `• ${payment.reference}` : ''}</p>
+                              <span className="text-[11px] text-slate-500">{payment.date}</span>
+                            </div>
+                            <strong className="font-mono text-amber-800">{formatCurrency(payment.amount, payment.currency)}</strong>
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
                     {/* Receipts List */}
                     {item.fundReceipts.length > 0 && (
