@@ -507,6 +507,7 @@ export class OpsDataStore {
   public addCashReceipt(data: Omit<CashReceipt, 'id' | 'code' | 'createdAt'>): CashReceipt {
     if (!hasPermission(this.getCurrentUser().role, 'funds', 'edit')) throw new Error('لا تملك صلاحية تسجيل المقبوضات.');
     if (!Number.isFinite(data.amount) || data.amount <= 0) throw new Error('مبلغ المقبوض غير صالح.');
+    if (!data.source?.trim() || !data.receivedBy?.trim() || !/^\\d{4}-\\d{2}-\\d{2}$/.test(data.date)) throw new Error('بيانات مصدر المقبوض أو المستلم أو التاريخ غير مكتملة.');
     if (data.type === 'cash_box' && !data.fundId) throw new Error('يجب تحديد الصندوق المستلم للمقبوض.');
     if (data.fundId && !this.funds.some((fund) => fund.id === data.fundId)) throw new Error('الصندوق المحدد غير موجود.');
     if (data.type === 'cash_box' && this.funds.find((fund) => fund.id === data.fundId)?.currency !== this.settings.currency) throw new Error('عملة الصندوق تختلف عن عملة المنشأة.');
