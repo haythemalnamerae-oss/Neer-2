@@ -155,6 +155,7 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
               </div>
 
               {canApproveSettlement && ['under_review', 'audited'].includes(st.status) && (
+                <>
                 <Button
                   variant="success"
                   size="sm"
@@ -173,6 +174,7 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
                 >
                   رفض وإعادة الفواتير
                 </Button>
+                </>
               )}
             </div>
           </div>
@@ -217,14 +219,14 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
                 <div className="text-left font-mono text-xs text-[#4F6C5B] space-y-1">
                   <p>تاريخ الإصدار: {new Date().toISOString().split('T')[0]}</p>
                   <p>كود الحركة: {previewSettlement.code}</p>
-                  <p className="text-[#215435] font-bold">الحالة: {previewSettlement.status === 'approved' ? 'معتمد رسمياً' : 'قيد المراجعة'}</p>
+                  <p className="text-[#215435] font-bold">الحالة: {previewSettlement.status === 'approved' || previewSettlement.status === 'closed' ? 'معتمد رسمياً' : previewSettlement.status === 'rejected' ? 'مرفوض' : 'قيد المراجعة'}</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4 text-xs sm:text-sm neu-inset p-5 rounded-2xl">
                 <div className="space-y-1.5">
                   <p><strong>اسم العهدة:</strong> {previewSettlement.fundName}</p>
-                  <p><strong>المسؤول / أمين العهدة:</strong> {previewSettlement.settledByName || 'مسؤول العمليات الميدانية'}</p>
+                  <p><strong>المسؤول / أمين العهدة:</strong> {previewSettlement.settledBy || 'مسؤول العمليات الميدانية'}</p>
                 </div>
                 <div className="space-y-1.5 text-left sm:text-right">
                   <p><strong>فترة دورة التسوية:</strong> من {previewSettlement.periodStart} إلى {previewSettlement.periodEnd}</p>
@@ -252,7 +254,7 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
                     </tr>
                     <tr className="font-bold">
                       <td className="p-3">صافي الرصيد المستحق لإعادة التعويض والتغذية (Reimbursement Due)</td>
-                      <td className="p-3 text-center font-mono text-base text-[#4E2B68] font-black">{formatCurrency(previewSettlement.totalExpenses)}</td>
+                      <td className="p-3 text-center font-mono text-base text-[#4E2B68] font-black">{formatCurrency(previewSettlement.totalExpenses, settings.currency)}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -327,7 +329,7 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
           <div className="grid grid-cols-2 gap-4 mb-6 text-xs">
             <div>
               <p><strong>اسم العهدة:</strong> {selectedSettlement.fundName}</p>
-              <p><strong>أمين العهدة المسؤول:</strong> {selectedSettlement.settledByName || 'المسؤول الميداني'}</p>
+              <p><strong>أمين العهدة المسؤول:</strong> {selectedSettlement.settledBy || 'المسؤول الميداني'}</p>
             </div>
             <div>
               <p><strong>فترة الدورة:</strong> من {selectedSettlement.periodStart} إلى {selectedSettlement.periodEnd}</p>
