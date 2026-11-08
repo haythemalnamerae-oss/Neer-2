@@ -53,6 +53,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
   const [standingFilter, setStandingFilter] = useState<'all' | 'payable' | 'receivable'>('all');
 
   const currentUser = dataStore.getCurrentUser();
+  const settings = dataStore.getSettings();
   const canCreateFund = hasPermission(currentUser.role, 'funds', 'create');
   const canEditFund = hasPermission(currentUser.role, 'funds', 'edit');
   const canCreateExpense = hasPermission(currentUser.role, 'expenses', 'create');
@@ -81,6 +82,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
   const totalBalance = funds.reduce((s, f) => s + f.currentBalance, 0);
   const totalReceipts = cashReceipts.reduce((s, r) => s + r.amount, 0);
   const totalPendingDeficit = pendingDeficitExpenses.reduce((s, e) => s + (e.deficitAmount || e.totalWithTax), 0);
+  const fundCurrencyForExpense = (fundId: string) => funds.find((fund) => fund.id === fundId)?.currency || settings.currency;
 
   const handleConfirmReplenish = (e: React.FormEvent) => {
     e.preventDefault();
@@ -193,7 +195,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
         <div className="inner-white-card p-5 space-y-1">
           <span className="text-xs font-semibold text-slate-500 block">إجمالي المخصصات المعتمدة</span>
           <span className="text-2xl font-black text-slate-900 block font-sans-inter dir-ltr">
-            {formatCurrency(totalAllocated)}
+            {formatCurrency(totalAllocated, settings.currency)}
           </span>
           <span className="text-[11px] text-slate-400 block font-medium">{funds.length} عهد مسجلة</span>
         </div>
@@ -201,7 +203,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
         <div className="inner-white-card p-5 space-y-1">
           <span className="text-xs font-semibold text-slate-500 block">الرصيد المتاح في العهد</span>
           <span className="text-2xl font-black text-emerald-800 block font-sans-inter dir-ltr">
-            {formatCurrency(totalBalance)}
+            {formatCurrency(totalBalance, settings.currency)}
           </span>
           <span className="text-[11px] text-emerald-700 font-bold block">
             نسبة السيولة: {totalAllocated > 0 ? Math.round((totalBalance / totalAllocated) * 100) : 0}%
@@ -211,7 +213,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
         <div className="inner-white-card p-5 space-y-1">
           <span className="text-xs font-semibold text-slate-500 block">إجمالي المقبوضات المسجلة</span>
           <span className="text-2xl font-black text-sky-800 block font-sans-inter dir-ltr">
-            {formatCurrency(totalReceipts)}
+            {formatCurrency(totalReceipts, settings.currency)}
           </span>
           <span className="text-[11px] text-sky-700 font-bold block">
             {cashReceipts.length} مقبوض مسجل
@@ -221,7 +223,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
         <div className={`inner-white-card p-5 space-y-1 ${pendingDeficitExpenses.length > 0 ? 'ring-2 ring-rose-400/40' : ''}`}>
           <span className="text-xs font-bold text-rose-700 block">عجز معلق تغطيته (رصيد سالب)</span>
           <span className="text-2xl font-black text-rose-700 block font-sans-inter dir-ltr">
-            {formatCurrency(totalPendingDeficit)}
+            {formatCurrency(totalPendingDeficit, settings.currency)}
           </span>
           <span className="text-[11px] text-rose-600 font-medium block">
             {pendingDeficitExpenses.length} فواتير تتطلب تسوية من الصندوق
@@ -314,7 +316,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
                 <div className="space-y-1.5">
                   <div className="flex justify-between text-xs text-[#4F6C5B]">
                     <span>نسبة الرصيد المتبقي: <strong className="font-mono">{ratio}%</strong></span>
-                    <span>المخصص: <strong className="dir-ltr font-mono">{formatCurrency(fund.totalAllocation)}</strong></span>
+                    <span>المخصص: <strong className="dir-ltr font-mono">{formatCurrency(fund.totalAllocation, fund.currency)}</strong></span>
                   </div>
                   <div className="w-full neu-inset-sm h-3 rounded-full overflow-hidden p-0.5">
                     <div
@@ -425,7 +427,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
 
                     <td className="p-3.5 font-mono">
                       <span className="text-[#A03E33] font-black text-sm dir-ltr block">
-                        -{formatCurrency(exp.deficitAmount || exp.totalWithTax)}
+                        -{formatCurrency(exp.deficitAmount || exp.totalWithTax, fundCurrencyForExpense(exp.fundId))}
                       </span>
                     </td>
 
@@ -539,7 +541,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
 
                       <td className="p-3.5 font-mono">
                         <strong className="text-[#255237] font-black text-sm dir-ltr block">
-                          +{formatCurrency(rc.amount)}
+                          +{formatCurrency(rc.amount, settings.currency)}
                         </strong>
                       </td>
 
