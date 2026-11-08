@@ -156,9 +156,19 @@ export class PeerSyncEngine {
 
     for (const remoteExp of payload.data.expenses || []) {
       report.totalEntitiesProcessed++;
-      if (!expenseMap.has(remoteExp.id)) {
+      const localExpense = expenseMap.get(remoteExp.id);
+      if (!localExpense) {
         expenseMap.set(remoteExp.id, remoteExp);
         report.newExpensesCount++;
+      } else if (localExpense.status !== remoteExp.status) {
+        const terminalConflict = ((localExpense.status === 'approved' || localExpense.status === 'settled') && remoteExp.status === 'rejected')
+          || (localExpense.status === 'rejected' && (remoteExp.status === 'approved' || remoteExp.status === 'settled'));
+        if (terminalConflict) {
+          report.hasConflicts = true;
+          report.conflictDetails.push(`تعارض اعتماد للمصروف ${remoteExp.code}: إحدى النسختين معتمدة والأخرى مرفوضة؛ تم الاحتفاظ بالحالة المحلية للمراجعة.`);
+        } else if (remoteExp.status === 'rejected' || remoteExp.status === 'settled' || (remoteExp.status === 'approved' && localExpense.status === 'pending_approval')) {
+          expenseMap.set(remoteExp.id, { ...localExpense, ...remoteExp });
+        }
       }
     }
 
@@ -178,9 +188,66 @@ export class PeerSyncEngine {
     const localStanding = dataStore.getStandingAccounts();
     const standingMap = new Map<string, StandingAccount>(localStanding.map((s) => [s.id, s]));
     for (const remoteStand of payload.data.standingAccounts || []) {
-      if (!standingMap.has(remoteStand.id)) {
+      report.totalEntitiesProcessed++;
+      const localStand = standingMap.get(remoteStand.id);
+      if (!localStand) {
         standingMap.set(remoteStand.id, remoteStand);
+        continue;
       }
+
+      if (localStand.currency && remoteStand.currency && localStand.currency !== remoteStand.currency) {
+        report.hasConflicts = true;
+        report.conflictDetails.push(`اختلاف عملة حساب المورد ${localStand.name} بين الجهازين؛ تم الاحتفاظ بعملة الجهاز المحلي.`);
+      }
+      if (localStand.direction !== remoteStand.direction) {
+        report.hasConflicts = true;
+        report.conflictDetails.push(`اختلاف طبيعة الحساب ${localStand.name} (لنا/علينا) بين الجهازين؛ تم الاحتفاظ بالتصنيف المحلي.`);
+      }
+      if (localStand.openingBalance !== undefined && remoteStand.openingBalance !== undefined && localStand.openingBalance !== remoteStand.openingBalance) {
+        report.hasConflicts = true;
+        report.conflictDetails.push(`اختلاف الرصيد الافتتاحي لحساب ${localStand.name}؛ لم يتم جمع الرصيدين.`);
+      }
+
+      const mergedEntries = [...(localStand.entries || [])];
+      const entryIds = new Map(mergedEntries.map((entry) => [entry.id, entry]));
+      const referenceEntries = new Map(mergedEntries.filter((entry) => entry.reference?.trim()).map((entry) => [entry.reference!.trim().toLowerCase(), entry]));
+      for (const remoteEntry of remoteStand.entries || []) {
+        const sameId = entryIds.get(remoteEntry.id);
+        if (sameId) {
+          if (sameId.amount !== remoteEntry.amount || sameId.type !== remoteEntry.type || sameId.reference !== remoteEntry.reference) {
+            report.hasConflicts = true;
+            report.conflictDetails.push(`تعارض في حركة دفتر حساب ${localStand.name}؛ تم الاحتفاظ بالحركة المحلية.`);
+          }
+          continue;
+        }
+        const refKey = remoteEntry.reference?.trim().toLowerCase();
+        const sameReference = refKey ? referenceEntries.get(refKey) : undefined;
+        if (sameReference) {
+          if (sameReference.amount !== remoteEntry.amount || sameReference.type !== remoteEntry.type) {
+            report.hasConflicts = true;
+            report.conflictDetails.push(`مرجع مكرر بقيمة مختلفة في حساب ${localStand.name}: ${remoteEntry.reference}؛ لم تتم إضافة الحركة الواردة.`);
+          }
+          continue;
+        }
+        mergedEntries.push(remoteEntry);
+        entryIds.set(remoteEntry.id, remoteEntry);
+        if (refKey) referenceEntries.set(refKey, remoteEntry);
+      }
+
+      const mergedAccount: StandingAccount = {
+        ...remoteStand,
+        ...localStand,
+        vendorName: localStand.vendorName || remoteStand.vendorName,
+        contactPhone: localStand.contactPhone || remoteStand.contactPhone,
+        address: localStand.address || remoteStand.address,
+        notes: localStand.notes || remoteStand.notes,
+        currency: localStand.currency || remoteStand.currency,
+        direction: localStand.direction,
+        openingBalance: localStand.openingBalance ?? remoteStand.openingBalance,
+        active: localStand.active === false || remoteStand.active === false ? false : true,
+        entries: mergedEntries.sort((a, b) => (b.createdAt || b.date).localeCompare(a.createdAt || a.date)),
+      };
+      standingMap.set(localStand.id, mergedAccount);
     }
 
     // 5. Merge Settlements
@@ -202,13 +269,25 @@ export class PeerSyncEngine {
       const remoteFund = payload.data.funds?.find((f) => f.id === fund.id);
       const totalAlloc = remoteFund ? Math.max(fund.totalAllocation, remoteFund.totalAllocation) : fund.totalAllocation;
 
-      // Calculate total spent for this fund from merged approved/recorded expenses
-      const fundExpenses = mergedExpensesList.filter((e) => e.fundId === fund.id && e.status !== 'rejected');
-      const totalSpent = fundExpenses.reduce((sum, e) => sum + (e.totalWithTax || e.amount), 0);
+      // Cash purchases reduce custody immediately; supplier-credit purchases reduce it only when paid.
+      const fundExpenses = mergedExpensesList.filter((e) => e.fundId === fund.id && e.status !== 'rejected' && !e.isSupplierCredit);
+      const cashExpenseTotal = fundExpenses.reduce((sum, e) => sum + (e.totalWithTax || e.amount), 0);
+      const supplierPayments = Array.from(standingMap.values())
+        .filter((account) => account.direction === 'payable' || account.direction === 'payable_by_us')
+        .flatMap((account) => account.entries || [])
+        .filter((entry) => entry.type === 'settlement' && entry.fundId === fund.id)
+        .reduce((sum, entry) => sum + entry.amount, 0);
+      const totalSpent = Number((cashExpenseTotal + supplierPayments).toFixed(2));
 
       // Add verified receipts allocated to this fund
       const fundReceipts = mergedReceiptsList.filter((r) => r.fundId === fund.id);
       const totalReceipts = fundReceipts.reduce((sum, r) => sum + r.amount, 0);
+      const localCashReceipts = localReceipts.filter((r) => r.fundId === fund.id && r.type === 'cash_box').reduce((sum, r) => sum + r.amount, 0);
+      const mergedCashReceipts = mergedReceiptsList.filter((r) => r.fundId === fund.id && r.type === 'cash_box').reduce((sum, r) => sum + r.amount, 0);
+      const localCoveredDeficits = localExpenses.filter((e) => e.fundId === fund.id && e.isCoveredFromCash).reduce((sum, e) => sum + (e.deficitAmount || 0), 0);
+      const mergedCoveredDeficits = mergedExpensesList.filter((e) => e.fundId === fund.id && e.isCoveredFromCash).reduce((sum, e) => sum + (e.deficitAmount || 0), 0);
+      const cashBoxBase = fund.cashBoxBalance === undefined ? 0 : fund.cashBoxBalance - localCashReceipts + localCoveredDeficits;
+      const cashBoxBalance = Number((cashBoxBase + mergedCashReceipts - mergedCoveredDeficits).toFixed(2));
 
       const netCurrent = Number((totalAlloc + totalReceipts - totalSpent).toFixed(2));
 
@@ -219,6 +298,7 @@ export class PeerSyncEngine {
         totalAllocation: totalAlloc,
         spentBalance: Number(totalSpent.toFixed(2)),
         currentBalance: netCurrent,
+        cashBoxBalance,
         lastReplenishedDate: remoteFund?.lastReplenishedDate || fund.lastReplenishedDate,
       };
     });
