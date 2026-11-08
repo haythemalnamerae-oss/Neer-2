@@ -14,12 +14,15 @@ import {
 } from 'lucide-react';
 import { ReportsService } from '../../services/reports.service';
 import { dataStore } from '../../lib/storage';
+import { hasPermission } from '../../lib/rbac/permissions';
 import { formatCurrency } from '../../lib/utils/format';
 import { Button } from '../ui/button';
 import { OperationsCashFlowChart, ExpenseDonutChart } from '../charts/OperationsCharts';
 
 export const ReportsView: React.FC = () => {
+  const currentUser = dataStore.getCurrentUser();
   const settings = dataStore.getSettings();
+  const canExportReports = hasPermission(currentUser.role, 'reports', 'create');
   const metrics = ReportsService.getDashboardMetrics();
   const categoryBreakdown = ReportsService.getExpenseCategoryBreakdown();
   const teamPerformance = ReportsService.getTeamPerformance();
@@ -56,7 +59,7 @@ export const ReportsView: React.FC = () => {
           </p>
         </div>
 
-        <Button
+        {canExportReports && <Button
           variant="outline"
           size="md"
           onClick={handleExportCSV}
@@ -64,7 +67,7 @@ export const ReportsView: React.FC = () => {
           className="text-xs sm:text-sm font-bold min-h-[44px]"
         >
           تصدير تقرير شامل (CSV)
-        </Button>
+        </Button>}
       </div>
 
       {/* KPI Grid */}
@@ -86,7 +89,7 @@ export const ReportsView: React.FC = () => {
         </div>
 
         <div className="neu-raised rounded-3xl p-5 space-y-1.5">
-          <span className="text-xs font-semibold text-[#577262] block">إجمالي المصروفات المنفقة</span>
+          <span className="text-xs font-semibold text-[#577262] block">إجمالي المصروفات المسجلة</span>
           <span className="text-2xl sm:text-3xl font-black text-[#142B1D] block font-mono dir-ltr">
             {formatCurrency(metrics.totalExpensesAmount)}
           </span>
