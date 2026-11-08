@@ -13,7 +13,7 @@ interface StandingAccountDetailsModalProps {
 }
 
 export const StandingAccountDetailsModal: React.FC<StandingAccountDetailsModalProps> = ({ account, onClose, canManage, canPostCharge }) => {
-  const [mode, setMode] = useState<'charge' | 'settlement'>(canPostCharge ? 'charge' : 'settlement');
+  const [mode, setMode] = useState<'charge' | 'settlement'>(canPostCharge && account?.active !== false ? 'charge' : 'settlement');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [description, setDescription] = useState('');
@@ -78,7 +78,7 @@ export const StandingAccountDetailsModal: React.FC<StandingAccountDetailsModalPr
 
         {canManage && <form onSubmit={handleSubmit} className="neu-raised rounded-2xl p-4 space-y-3">
           <div className="flex flex-wrap gap-2">
-            {canPostCharge && <button type="button" onClick={() => setMode('charge')} className={`px-4 py-2 rounded-xl text-xs font-bold ${mode === 'charge' ? 'neu-inset text-emerald-900' : 'neu-raised text-slate-600'}`}>
+            {canPostCharge && current.active !== false && <button type="button" onClick={() => setMode('charge') className={`px-4 py-2 rounded-xl text-xs font-bold ${mode === 'charge' ? 'neu-inset text-emerald-900' : 'neu-raised text-slate-600'}`}>
               {isPayable ? 'إضافة فاتورة معتمدة / رصيد سابق' : 'إضافة مستحق معتمد لنا'}
             </button>}
             <button type="button" onClick={() => setMode('settlement')} className={`px-4 py-2 rounded-xl text-xs font-bold ${mode === 'settlement' ? 'neu-inset text-emerald-900' : 'neu-raised text-slate-600'}`}>
@@ -121,6 +121,7 @@ export const StandingAccountDetailsModal: React.FC<StandingAccountDetailsModalPr
         <div className="space-y-2">
           <h4 className="font-black text-sm text-slate-800">كشف حركة الحساب</h4>
           {!canManage && <p className="text-xs text-slate-500">صلاحية العرض فقط؛ لا يمكنك إضافة حركات أو تسويات على هذا الحساب.</p>}
+          {current.active === false && <p className="text-xs text-rose-700">هذا الحساب موقوف؛ يمكن مراجعة كشفه وتسوية الرصيد المتبقي، ولا يمكن تسجيل فواتير جديدة.</p>}
           {canManage && !canPostCharge && <p className="text-xs text-slate-500">إضافة فاتورة مباشرة تتطلب صلاحية اعتماد المصروفات؛ يمكنك تسجيل السداد أو التحصيل حسب صلاحياتك.</p>}
           {entries.length === 0 ? <p className="text-xs text-slate-500 neu-inset-sm rounded-xl p-4">لا توجد حركات بعد. سيظهر هنا كل شراء وفاتورة وسداد أو تحصيل.</p> : (
             <div className="overflow-x-auto">
