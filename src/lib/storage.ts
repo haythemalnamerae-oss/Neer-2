@@ -111,7 +111,7 @@ const DEFAULT_SETTINGS: SystemSettings = {
   themeAccent: 'indigo',
 };
 
-const STORAGE_KEYS = {
+export const STORAGE_KEYS = {
   USERS: 'ops_users_v3',
   CURRENT_USER_ID: 'ops_current_user_id_v3',
   FUNDS: 'ops_funds_v3',
