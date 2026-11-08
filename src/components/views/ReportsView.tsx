@@ -30,6 +30,19 @@ export const ReportsView: React.FC = () => {
 
   const [expandedFundId, setExpandedFundId] = useState<string | null>(null);
 
+  const handleExportStandingAccountsCSV = () => {
+    const csvData = ReportsService.exportStandingAccountsToCSV();
+    const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Supplier_Accounts_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const handleExportCSV = () => {
     const csvData = ReportsService.exportExpensesToCSV();
     const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
@@ -59,15 +72,14 @@ export const ReportsView: React.FC = () => {
           </p>
         </div>
 
-        {canExportReports && <Button
-          variant="outline"
-          size="md"
-          onClick={handleExportCSV}
-          icon={<Download className="w-4.5 h-4.5 stroke-[2.2]" />}
-          className="text-xs sm:text-sm font-bold min-h-[44px]"
-        >
-          تصدير تقرير شامل (CSV)
-        </Button>}
+        {canExportReports && <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="md" onClick={handleExportCSV} icon={<Download className="w-4.5 h-4.5 stroke-[2.2]" />} className="text-xs sm:text-sm font-bold min-h-[44px]">
+            تصدير المصروفات (CSV)
+          </Button>
+          <Button variant="outline" size="md" onClick={handleExportStandingAccountsCSV} icon={<Download className="w-4.5 h-4.5 stroke-[2.2]" />} className="text-xs sm:text-sm font-bold min-h-[44px]">
+            تصدير دفاتر الموردين (CSV)
+          </Button>
+        </div>}
       </div>
 
       {/* KPI Grid */}
