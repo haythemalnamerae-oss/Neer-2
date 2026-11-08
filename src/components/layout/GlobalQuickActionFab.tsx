@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, CheckSquare, Receipt, Target, FileCheck2, ShieldAlert, X } from 'lucide-react';
+import { Plus, CheckSquare, Receipt, Target, FileCheck2, X } from 'lucide-react';
 import { dataStore } from '../../lib/storage';
 import { hasPermission } from '../../lib/rbac/permissions';
 
@@ -45,25 +45,7 @@ export const GlobalQuickActionFab: React.FC<GlobalQuickActionFabProps> = ({
       allowed: hasPermission(user.role, 'tasks', 'approve'),
       run: () => onSelectView('approvals'),
     },
-    {
-      key: 'sos',
-      label: 'نداء استغاثة (SOS)',
-      icon: ShieldAlert,
-      allowed: true,
-      run: () => {
-        const reason = window.prompt(
-          'سبب طلب الدعم الميداني الطارئ:',
-          'عطل طارئ / بحاجة لمساندة فورية'
-        );
-        if (reason)
-          dataStore.addNotification({
-            title: 'نداء استغاثة طارئ (SOS)',
-            message: `أرسل ${user.name} طلب مساعدة عاجل: ${reason}`,
-            type: 'alert',
-            targetView: 'daily',
-          });
-      },
-    },
+
   ].filter((item) => item.allowed);
 
   return (
