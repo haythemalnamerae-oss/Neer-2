@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Task } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
+import { hasPermission } from '../../lib/rbac/permissions';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -31,10 +32,15 @@ export const FollowUpsView: React.FC<FollowUpsViewProps> = ({
   const [filterReason, setFilterReason] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
+  const user = dataStore.getCurrentUser();
+  const canEditTasks = hasPermission(user.role, 'tasks', 'edit');
   const allTasks = dataStore.getTasks();
+  const scopedTasks = user.role === 'field_officer'
+    ? allTasks.filter((task) => task.assigneeId === user.id)
+    : allTasks;
 
   // Tasks with chains or follow-up outcomes
-  const chainTasks = allTasks.filter(
+  const chainTasks = scopedTasks.filter(
     (t) =>
       Boolean(t.parentTaskId) ||
       (t.taskChain && t.taskChain.length > 0) ||
@@ -75,6 +81,24 @@ export const FollowUpsView: React.FC<FollowUpsViewProps> = ({
         <span className="neu-raised text-emerald-800 font-extrabold px-4 py-2 rounded-2xl text-xs sm:text-sm">
           {chainTasks.length} مهام في سلاسل متابعة
         </span>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2">
+        <label className="relative block">
+          <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="ابحث بعنوان المهمة أو الكود أو سبب المتابعة" className="min-h-11 w-full rounded-xl border border-slate-200 pr-9 pl-3 text-sm" />
+        </label>
+        <select value={filterReason} onChange={(event) => setFilterReason(event.target.value)} className="min-h-11 rounded-xl border border-slate-200 px-3 text-sm">
+          <option value="all">كل أسباب المتابعة</option>
+          <option value="client_unavailable">العميل غير متاح</option>
+          <option value="document_missing">مستند ناقص</option>
+          <option value="payment_pending">دفعة معلقة</option>
+          <option value="needs_approval">تحتاج اعتماد</option>
+          <option value="client_postponed">تأجيل من العميل</option>
+          <option value="weather_conditions">ظروف جوية</option>
+          <option value="technical_blocker">عائق فني</option>
+          <option value="other">أخرى</option>
+        </select>
       </div>
 
       {/* Grid of Follow-up Cards */}
@@ -137,14 +161,14 @@ export const FollowUpsView: React.FC<FollowUpsViewProps> = ({
                 >
                   عرض التفاصيل
                 </Button>
-                <Button
+                {canEditTasks && <Button
                   variant="success"
                   size="sm"
                   onClick={() => onRecordOutcome(task)}
                   icon={<CheckCircle2 className="w-4 h-4 ml-1" />}
                 >
                   تحديث النتيجة
-                </Button>
+                </Button>}
               </div>
             </div>
           );
