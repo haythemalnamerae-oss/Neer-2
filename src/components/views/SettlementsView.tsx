@@ -322,9 +322,11 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
         <div className="hidden print:block fixed inset-0 bg-white p-8 text-black z-50 text-right dir-rtl">
           <div className="border-b-2 border-black pb-4 mb-6 flex justify-between items-start">
             <div>
-              <h1 className="text-2xl font-black">منظومة العمليات الميدانية والعهد - OpsPlatform</h1>
+              <h1 className="text-2xl font-black">{settings.organizationName}</h1>
               <h2 className="text-lg font-bold mt-1">سند تصفية وتسوية عهدة نقدية رسمية</h2>
-              <p className="text-xs mt-0.5">رقم السند: {selectedSettlement.voucherNumber || selectedSettlement.code}</p>
+              <p className="text-xs mt-0.5">{settings.headquarters || ' '} </p>
+            <p className="text-xs mt-0.5">الرقم الضريبي: {settings.taxRegistrationNumber || 'غير مسجل'}</p>
+            <p className="text-xs mt-0.5">رقم السند: {selectedSettlement.voucherNumber || selectedSettlement.code}</p>
             </div>
             <div className="text-left font-mono text-xs">
               <p>تاريخ السند: {new Date().toISOString().split('T')[0]}</p>
