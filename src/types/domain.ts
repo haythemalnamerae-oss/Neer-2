@@ -322,6 +322,7 @@ export interface Expense {
   submittedBy: string;
   submittedAt: string;
   auditedBy?: string;
+  auditedById?: string;
   auditedAt?: string;
   approvedBy?: string;
   approvedAt?: string;
