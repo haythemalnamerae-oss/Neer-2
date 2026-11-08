@@ -22,7 +22,7 @@ CREATE TYPE task_priority AS ENUM ('urgent', 'high', 'medium', 'low');
 CREATE TYPE task_status AS ENUM ('new', 'scheduled', 'started', 'in_progress', 'paused', 'pending_approval', 'approved', 'rejected', 'deferred', 'cancelled', 'todo', 'review', 'completed');
 CREATE TYPE fund_status AS ENUM ('active', 'warning', 'depleted', 'closed');
 CREATE TYPE expense_status AS ENUM ('draft', 'pending_approval', 'approved', 'rejected', 'settled');
-CREATE TYPE settlement_status AS ENUM ('draft', 'under_review', 'audited', 'approved', 'closed');
+CREATE TYPE settlement_status AS ENUM ('draft', 'under_review', 'audited', 'approved', 'closed', 'rejected');
 
 -- 1. Users Table
 CREATE TABLE users (
