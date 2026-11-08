@@ -1753,6 +1753,7 @@ export class OpsDataStore {
 
   public updateSettings(newSettings: Partial<SystemSettings>): void {
     if (!hasPermission(this.getCurrentUser().role, 'settings', 'edit')) throw new Error('لا تملك صلاحية تعديل إعدادات النظام.');
+    if (newSettings.autoCaptureLocationWithoutApproval !== undefined && this.getCurrentUser().role !== 'admin') throw new Error('سياسة التقاط الموقع التلقائي متاحة لمدير النظام فقط.');
     const nextSettings = { ...this.settings, ...newSettings };
     if (!/^[A-Z]{3}$/.test(nextSettings.currency)) throw new Error('رمز العملة يجب أن يتكون من ثلاثة أحرف كبيرة.');
     if (!Number.isFinite(nextSettings.taxRate) || nextSettings.taxRate < 0 || nextSettings.taxRate > 100) throw new Error('نسبة الضريبة يجب أن تكون بين 0 و100.');
