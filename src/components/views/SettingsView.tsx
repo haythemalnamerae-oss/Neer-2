@@ -168,6 +168,7 @@ export const SettingsView: React.FC = () => {
                 <option value="USD">دولار أمريكي (USD)</option>
                 <option value="YER">ريال يمني (YER)</option>
               </select>
+              <p className="text-[11px] leading-relaxed text-slate-500">لا يتم تحويل أرصدة العهد تلقائياً. إذا كانت هناك عهد بعملة أخرى، يجب تسويتها وتحويلها بخطة معتمدة قبل تغيير عملة النظام.</p>
             </div>
 
             <Input
