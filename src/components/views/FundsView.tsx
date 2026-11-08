@@ -919,7 +919,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
         isOpen={isStandingModalOpen}
         onClose={() => setIsStandingModalOpen(false)}
       />
-      <StandingAccountDetailsModal key={selectedStandingAccount?.id || 'none'} account={selectedStandingAccount} onClose={() => setSelectedStandingAccount(null)} canManage={canEditFund} />
+      <StandingAccountDetailsModal key={selectedStandingAccount?.id || 'none'} account={selectedStandingAccount} onClose={() => setSelectedStandingAccount(null)} canManage={canEditFund} canPostCharge={canEditFund && canApproveExpense} />
     </div>
   );
 };
