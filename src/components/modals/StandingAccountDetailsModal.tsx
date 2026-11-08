@@ -137,7 +137,7 @@ export const StandingAccountDetailsModal: React.FC<StandingAccountDetailsModalPr
                 <tbody>
                   {(() => {
                     let runningBalance = openingBalance;
-                    const chronologicalRows = entries.slice().reverse().map((entry) => {
+                    const chronologicalRows = entries.slice().sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt)).map((entry) => {
                       runningBalance += entry.type === 'charge' ? entry.amount : -entry.amount;
                       return { entry, balance: runningBalance };
                     });
