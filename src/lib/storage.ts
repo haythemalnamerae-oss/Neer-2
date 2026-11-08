@@ -314,6 +314,12 @@ export class OpsDataStore {
 
     const primaryFund = this.funds.find((f) => f.id === expenseData.fundId);
     if (!primaryFund) throw new Error('العهدة المحددة غير موجودة.');
+    if (currentUser.role === 'field_officer' && primaryFund.holderId !== currentUser.id) throw new Error('لا يمكنك تسجيل مصروف على عهدة غير مسندة إليك.');
+    if (expenseData.taskId) {
+      const linkedTask = this.tasks.find((task) => task.id === expenseData.taskId);
+      if (!linkedTask) throw new Error('المهمة المرتبطة بالمصروف غير موجودة.');
+      if (currentUser.role === 'field_officer' && linkedTask.assigneeId !== currentUser.id) throw new Error('لا يمكنك ربط المصروف بمهمة غير مسندة إليك.');
+    }
     const avail1 = primaryFund.currentBalance;
 
     let cascadeSplit = expenseData.cascadeSplit;
@@ -324,6 +330,7 @@ export class OpsDataStore {
     if (expenseData.cascadeDeduction && expenseData.secondaryFundId && totalWithTax > avail1) {
       const secondaryFund = this.funds.find((f) => f.id === expenseData.secondaryFundId);
       if (!secondaryFund || secondaryFund.id === primaryFund.id) throw new Error('العهدة البديلة غير صالحة.');
+      if (currentUser.role === 'field_officer' && secondaryFund.holderId !== currentUser.id) throw new Error('لا يمكنك استخدام عهدة بديلة غير مسندة إليك.');
       const neededFromSecondary = Number((totalWithTax - avail1).toFixed(2));
       if (secondaryFund.currentBalance < neededFromSecondary) throw new Error('رصيد العهدة البديلة لا يكفي لتغطية الفرق.');
       cascadeSplit = {
