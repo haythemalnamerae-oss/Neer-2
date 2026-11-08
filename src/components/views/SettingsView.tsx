@@ -25,6 +25,9 @@ export const SettingsView: React.FC = () => {
   const [vatRate, setVatRate] = useState('5');
   const [warningThreshold, setWarningThreshold] = useState('25');
   const [autoNotify, setAutoNotify] = useState(true);
+  const [autoCaptureLocation, setAutoCaptureLocation] = useState(
+    dataStore.getSettings().autoCaptureLocationWithoutApproval
+  );
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [accountsVersion, setAccountsVersion] = useState(0);
@@ -32,6 +35,7 @@ export const SettingsView: React.FC = () => {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    dataStore.updateSettings({ autoCaptureLocationWithoutApproval: autoCaptureLocation });
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
   };
@@ -160,15 +164,30 @@ export const SettingsView: React.FC = () => {
             <h3 className="text-sm sm:text-base font-extrabold text-slate-800">التنبيهات التلقائية وصيانة النظام</h3>
           </div>
           <div className="space-y-4">
-            <label className="flex items-center gap-3.5 p-3.5 rounded-2xl neu-inset-sm cursor-pointer">
+            <label className="flex items-start gap-3.5 p-3.5 rounded-2xl neu-inset-sm cursor-pointer">
               <input
                 type="checkbox"
                 checked={autoNotify}
                 onChange={(e) => setAutoNotify(e.target.checked)}
-                className="w-5 h-5 rounded-md accent-[#345c47] cursor-pointer"
+                className="w-5 h-5 rounded-md accent-[#345c47] cursor-pointer mt-0.5 shrink-0"
               />
               <span className="text-xs sm:text-sm font-bold text-slate-700">
                 إرسال إشعارات فورية عند انخفاض رصيد أي عهدة نقدية تحت حد الإنذار المحدد
+              </span>
+            </label>
+
+            <label className="flex items-start gap-3.5 p-3.5 rounded-2xl neu-inset-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={autoCaptureLocation}
+                onChange={(e) => setAutoCaptureLocation(e.target.checked)}
+                className="w-5 h-5 rounded-md accent-[#345c47] cursor-pointer mt-0.5 shrink-0"
+              />
+              <span className="text-xs sm:text-sm font-bold text-slate-700">
+                حفظ موقع تنفيذ الخطوة تلقائياً عند بدء المهمة دون طلب موافقة الموظف
+                <span className="block text-[11px] font-normal text-slate-500 mt-1">
+                  يتحكم بهذا الخيار مالك النظام أو المدير المخول فقط، ويُسجل التغيير في سجل التدقيق.
+                </span>
               </span>
             </label>
 
