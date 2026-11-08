@@ -243,6 +243,9 @@ export class OpsDataStore {
   public addFund(fund: Omit<PettyCashFund, 'id' | 'code' | 'spentBalance' | 'currentBalance' | 'status' | 'lastReplenishedDate'>): PettyCashFund {
     if (!hasPermission(this.getCurrentUser().role, 'funds', 'create')) throw new Error('لا تملك صلاحية إنشاء عهدة.');
     if (!Number.isFinite(fund.totalAllocation) || fund.totalAllocation <= 0) throw new Error('مبلغ تخصيص العهدة غير صالح.');
+    if (!Number.isFinite(fund.warningThreshold) || fund.warningThreshold < 0 || fund.warningThreshold > 100) throw new Error('نسبة تنبيه الرصيد يجب أن تكون بين 0 و100.');
+    const holder = this.users.find((user) => user.id === fund.holderId && user.active);
+    if (!holder) throw new Error('يجب اختيار أمين عهدة نشط.');
     const newFund: PettyCashFund = {
       ...fund,
       id: `fund-${Date.now()}`,
