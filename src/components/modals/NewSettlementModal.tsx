@@ -87,18 +87,18 @@ export const NewSettlementModal: React.FC<NewSettlementModalProps> = ({ isOpen, 
           <div className="p-4 sm:p-5 neu-raised rounded-3xl space-y-2.5">
             <div className="flex justify-between text-xs sm:text-sm">
               <span className="text-slate-600 font-medium">سلفة التخصيص الأولية:</span>
-              <span className="font-extrabold text-slate-800 dir-ltr font-mono">{formatCurrency(selectedFund.totalAllocation)}</span>
+              <span className="font-extrabold text-slate-800 dir-ltr font-mono">{formatCurrency(selectedFund.totalAllocation, selectedFund.currency)}</span>
             </div>
             <div className="flex justify-between text-xs sm:text-sm">
               <span className="text-slate-600 font-medium">الفواتير المعتمدة غير المسواة:</span>
               <span className="font-extrabold text-emerald-800 dir-ltr font-mono">
-                {eligibleExpenses.length} فاتورة - {formatCurrency(totalExpensesAmount)}
+                {eligibleExpenses.length} فاتورة - {formatCurrency(totalExpensesAmount, selectedFund.currency)}
               </span>
             </div>
             <div className="flex justify-between text-xs sm:text-sm pt-2.5 border-t border-black/[0.04]">
               <span className="font-bold text-slate-700">الرصيد الحالي للعهدة:</span>
               <span className="font-black text-emerald-800 dir-ltr font-mono text-sm sm:text-base">
-                {formatCurrency(selectedFund.currentBalance)}
+                {formatCurrency(selectedFund.currentBalance, selectedFund.currency)}
               </span>
             </div>
           </div>
