@@ -4,7 +4,7 @@ import { hasPermission } from '../lib/rbac/permissions';
 
 const toCsvCell = (value: unknown): string => {
   const raw = String(value ?? '');
-  const safe = typeof value === 'string' && /^[\\s]*[=+@-]/.test(raw) ? "'" + raw : raw;
+  const safe = typeof value === 'string' && /^\s*[=+@-]/.test(raw) ? "'" + raw : raw;
   return '"' + safe.replaceAll('"', '""') + '"';
 };
 
