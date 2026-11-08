@@ -222,7 +222,8 @@ export const SettingsView: React.FC = () => {
               </span>
             </label>
 
-            {canManageLocationPolicy && (            <label className="flex items-start gap-3.5 p-3.5 rounded-2xl neu-inset-sm cursor-pointer">
+            {canManageLocationPolicy && (
+            <label className="flex items-start gap-3.5 p-3.5 rounded-2xl neu-inset-sm cursor-pointer">
               <input
                 type="checkbox"
                 checked={autoCaptureLocation}
@@ -235,7 +236,8 @@ export const SettingsView: React.FC = () => {
                   يتحكم بهذا الخيار مالك النظام أو المدير المخول فقط، ويُسجل التغيير في سجل التدقيق.
                 </span>
               </span>
-            </label>)}
+            </label>
+            )}
             <label className="flex items-start gap-3.5 p-3.5 rounded-2xl neu-inset-sm cursor-pointer">
               <input type="checkbox" checked={requireReceipt} onChange={(e) => setRequireReceipt(e.target.checked)} className="w-5 h-5 rounded-md accent-[#345c47] mt-0.5 shrink-0" />
               <span className="text-xs sm:text-sm font-bold text-slate-700">اشتراط توفر أصل الفاتورة الورقي قبل تسجيل المصروف</span>
