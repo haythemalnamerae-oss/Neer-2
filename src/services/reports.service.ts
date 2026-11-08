@@ -213,8 +213,17 @@ export class ReportsService {
 
     const supplierAccounts = dataStore.getStandingAccounts();
     return funds.map((f) => {
-      const allFundExpenses = expenses.filter((expense) => expense.fundId === f.id);
-      const fundExpenses = allFundExpenses.filter((expense) => expense.status !== 'rejected' && !expense.isSupplierCredit);
+      const allFundExpenses = expenses.filter((expense) => expense.fundId === f.id || expense.cascadeSplit?.secondaryFundId === f.id);
+      const fundExpenses = allFundExpenses
+        .filter((expense) => expense.status !== 'rejected' && !expense.isSupplierCredit)
+        .map((expense) => ({
+          ...expense,
+          fundExpenseAmount: expense.cascadeSplit
+            ? (expense.cascadeSplit.primaryFundId === f.id ? expense.cascadeSplit.primaryAmount : expense.cascadeSplit.secondaryAmount)
+            : expense.isDeficit
+              ? Math.max(0, expense.totalWithTax - (expense.deficitAmount || 0))
+              : expense.totalWithTax,
+        }));
       const rejectedExpenses = allFundExpenses.filter((expense) => expense.status === 'rejected');
       const fundReceipts = receipts.filter((receipt) => receipt.fundId === f.id);
       const supplierPayments = supplierAccounts
@@ -224,7 +233,7 @@ export class ReportsService {
           .map((entry) => ({ ...entry, accountName: account.name, currency: account.currency || f.currency })));
       const cascadeExpenses = expenses.filter((expense) => expense.cascadeSplit?.secondaryFundId === f.id && expense.status !== 'rejected');
       const openDeficitExpenses = fundExpenses.filter((e) => e.isDeficit && !e.isCoveredFromCash);
-      const cashExpensesTotal = fundExpenses.reduce((sum, expense) => sum + expense.totalWithTax, 0);
+      const cashExpensesTotal = fundExpenses.reduce((sum, expense) => sum + expense.fundExpenseAmount, 0);
       const supplierPaymentsTotal = supplierPayments.reduce((sum, payment) => sum + payment.amount, 0);
 
       return {
