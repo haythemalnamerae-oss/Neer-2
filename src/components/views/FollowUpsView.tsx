@@ -5,18 +5,13 @@ import {
   Calendar,
   User,
   AlertTriangle,
-  ArrowRight,
   CheckCircle2,
-  Phone,
   Search,
 } from 'lucide-react';
 import { Task } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
 import { hasPermission } from '../../lib/rbac/permissions';
-import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
-import { formatCurrency } from '../../lib/utils/format';
 
 interface FollowUpsViewProps {
   onSelectTask: (task: Task) => void;
@@ -122,12 +117,13 @@ export const FollowUpsView: React.FC<FollowUpsViewProps> = ({
               </div>
 
               <div>
-                <h3
+                <button
+                  type="button"
                   onClick={() => onSelectTask(task)}
-                  className="font-extrabold text-base text-slate-800 hover:text-emerald-800 transition cursor-pointer"
+                  className="block w-full text-right font-extrabold text-base text-slate-800 hover:text-emerald-800 transition cursor-pointer"
                 >
                   {task.title}
-                </h3>
+                </button>
                 <p className="text-xs text-slate-500 mt-1 line-clamp-2">{task.location} - {task.clientName}</p>
               </div>
 
