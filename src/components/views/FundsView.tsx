@@ -735,6 +735,9 @@ export const FundsView: React.FC<FundsViewProps> = ({
                           }} className="w-8 h-8 rounded-xl neu-raised text-rose-600 hover:text-rose-800 active:neu-inset inline-flex items-center justify-center transition cursor-pointer" title="إيقاف الحساب">
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>}
+                          {canEditFund && acc.active === false && <button type="button" onClick={() => {
+                            if (window.confirm(`إعادة تفعيل حساب ${acc.name}؟`)) dataStore.updateStandingAccount(acc.id, { active: true });
+                          }} className="px-3 py-2 rounded-xl neu-raised text-emerald-800 font-bold" title="إعادة تفعيل الحساب">تفعيل</button>}
                         </div>
                       </td>
                     </tr>
