@@ -8,7 +8,7 @@ import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { SmartSelect } from '../ui/SmartSelect';
 import { NewStandingAccountModal } from './NewStandingAccountModal';
-import { AlertTriangle, Layers, UploadCloud, CheckCircle2, Wallet, Tag, Plus } from 'lucide-react';
+import { AlertTriangle, Tag, Plus } from 'lucide-react';
 
 interface NewExpenseModalProps {
   isOpen: boolean;
@@ -55,10 +55,10 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
 
   // Find best matching fund:
   const getInitialFundId = () => {
-    if (initialFundId) return initialFundId;
+    if (initialFundId && funds.some((fund) => fund.id === initialFundId)) return initialFundId;
     if (effectiveTaskId) {
       const task = tasks.find((t) => t.id === effectiveTaskId);
-      if (task?.fundId) return task.fundId;
+      if (task?.fundId && funds.some((fund) => fund.id === task.fundId)) return task.fundId;
     }
     const userFund = funds.find((f) => f.holderId === currentUser.id);
     if (userFund) return userFund.id;
@@ -84,11 +84,11 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
     if (effectiveTaskId) {
       setTaskId(effectiveTaskId);
       const task = tasks.find((t) => t.id === effectiveTaskId);
-      if (task?.fundId && !initialFundId) {
+      if (task?.fundId && funds.some((fund) => fund.id === task.fundId) && !initialFundId) {
         setFundId(task.fundId);
       }
     }
-    if (initialFundId) {
+    if (initialFundId && funds.some((fund) => fund.id === initialFundId)) {
       setFundId(initialFundId);
     } else if (!effectiveTaskId) {
       const userFund = funds.find((f) => f.holderId === currentUser.id);
