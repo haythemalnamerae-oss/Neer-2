@@ -17,13 +17,14 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   const user = dataStore.getCurrentUser();
   const navItems = [
     { id: 'daily', label: 'الرئيسية', icon: LayoutDashboard, module: 'dashboard' },
-    { id: 'tasks', label: 'المهام', icon: CheckSquare, module: 'tasks' },
+    { id: 'tasks', label: 'مهامي', icon: CheckSquare, module: 'tasks' },
     { id: 'approvals', label: 'الاعتمادات', icon: FileCheck2, module: 'tasks' },
-    { id: 'funds', label: 'العهد', icon: Wallet, module: 'funds' },
   ].filter((item) => hasPermission(user.role, item.module, 'view'));
 
   const moreViews = [
     'dashboard',
+    'map',
+    'performance',
     'followUps',
     'expenses',
     'settlements',
@@ -34,7 +35,6 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     'roles',
     'audit',
     'settings',
-    'codeViewer',
   ];
   const moreSelected = moreViews.includes(currentView);
 
