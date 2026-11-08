@@ -246,7 +246,7 @@ export class OpsDataStore {
     const newFund: PettyCashFund = {
       ...fund,
       id: `fund-${Date.now()}`,
-      code: `PCF-2026-0${this.funds.length + 1}`,
+      code: `PCF-${new Date().getFullYear()}-${String(this.funds.length + 1).padStart(5, '0')}`,
       currentBalance: fund.totalAllocation,
       spentBalance: 0,
       status: 'active',
@@ -307,6 +307,9 @@ export class OpsDataStore {
   ): Expense {
     if (!hasPermission(this.getCurrentUser().role, 'expenses', 'create')) throw new Error('لا تملك صلاحية تسجيل المصروفات.');
     if (!Number.isFinite(expenseData.amount) || expenseData.amount <= 0) throw new Error('مبلغ المصروف غير صالح.');
+    if (!expenseData.invoiceNumber?.trim() || !expenseData.vendorName?.trim() || !expenseData.description?.trim()) throw new Error('بيانات الفاتورة والمورد والبيان مطلوبة.');
+    const duplicateInvoice = this.expenses.some((expense) => expense.status !== 'rejected' && expense.invoiceNumber.trim().toLowerCase() === expenseData.invoiceNumber.trim().toLowerCase() && expense.vendorName.trim().toLowerCase() === expenseData.vendorName.trim().toLowerCase());
+    if (duplicateInvoice) throw new Error('رقم الفاتورة مسجل مسبقاً لهذا المورد. تحقق من الفواتير قبل إعادة الإدخال.');
     const taxRate = this.settings.taxRate / 100;
     const taxAmount = Number((expenseData.amount * taxRate).toFixed(2));
     const totalWithTax = Number((expenseData.amount + taxAmount).toFixed(2));
@@ -408,7 +411,7 @@ export class OpsDataStore {
     const newExpense: Expense = {
       ...expenseData,
       id: `exp-${Date.now()}`,
-      code: `EXP-${Math.floor(1000 + Math.random() * 9000)}`,
+      code: `EXP-${new Date().getFullYear()}-${String(this.expenses.length + 1).padStart(6, '0')}`,
       taxAmount,
       totalWithTax,
       status: 'pending_approval',
@@ -500,7 +503,7 @@ export class OpsDataStore {
     const newReceipt: CashReceipt = {
       ...data,
       id: `cr-${Date.now()}`,
-      code: `REC-${Math.floor(1000 + Math.random() * 9000)}`,
+      code: `REC-${new Date().getFullYear()}-${String(this.cashReceipts.length + 1).padStart(6, '0')}`,
       createdAt: new Date().toISOString(),
     };
     this.cashReceipts = [newReceipt, ...this.cashReceipts];
