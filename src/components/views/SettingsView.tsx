@@ -24,6 +24,7 @@ export const SettingsView: React.FC = () => {
   const currentUser = dataStore.getCurrentUser();
   const canEditSettings = hasPermission(currentUser.role, 'settings', 'edit');
   const canResetData = currentUser.role === 'admin';
+  const canManageLocationPolicy = currentUser.role === 'admin';
   const [companyName, setCompanyName] = useState(initialSettings.organizationName);
   const [taxNumber, setTaxNumber] = useState(initialSettings.taxRegistrationNumber);
   const [headquarters, setHeadquarters] = useState(initialSettings.headquarters);
@@ -55,7 +56,8 @@ export const SettingsView: React.FC = () => {
         organizationName: companyName.trim(), taxRegistrationNumber: taxNumber.trim(), headquarters: headquarters.trim(),
         currency: defaultCurrency, taxRate: tax, fundWarningThresholdPercent: threshold, singleExpenseLimit: expenseLimit,
         autoNotifyOnLowBalance: autoNotify, requireReceiptForExpense: requireReceipt, requireInvoiceNumber,
-        requireDualApprovalForSettlements: requireDualApproval, autoCaptureLocationWithoutApproval: autoCaptureLocation,
+        requireDualApprovalForSettlements: requireDualApproval,
+        ...(canManageLocationPolicy ? { autoCaptureLocationWithoutApproval: autoCaptureLocation } : {}),
       });
     } catch (error) {
       alert(error instanceof Error ? error.message : 'تعذر حفظ الإعدادات.');
@@ -219,7 +221,7 @@ export const SettingsView: React.FC = () => {
               </span>
             </label>
 
-            <label className="flex items-start gap-3.5 p-3.5 rounded-2xl neu-inset-sm cursor-pointer">
+            {canManageLocationPolicy && (            <label className="flex items-start gap-3.5 p-3.5 rounded-2xl neu-inset-sm cursor-pointer">
               <input
                 type="checkbox"
                 checked={autoCaptureLocation}
@@ -232,7 +234,7 @@ export const SettingsView: React.FC = () => {
                   يتحكم بهذا الخيار مالك النظام أو المدير المخول فقط، ويُسجل التغيير في سجل التدقيق.
                 </span>
               </span>
-            </label>
+            </label>)}
             <label className="flex items-start gap-3.5 p-3.5 rounded-2xl neu-inset-sm cursor-pointer">
               <input type="checkbox" checked={requireReceipt} onChange={(e) => setRequireReceipt(e.target.checked)} className="w-5 h-5 rounded-md accent-[#345c47] mt-0.5 shrink-0" />
               <span className="text-xs sm:text-sm font-bold text-slate-700">اشتراط توفر أصل الفاتورة الورقي قبل تسجيل المصروف</span>
