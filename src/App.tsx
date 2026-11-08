@@ -89,7 +89,12 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen neu-bg text-slate-800 flex font-['Cairo',sans-serif] antialiased selection:bg-[#4C755D] selection:text-white dir-rtl transition-colors duration-200">
+    <div
+      className="min-h-screen text-slate-800 flex font-['Cairo',sans-serif] antialiased selection:bg-[#2A443B] selection:text-white dir-rtl transition-colors duration-200"
+      style={{
+        backgroundColor: '#E5EBE7',
+      }}
+    >
       {/* Sidebar Navigation */}
       <Sidebar
         currentView={currentView}
@@ -99,8 +104,8 @@ export default function App() {
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 transition-all duration-200">
+      {/* Main Workspace Frame */}
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen">
         {/* Top Header */}
         <Header
           currentUser={currentUser}
@@ -111,12 +116,12 @@ export default function App() {
           currentView={currentView}
         />
 
-        {/* Dynamic View Body */}
-        <main className="flex-1 p-3.5 sm:p-6 lg:p-8 pb-28 lg:pb-8 max-w-7xl w-full mx-auto">
+        {/* Dynamic View Content */}
+        <main className="flex-1 px-3 sm:px-6 lg:px-8 py-5 sm:py-7 max-w-7xl mx-auto w-full mobile-content-safe">
           {currentView === 'daily' && (
             <DailyCommandCenterView
               onOpenNewTask={handleOpenNewTask}
-              onOpenNewExpense={(taskId) => handleOpenNewExpense(taskId)}
+              onOpenNewExpense={handleOpenNewExpense}
               onSelectTask={handleSelectTask}
               onRecordOutcome={handleRecordOutcome}
               onViewChain={handleViewChain}
@@ -130,9 +135,9 @@ export default function App() {
 
           {currentView === 'dashboard' && (
             <DashboardView
+              onSelectView={handleSelectView}
               onOpenNewTask={handleOpenNewTask}
               onOpenNewExpense={() => handleOpenNewExpense()}
-              onSelectView={handleSelectView}
             />
           )}
 
@@ -148,8 +153,8 @@ export default function App() {
           {currentView === 'followUps' && (
             <FollowUpsView
               onSelectTask={handleSelectTask}
-              onRecordOutcome={handleRecordOutcome}
               onViewChain={handleViewChain}
+              onRecordOutcome={handleRecordOutcome}
             />
           )}
 
@@ -188,26 +193,25 @@ export default function App() {
 
           {currentView === 'settings' && <SettingsView />}
 
-          {(currentView === 'code' || currentView === 'codeViewer') && (
-            <CodeRepositoryViewer onBackToDashboard={() => handleSelectView('daily')} />
-          )}
+          {currentView === 'codeViewer' && <CodeRepositoryViewer />}
         </main>
+
+        {/* Floating Quick Action Button */}
+        <GlobalQuickActionFab
+          onOpenNewTask={handleOpenNewTask}
+          onOpenNewExpense={() => handleOpenNewExpense()}
+          onSelectView={handleSelectView}
+        />
+
+        {/* Mobile Bottom Navigation */}
+        <MobileBottomNav
+          currentView={currentView}
+          onSelectView={handleSelectView}
+          onOpenMore={() => setIsMobileSidebarOpen(true)}
+        />
       </div>
 
-      {/* Mobile Floating Bottom Navigation Bar */}
-      <MobileBottomNav
-        currentView={currentView}
-        onSelectView={handleSelectView}
-      />
-
-      {/* Global Quick Action Floating Button */}
-      <GlobalQuickActionFab
-        onOpenNewTask={handleOpenNewTask}
-        onOpenNewExpense={() => handleOpenNewExpense()}
-        onSelectView={handleSelectView}
-      />
-
-      {/* --- Global Modals --- */}
+      {/* Global Modals */}
       <NewTaskModal
         isOpen={isNewTaskModalOpen}
         onClose={() => setIsNewTaskModalOpen(false)}
@@ -232,46 +236,39 @@ export default function App() {
         onClose={() => setIsNewSettlementModalOpen(false)}
       />
 
-      <TaskDetailsModal
-        task={selectedTaskForDetails}
-        isOpen={Boolean(selectedTaskForDetails)}
-        onClose={() => setSelectedTaskForDetails(null)}
-        onRecordOutcome={(t) => {
-          setSelectedTaskForDetails(null);
-          setSelectedTaskForOutcome(t);
-        }}
-        onViewChain={(t) => {
-          setSelectedTaskForDetails(null);
-          setSelectedTaskForChain(t);
-        }}
-        onAddExpense={(taskId) => {
-          setSelectedTaskForDetails(null);
-          handleOpenNewExpense(taskId);
-        }}
-      />
+      {selectedTaskForDetails && (
+        <TaskDetailsModal
+          task={selectedTaskForDetails}
+          isOpen={true}
+          onClose={() => setSelectedTaskForDetails(null)}
+          onRecordOutcome={handleRecordOutcome}
+          onViewChain={handleViewChain}
+          onAddExpense={(taskId) => {
+            setSelectedTaskForDetails(null);
+            handleOpenNewExpense(taskId);
+          }}
+        />
+      )}
 
-      <TaskOutcomeModal
-        task={selectedTaskForOutcome}
-        isOpen={Boolean(selectedTaskForOutcome)}
-        onClose={() => setSelectedTaskForOutcome(null)}
-        onSuccess={() => {
-          setSelectedTaskForOutcome(null);
-        }}
-        onViewChain={(t) => {
-          setSelectedTaskForOutcome(null);
-          setSelectedTaskForChain(t);
-        }}
-      />
+      {selectedTaskForOutcome && (
+        <TaskOutcomeModal
+          task={selectedTaskForOutcome}
+          isOpen={true}
+          onClose={() => setSelectedTaskForOutcome(null)}
+        />
+      )}
 
-      <TaskChainModal
-        task={selectedTaskForChain}
-        isOpen={Boolean(selectedTaskForChain)}
-        onClose={() => setSelectedTaskForChain(null)}
-        onSelectTask={(t) => {
-          setSelectedTaskForChain(null);
-          setSelectedTaskForDetails(t);
-        }}
-      />
+      {selectedTaskForChain && (
+        <TaskChainModal
+          task={selectedTaskForChain}
+          isOpen={true}
+          onClose={() => setSelectedTaskForChain(null)}
+          onSelectTask={(task) => {
+            setSelectedTaskForChain(null);
+            setSelectedTaskForDetails(task);
+          }}
+        />
+      )}
     </div>
   );
 }

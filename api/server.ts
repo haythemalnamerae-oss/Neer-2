@@ -93,7 +93,7 @@ app.get('/api/v1/admin/permissions', async (req, res) => {
 });
 
 app.put('/api/v1/admin/permissions/:roleKey', async (req, res) => {
-  const auth = (req as AuthenticatedRequest).auth;
+  const auth = (req as unknown as AuthenticatedRequest).auth;
   if (auth.role !== 'admin') return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Admin role required.' } });
   const roleKey = req.params.roleKey;
   if (!['ops_manager','finance_officer','field_officer','viewer'].includes(roleKey)) return res.status(400).json({ error: { code: 'PROTECTED_ROLE', message: 'The administrator role is protected.' } });
@@ -113,7 +113,7 @@ app.put('/api/v1/admin/permissions/:roleKey', async (req, res) => {
 });
 
 app.all('/api/v1/:resource/:id?', async (req, res) => {
-  const auth = (req as AuthenticatedRequest).auth;
+  const auth = (req as unknown as AuthenticatedRequest).auth;
   const resource = resources[req.params.resource as keyof typeof resources];
   if (!resource) return res.status(404).json({ error: { code: 'RESOURCE_NOT_FOUND', message: 'Unknown API resource.' } });
   if (req.params.id && !idPattern.test(req.params.id)) return res.status(400).json({ error: { code: 'INVALID_ID', message: 'Invalid record id.' } });

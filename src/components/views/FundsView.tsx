@@ -132,141 +132,128 @@ export const FundsView: React.FC<FundsViewProps> = ({
 
   return (
     <div className="space-y-7 animate-in fade-in duration-200">
-      {/* Top Banner: Soft UI Master Card */}
-      <div className="neu-raised-lg rounded-3xl p-6 sm:p-7 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
+      {/* Top Banner: Forest Green Master Card */}
+      <div
+        className="rounded-[28px] p-6 sm:p-7 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 text-white shadow-xl"
+        style={{
+          backgroundColor: '#2A443B',
+          boxShadow: '0 20px 45px rgba(22, 44, 34, 0.28), 0 4px 12px rgba(0, 0, 0, 0.1)',
+        }}
+      >
         <div>
-          <div className="flex items-center gap-2 text-[#3D674E] font-bold text-xs uppercase mb-1">
+          <div className="flex items-center gap-2 text-emerald-300 font-bold text-xs uppercase mb-1">
             <Wallet className="w-4 h-4" />
             <span>المنظومة المالية المدمجة وإدارة العهد والصندوق</span>
           </div>
-          <h2 className="text-xl sm:text-2xl font-black text-[#1A2E22] font-serif-display">
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white font-serif-hero tracking-tight">
             سجل العهد، السيولة، المقبوضات وتغطية العجز
           </h2>
-          <p className="text-xs text-[#526F5E] mt-0.5 font-medium">
+          <p className="text-xs sm:text-sm text-white/75 mt-1 font-sans-inter">
             الرقابة المالية الذكية: تتبع استنزاف العهد المتعددة، تسوية الرصيد السالب، والمقبوضات النقدية
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <Button
-            variant="outline"
-            size="md"
+        <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+          <button
             onClick={() => setIsReceiptModalOpen(true)}
-            icon={<ArrowDownLeft className="w-4 h-4 ml-1" />}
-            className="text-xs font-bold"
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold font-sans-inter transition-all border border-white/20 cursor-pointer shadow-xs active:scale-95"
           >
-            توريد مقبوضات نقدية
-          </Button>
-          <Button
-            variant="outline"
-            size="md"
+            <ArrowDownLeft className="w-4 h-4 ml-1" />
+            <span>توريد مقبوضات</span>
+          </button>
+          <button
             onClick={onOpenNewSettlement}
-            className="text-xs font-bold"
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold font-sans-inter transition-all border border-white/20 cursor-pointer shadow-xs active:scale-95"
           >
-            طلب تسوية دورية
-          </Button>
-          <Button
-            variant="primary"
-            size="md"
+            <span>طلب تسوية</span>
+          </button>
+          <button
             onClick={onOpenNewFund}
-            icon={<Plus className="w-4 h-4 ml-1" />}
-            className="text-xs font-bold"
+            className="flex items-center gap-1.5 px-5 py-2.5 rounded-2xl bg-[#F4F7F5] hover:bg-white text-[#2A443B] text-xs font-bold font-sans-inter transition-all shadow-md cursor-pointer active:scale-95"
           >
-            عهدة جديدة
-          </Button>
+            <Plus className="w-4 h-4 stroke-[2.5]" />
+            <span>عهدة جديدة</span>
+          </button>
         </div>
       </div>
 
-      {/* KPI Overview Cards with Dual Shadows */}
+      {/* KPI Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="neu-raised rounded-3xl p-5 space-y-1">
-          <span className="text-xs font-semibold text-[#577262] block">إجمالي المخصصات المعتمدة</span>
-          <span className="text-2xl font-black text-[#1A2E22] block font-mono dir-ltr">
+        <div className="inner-white-card p-5 space-y-1">
+          <span className="text-xs font-semibold text-slate-500 block">إجمالي المخصصات المعتمدة</span>
+          <span className="text-2xl font-black text-slate-900 block font-sans-inter dir-ltr">
             {formatCurrency(totalAllocated)}
           </span>
-          <span className="text-[11px] text-[#6E8779] block font-medium">{funds.length} عهد مسجلة</span>
+          <span className="text-[11px] text-slate-400 block font-medium">{funds.length} عهد مسجلة</span>
         </div>
 
-        <div className="neu-raised rounded-3xl p-5 space-y-1">
-          <span className="text-xs font-semibold text-[#577262] block">الرصيد المتاح في العهد</span>
-          <span className="text-2xl font-black text-[#265538] block font-mono dir-ltr">
+        <div className="inner-white-card p-5 space-y-1">
+          <span className="text-xs font-semibold text-slate-500 block">الرصيد المتاح في العهد</span>
+          <span className="text-2xl font-black text-emerald-800 block font-sans-inter dir-ltr">
             {formatCurrency(totalBalance)}
           </span>
-          <span className="text-[11px] text-[#3A684C] font-bold block">
+          <span className="text-[11px] text-emerald-700 font-bold block">
             نسبة السيولة: {totalAllocated > 0 ? Math.round((totalBalance / totalAllocated) * 100) : 0}%
           </span>
         </div>
 
-        <div className="neu-raised rounded-3xl p-5 space-y-1">
-          <span className="text-xs font-semibold text-[#577262] block">المقبوضات في الصندوق</span>
-          <span className="text-2xl font-black text-[#2B4E6B] block font-mono dir-ltr">
+        <div className="inner-white-card p-5 space-y-1">
+          <span className="text-xs font-semibold text-slate-500 block">المقبوضات في الصندوق</span>
+          <span className="text-2xl font-black text-sky-800 block font-sans-inter dir-ltr">
             {formatCurrency(totalReceipts)}
           </span>
-          <span className="text-[11px] text-[#3B6488] font-bold block">
+          <span className="text-[11px] text-sky-700 font-bold block">
             {cashReceipts.length} مقبوض مسجل
           </span>
         </div>
 
-        <div className={`neu-raised rounded-3xl p-5 space-y-1 ${pendingDeficitExpenses.length > 0 ? 'ring-2 ring-[#C2584A]/30' : ''}`}>
-          <span className="text-xs font-bold text-[#A03E33] block">عجز معلق تغطيته (رصيد سالب)</span>
-          <span className="text-2xl font-black text-[#A03E33] block font-mono dir-ltr">
+        <div className={`inner-white-card p-5 space-y-1 ${pendingDeficitExpenses.length > 0 ? 'ring-2 ring-rose-400/40' : ''}`}>
+          <span className="text-xs font-bold text-rose-700 block">عجز معلق تغطيته (رصيد سالب)</span>
+          <span className="text-2xl font-black text-rose-700 block font-sans-inter dir-ltr">
             {formatCurrency(totalPendingDeficit)}
           </span>
-          <span className="text-[11px] text-[#A03E33] font-medium block">
+          <span className="text-[11px] text-rose-600 font-medium block">
             {pendingDeficitExpenses.length} فواتير تتطلب تسوية من الصندوق
           </span>
         </div>
       </div>
 
-      {/* Navigation Sub-Tabs with Neumorphic Inset Well */}
-      <div className="neu-inset-sm p-2 rounded-2xl flex items-center gap-2 overflow-x-auto text-xs sm:text-sm font-bold">
-        <button
-          onClick={() => setActiveTab('funds')}
-          className={`px-4.5 py-3 rounded-2xl transition cursor-pointer flex items-center gap-2.5 shrink-0 min-h-[46px] ${
-            activeTab === 'funds'
-              ? 'neu-button text-[#142B1E] font-black'
-              : 'text-[#4A6957] hover:text-[#183122]'
-          }`}
-        >
-          <Wallet className="w-5 h-5 stroke-[2.2]" />
-          <span>العهد النقدية والمخصصات ({funds.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('deficit')}
-          className={`px-4.5 py-3 rounded-2xl transition cursor-pointer flex items-center gap-2.5 shrink-0 min-h-[46px] ${
-            activeTab === 'deficit'
-              ? 'neu-button text-[#142B1E] font-black'
-              : 'text-[#4A6957] hover:text-[#183122]'
-          }`}
-        >
-          <BadgeAlert className="w-5 h-5 text-[#9C392D] stroke-[2.2]" />
-          <span>العجز والمصروفات السالبة ({pendingDeficitExpenses.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('receipts')}
-          className={`px-4.5 py-3 rounded-2xl transition cursor-pointer flex items-center gap-2.5 shrink-0 min-h-[46px] ${
-            activeTab === 'receipts'
-              ? 'neu-button text-[#142B1E] font-black'
-              : 'text-[#4A6957] hover:text-[#183122]'
-          }`}
-        >
-          <ArrowDownLeft className="w-5 h-5 text-[#245237] stroke-[2.2]" />
-          <span>سجل المقبوضات النقدية والصندوق ({cashReceipts.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('standing')}
-          className={`px-4.5 py-3 rounded-2xl transition cursor-pointer flex items-center gap-2.5 shrink-0 min-h-[46px] ${
-            activeTab === 'standing'
-              ? 'neu-button text-[#142B1E] font-black'
-              : 'text-[#4A6957] hover:text-[#183122]'
-          }`}
-        >
-          <CreditCard className="w-5 h-5 text-[#2B4E6B] stroke-[2.2]" />
-          <span>الحسابات الدائمة (لنا / علينا) ({standingAccounts.length})</span>
-        </button>
+      {/* Navigation Sub-Tabs with circular notification count badges */}
+      <div className="inner-white-card p-2 flex items-center gap-2 overflow-x-auto text-xs sm:text-sm font-bold no-scrollbar">
+        {[
+          { id: 'funds', label: 'العهد النقدية والمخصصات', icon: Wallet, count: funds.length },
+          { id: 'deficit', label: 'العجز والرصيد السالب', icon: AlertTriangle, count: pendingDeficitExpenses.length, alert: pendingDeficitExpenses.length > 0 },
+          { id: 'receipts', label: 'مقبوضات الصندوق', icon: ArrowDownLeft, count: cashReceipts.length },
+          { id: 'standing', label: 'حسابات الصرف الدائمة', icon: CreditCard, count: standingAccounts.length },
+        ].map((tab) => {
+          const isSelected = activeTab === tab.id;
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`px-4 py-2 rounded-full transition cursor-pointer flex items-center gap-2 shrink-0 ${
+                isSelected
+                  ? 'bg-[#2A443B] text-white shadow-xs'
+                  : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/80'
+              }`}
+            >
+              <Icon className="w-4 h-4 stroke-[2]" />
+              <span>{tab.label}</span>
+              <span
+                className={`min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center ${
+                  isSelected
+                    ? 'bg-white text-[#2A443B]'
+                    : tab.alert
+                    ? 'bg-rose-100 text-rose-800'
+                    : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                {tab.count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* TAB 1: Petty Cash Funds Grid */}

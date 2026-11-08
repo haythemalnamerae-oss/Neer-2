@@ -1,93 +1,146 @@
 @import "tailwindcss";
 
-:root {
-  font-family: 'IBM Plex Sans Arabic', 'Noto Sans Arabic', sans-serif;
-  color: #17231c;
-  background: #f5f7f5;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  color-scheme: light;
+@layer base {
+  :root {
+    --font-sans: 'Cairo', 'IBM Plex Sans Arabic', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-serif: 'Cairo', 'Playfair Display', serif;
+    color: #1a2e26;
+    background-color: #E5EBE7;
+    font-family: var(--font-sans);
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background-color: #E5EBE7;
+    color: #1a2e26;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+  }
 }
 
-html { min-width: 320px; background: #f5f7f5; }
-body {
-  margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
-  background: #f5f7f5;
-  color: #17231c;
-  font-family: 'IBM Plex Sans Arabic', 'Noto Sans Arabic', sans-serif;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-button, input, select, textarea { font: inherit; }
-button { -webkit-tap-highlight-color: transparent; }
+/* Color Tokens & Themes */
+.bg-stage { background-color: #E5EBE7; }
+.bg-forest { background-color: #2A443B; }
+.text-forest { color: #2A443B; }
+.bg-cream-card { background-color: #F4F7F5; }
 
-/* Compatibility utilities used across existing views, softened to reduce visual noise. */
-.neu-bg { background-color: #f5f7f5 !important; }
-.font-serif-display, .font-sans-inter { font-family: 'IBM Plex Sans Arabic', 'Noto Sans Arabic', sans-serif !important; }
-.neu-raised-lg, .neu-raised {
-  background: #fff !important;
-  border: 1px solid #e3e9e4 !important;
-  box-shadow: 0 2px 8px rgba(27, 52, 36, .045) !important;
+/* Exact Specification: Inner White Cards (Exact Hex: #F4F7F5, border-radius: 24px, Soft Depth Shadows) */
+.inner-white-card,
+.neu-raised-lg,
+.neu-raised {
+  background-color: #F4F7F5 !important;
+  border-radius: 24px !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 12px 30px rgba(22, 44, 34, 0.08), 0 2px 6px rgba(22, 44, 34, 0.04) !important;
 }
-.neu-raised-sm, .neu-button {
-  background: #fff !important;
-  border: 1px solid #e3e9e4 !important;
-  box-shadow: 0 1px 3px rgba(27, 52, 36, .04) !important;
-}
-.neu-inset, .neu-inset-sm, .neu-inset-deep {
-  background: #f1f4f1 !important;
-  border: 1px solid #e5ebe6 !important;
-  box-shadow: none !important;
-}
-.neu-button { transition: background-color .16s ease, border-color .16s ease, color .16s ease; }
-.neu-button:hover { background-color: #f4f7f4 !important; border-color: #cbd8ce !important; transform: none !important; }
-.neu-button:active, .neu-button.active { background: #eaf1eb !important; box-shadow: none !important; }
 
+.neu-raised-sm {
+  background-color: #F4F7F5 !important;
+  border-radius: 16px !important;
+  border: 1px solid rgba(255, 255, 255, 0.7) !important;
+  box-shadow: 0 4px 14px rgba(22, 44, 34, 0.06), 0 1px 3px rgba(22, 44, 34, 0.03) !important;
+}
+
+/* Inset / Active State */
+.neu-inset,
+.neu-inset-sm,
+.neu-inset-deep {
+  background-color: #E2E8E4 !important;
+  border-radius: 16px !important;
+  border: 1px solid rgba(0, 0, 0, 0.04) !important;
+  box-shadow: inset 0 2px 5px rgba(22, 44, 34, 0.08) !important;
+}
+
+/* Glass & Translucent Button Utility */
+.header-icon-circle {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.header-icon-circle:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+/* Primary Hero Typography */
+.font-serif-hero {
+  font-family: 'Cairo', 'Playfair Display', serif;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.font-sans-inter {
+  font-family: 'Cairo', 'IBM Plex Sans Arabic', 'Inter', sans-serif;
+}
+
+/* Form inputs matching the soft cream aesthetics */
 input[type="text"], input[type="number"], input[type="date"], input[type="time"], input[type="email"],
 input[type="password"], input[type="search"], textarea, select {
-  background-color: #fff !important;
-  border: 1px solid #dce5de !important;
-  box-shadow: none !important;
-  color: #17231c !important;
-  border-radius: .75rem !important;
-  padding: .7rem .9rem !important;
-  font-size: .9375rem !important;
-  font-weight: 400 !important;
+  background-color: #FFFFFF !important;
+  border: 1px solid rgba(42, 68, 59, 0.15) !important;
+  color: #1a2e26 !important;
+  border-radius: 16px !important;
+  padding: 0.75rem 1rem !important;
+  font-size: 0.875rem !important;
   outline: none !important;
-  min-height: 44px;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(22, 44, 34, 0.03) !important;
 }
+
 input:focus, textarea:focus, select:focus {
-  border-color: #477457 !important;
-  box-shadow: 0 0 0 3px rgba(71, 116, 87, .14) !important;
+  border-color: #2A443B !important;
+  box-shadow: 0 0 0 3px rgba(42, 68, 59, 0.16) !important;
 }
 
-table { border-collapse: separate; border-spacing: 0; width: 100%; }
-thead th { background: #f7f9f7 !important; color: #53665a !important; font-weight: 600 !important; font-size: .8125rem !important; border-bottom: 1px solid #e3e9e4 !important; padding: .8rem 1rem !important; }
-tbody tr { transition: background-color .15s ease; }
-tbody tr:hover { background: rgba(235, 241, 236, .55) !important; }
-tbody td { padding: .8rem 1rem !important; border-bottom: 1px solid #edf1ed !important; color: #263a2d; font-size: .875rem; }
-tbody tr:last-child td { border-bottom: none !important; }
-
-#root { min-height: 100vh; }
-.mobile-content-safe { padding-bottom: calc(6.75rem + env(safe-area-inset-bottom)); }
-.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
-
-@media (max-width: 639px) {
-  body { font-size: 15px; }
-  .mobile-content-safe { padding-bottom: calc(6.25rem + env(safe-area-inset-bottom)); }
-  .neu-raised-lg, .neu-raised { border-radius: 1rem !important; }
-  .mobile-card-compact { padding: 1rem !important; }
-  .mobile-scroll-row { scrollbar-width: none; }
-  .mobile-scroll-row::-webkit-scrollbar { display: none; }
+/* Tables in the Ops platform */
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
 }
 
-@media print {
-  body * { visibility: hidden; }
-  #printable-voucher, #printable-voucher * { visibility: visible; }
-  #printable-voucher { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 20px; border: none !important; box-shadow: none !important; }
+thead th {
+  background-color: rgba(42, 68, 59, 0.05) !important;
+  color: #2A443B !important;
+  font-weight: 700 !important;
+  font-size: 0.8125rem !important;
+  border-bottom: 1px solid rgba(42, 68, 59, 0.08) !important;
+  padding: 0.875rem 1rem !important;
+}
+
+tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+tbody tr:hover {
+  background-color: rgba(42, 68, 59, 0.03) !important;
+}
+
+tbody td {
+  padding: 0.875rem 1rem !important;
+  border-bottom: 1px solid rgba(42, 68, 59, 0.05) !important;
+  color: #1a2e26;
+  font-size: 0.875rem;
+}
+
+tbody tr:last-child td {
+  border-bottom: none !important;
+}
+
+/* Clean scrollbar */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.mobile-content-safe {
+  padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
 }
