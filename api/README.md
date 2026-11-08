@@ -7,7 +7,7 @@ All paths require a Supabase Auth access token in `Authorization: Bearer ...` an
 - `GET /api/v1/admin/permissions` — admin only; returns `{ permissions, grants }`.
 - `PUT /api/v1/admin/permissions/{roleKey}` — admin only; persist grants for a built-in non-admin role. Body: `{ "grants": [{ "permissionKey": "tasks.edit", "granted": true }] }`. Admin grants are intentionally protected.
 
-Resource collections support `GET` and `POST`; item paths support `GET`, `PATCH`, and `DELETE`. The backend checks `module.action` grants from `role_permissions` before forwarding each operation. Apply all SQL migrations before starting the API.
+Operational resource collections support `GET` and `POST`; item paths support `GET`, `PATCH`, and `DELETE`. The backend checks `module.action` grants from `role_permissions` before forwarding each operation. Financial resources (`funds`, `expenses`, `settlements`, `settlement-expenses`, `cash-receipts`, and `standing-accounts`) are intentionally read-only through generic CRUD: writes return `409 FINANCIAL_TRANSACTION_REQUIRED` until dedicated atomic, audited transaction workflows are implemented. Apply all SQL migrations before starting the API.
 
 ## Integration guidance
 
