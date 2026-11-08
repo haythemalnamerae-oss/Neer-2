@@ -1,9 +1,8 @@
 // Source: Google Maps Platform Code Assist
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   MapPin,
   Clock,
-  User as UserIcon,
   Plus,
   Play,
   Pause,
@@ -12,21 +11,15 @@ import {
   Navigation,
   Compass,
   Filter,
-  Layers,
   Search,
   ExternalLink,
   ChevronRight,
-  ShieldCheck,
-  Calendar,
-  DollarSign,
-  Maximize2,
-  RefreshCw,
 } from 'lucide-react';
 import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
 import { Task, TaskStatus } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
 import { hasPermission } from '../../lib/rbac/permissions';
-import { formatCurrency, TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG } from '../../lib/utils/format';
+import { formatCurrency, TASK_STATUS_CONFIG } from '../../lib/utils/format';
 import { Button } from '../ui/button';
 
 interface FieldMapViewProps {
