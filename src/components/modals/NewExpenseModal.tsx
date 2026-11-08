@@ -209,14 +209,14 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
               <span>حسابات المصروفات الاعتيادية والموردين المعتادين (بقالة، بوفيه، وقود):</span>
             </span>
             <div className="flex items-center gap-2">
-              <button
+              {hasPermission(currentUser.role, 'funds', 'edit') && <button
                 type="button"
                 onClick={() => setIsAddStandingModalOpen(true)}
                 className="neu-raised text-[11px] font-extrabold text-emerald-800 px-2.5 py-1 rounded-xl hover:text-emerald-950 flex items-center gap-1 cursor-pointer active:neu-inset transition"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>إضافة حساب معتاد جديد</span>
-              </button>
+              </button>}
               {selectedStandingAccId && (
                 <button
                   type="button"
