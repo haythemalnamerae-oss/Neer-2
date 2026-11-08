@@ -83,6 +83,7 @@ export class ReportsService {
       'المورد / المحل',
       'رقم الفاتورة الضريبية',
       'حالة الاعتماد',
+      'يتطلب تدقيقاً خاصاً',
       'تاريخ الرفع',
       'المسؤول'
     ];
@@ -97,6 +98,7 @@ export class ReportsService {
       `"${e.vendorName}"`,
       `"${e.invoiceNumber}"`,
       e.status,
+      e.specialAuditRequired ? 'نعم' : 'لا',
       e.submittedAt,
       `"${e.submittedBy}"`,
     ]);
