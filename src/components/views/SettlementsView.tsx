@@ -225,7 +225,7 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
                 <div className="text-left font-mono text-xs text-[#4F6C5B] space-y-1">
                   <p>تاريخ الإصدار: {new Date().toISOString().split('T')[0]}</p>
                   <p>كود الحركة: {previewSettlement.code}</p>
-                  <p className="text-[#215435] font-bold">الحالة: {previewSettlement.status === 'approved' || previewSettlement.status === 'closed' ? 'معتمد رسمياً' : previewSettlement.status === 'rejected' ? 'مرفوض' : 'قيد المراجعة'}</p>
+                  <p className="text-[#215435] font-bold">الحالة: {previewSettlement.status === 'approved' || previewSettlement.status === 'closed' ? 'معتمد نهائياً' : previewSettlement.status === 'rejected' ? 'مرفوض' : previewSettlement.status === 'audited' ? 'مدقق — بانتظار اعتماد ثانٍ' : 'قيد المراجعة'}</p>
                 </div>
               </div>
 
@@ -339,7 +339,7 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
             </div>
             <div>
               <p><strong>فترة الدورة:</strong> من {selectedSettlement.periodStart} إلى {selectedSettlement.periodEnd}</p>
-              <p><strong>حالة الاعتماد:</strong> {selectedSettlement.status === 'approved' || selectedSettlement.status === 'closed' ? 'معتمد ومصادق عليه' : 'قيد المراجعة — غير معتمد'}</p>
+              <p><strong>حالة الاعتماد:</strong> {selectedSettlement.status === 'approved' || selectedSettlement.status === 'closed' ? 'معتمد ومصادق عليه' : selectedSettlement.status === 'rejected' ? 'مرفوض' : selectedSettlement.status === 'audited' ? 'مدقق — بانتظار اعتماد نهائي' : 'قيد المراجعة — غير معتمد'}</p>
             </div>
           </div>
         </div>
