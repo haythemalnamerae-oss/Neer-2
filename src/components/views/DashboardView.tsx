@@ -47,15 +47,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const users = dataStore.getUsers();
   const tasks = dataStore.getTasks();
 
-  const totalFundsBalance = funds.reduce((s, f) => s + f.currentBalance, 0);
-  const totalExpenses = expenses.reduce((s, e) => s + e.totalWithTax, 0);
+  const matchingCurrencyFunds = funds.filter((fund) => fund.currency === dataStore.getSettings().currency);
+  const otherCurrencyFundCount = funds.length - matchingCurrencyFunds.length;
+  const totalFundsBalance = matchingCurrencyFunds.reduce((sum, fund) => sum + fund.currentBalance, 0);
+  const activeExpenses = expenses.filter((expense) => expense.status !== 'rejected');
+  const totalExpenses = activeExpenses.reduce((sum, expense) => sum + expense.totalWithTax, 0);
 
   // Spending categories percentages
   const categorySpending = {
-    shopping: expenses.filter((e) => e.category === 'materials' || e.category === 'tools').reduce((s, e) => s + e.totalWithTax, 0),
-    food: expenses.filter((e) => e.category === 'hospitality').reduce((s, e) => s + e.totalWithTax, 0),
-    transport: expenses.filter((e) => e.category === 'transport' || e.category === 'fuel').reduce((s, e) => s + e.totalWithTax, 0),
-    services: expenses.filter((e) => e.category === 'maintenance' || e.category === 'government' || e.category === 'other').reduce((s, e) => s + e.totalWithTax, 0),
+    shopping: activeExpenses.filter((e) => e.category === 'materials' || e.category === 'tools').reduce((s, e) => s + e.totalWithTax, 0),
+    food: activeExpenses.filter((e) => e.category === 'hospitality').reduce((s, e) => s + e.totalWithTax, 0),
+    transport: activeExpenses.filter((e) => e.category === 'transport' || e.category === 'fuel').reduce((s, e) => s + e.totalWithTax, 0),
+    services: activeExpenses.filter((e) => e.category === 'maintenance' || e.category === 'government' || e.category === 'other').reduce((s, e) => s + e.totalWithTax, 0),
   };
 
   const calcPercent = (val: number) => {
@@ -93,8 +96,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <p className="text-sm font-bold text-[#284C36]">إجمالي الأرصدة المتاحة في العهد</p>
             <p className="text-xs text-[#587565] mt-1">يعرض الرصيد الفعلي المسجل حالياً، دون نسب نمو أو منحنى تاريخي غير مستند إلى سجل مالي.</p>
             <div className="mt-3 flex items-center justify-between text-xs text-[#486857]">
-              <span>عدد العهد المسجلة</span><strong className="font-mono">{funds.length}</strong>
+              <span>عدد العهد بعملة المنشأة ({dataStore.getSettings().currency})</span><strong className="font-mono">{matchingCurrencyFunds.length}</strong>
             </div>
+            {otherCurrencyFundCount > 0 && <p className="text-[11px] text-amber-700 mt-2">هناك {otherCurrencyFundCount} عهد بعملات أخرى؛ لم تُجمع مع هذا الرصيد لتجنب خلط العملات.</p>}
           </div>
 
           {/* Quick Action Circles: Send / Receive / More (Enlarged for Mobile Ease of Use) */}
@@ -430,7 +434,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             const userCompleted = userTasks.filter((t) => t.status === 'completed' || t.status === 'approved').length;
             const userPaused = userTasks.filter((t) => t.isPaused).length;
             const completionRate = userTasks.length > 0 ? Math.round((userCompleted / userTasks.length) * 100) : 100;
-            const onTimeCompliance = completionRate >= 75 ? '96%' : '84%';
+            const hasDueDateEvidence = userTasks.some((task) => Boolean(task.dueDate));
 
             return (
               <div key={u.id} className="neu-raised rounded-3xl p-5 space-y-3.5">
@@ -452,8 +456,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <strong className="text-[#132A1C] font-mono">{userCompleted} / {userTasks.length}</strong>
                   </div>
                   <div className="flex justify-between text-[#446251]">
-                    <span>نسبة الالتزام بالموعد:</span>
-                    <strong className="text-[#235337] font-bold font-mono">{onTimeCompliance}</strong>
+                    <span>الالتزام بالمواعيد:</span>
+                    <strong className="text-[#235337] font-bold font-mono">{hasDueDateEvidence ? 'غير محسوبة' : 'لا توجد بيانات موعد'}</strong>
                   </div>
                   <div className="flex justify-between text-[#446251]">
                     <span>نقاط التعثر / التوقف:</span>
