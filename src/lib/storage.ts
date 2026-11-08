@@ -1598,6 +1598,26 @@ export class OpsDataStore {
     this.notify();
   }
 
+  public rejectSettlement(settlementId: string, reason: string): void {
+    const currentUser = this.getCurrentUser();
+    if (!hasPermission(currentUser.role, 'settlements', 'approve')) throw new Error('لا تملك صلاحية رفض التسويات.');
+    if (!reason?.trim()) throw new Error('يجب تسجيل سبب رفض التسوية.');
+    const settlement = this.settlements.find((item) => item.id === settlementId);
+    if (!settlement || !['under_review', 'audited'].includes(settlement.status)) throw new Error('لا يمكن رفض هذه التسوية؛ ربما سبق اعتمادها أو رفضها.');
+    this.settlements = this.settlements.map((item) => item.id === settlementId
+      ? { ...item, status: 'rejected', auditNotes: reason.trim() }
+      : item);
+    safeSet(STORAGE_KEYS.SETTLEMENTS, this.settlements);
+    this.logAudit('رفض تسوية عهدة', 'reject', 'settlement', settlementId, `سبب الرفض: ${reason.trim()}`);
+    this.addNotification({
+      title: 'رفض طلب تسوية عهدة',
+      message: `تم رفض التسوية ${settlement.code} وإعادة فواتيرها إلى قائمة الفواتير المعتمدة غير المسواة.`,
+      type: 'warning',
+      targetView: 'settlements',
+    });
+    this.notify();
+  }
+
   // --- Follow Ups ---
   public getFollowUps(): FollowUp[] {
     return [...this.followUps];
