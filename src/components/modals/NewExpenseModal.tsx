@@ -156,26 +156,31 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
     const task = tasks.find((t) => t.id === taskId);
     const standingAcc = standingAccounts.find((a) => a.id === selectedStandingAccId);
 
-    dataStore.addExpense({
-      fundId,
-      fundName: selectedFund?.name || 'العهدة النقدية',
-      amount: numAmount,
-      category,
-      description,
-      invoiceNumber,
-      vendorName,
-      hasReceipt,
-      receiptUrl: undefined,
-      expenseDate: new Date().toISOString().split('T')[0],
-      taskId: taskId || undefined,
-      taskTitle: task?.title,
-      cascadeDeduction: coverageMethod === 'cascade',
-      secondaryFundId: coverageMethod === 'cascade' ? secondaryFundId : undefined,
-      allowDeficit: coverageMethod === 'deficit' && canApproveExpense,
-      standingAccountId: standingAcc?.id,
-      standingAccountName: standingAcc?.name,
-      standingDirection: standingAcc?.direction,
-    });
+    try {
+      dataStore.addExpense({
+        fundId,
+        fundName: selectedFund?.name || 'العهدة النقدية',
+        amount: numAmount,
+        category,
+        description,
+        invoiceNumber,
+        vendorName,
+        hasReceipt,
+        receiptUrl: undefined,
+        expenseDate: new Date().toISOString().split('T')[0],
+        taskId: taskId || undefined,
+        taskTitle: task?.title,
+        cascadeDeduction: coverageMethod === 'cascade',
+        secondaryFundId: coverageMethod === 'cascade' ? secondaryFundId : undefined,
+        allowDeficit: coverageMethod === 'deficit' && canApproveExpense,
+        standingAccountId: standingAcc?.id,
+        standingAccountName: standingAcc?.name,
+        standingDirection: standingAcc?.direction,
+      });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'تعذر تسجيل المصروف. تحقق من البيانات والرصيد.');
+      return;
+    }
 
     onClose();
     // Reset
