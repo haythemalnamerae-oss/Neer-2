@@ -662,7 +662,7 @@ export class OpsDataStore {
     const user = this.getCurrentUser();
     if (!hasPermission(user.role, 'funds', 'edit') || !hasPermission(user.role, 'expenses', 'approve')) throw new Error('إضافة فاتورة معتمدة على حساب مورد تتطلب صلاحية إدارة مالية واعتماد المصروفات.');
     if (!Number.isFinite(amount) || amount <= 0) throw new Error('مبلغ الحركة غير صالح.');
-    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || !description.trim()) throw new Error('تاريخ الحركة وبيانها مطلوبان.');
+    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || !description.trim() || !reference?.trim()) throw new Error('تاريخ الحركة وبيانها ورقم الفاتورة أو المرجع الداخلي مطلوبة.');
     const account = this.standingAccounts.find((item) => item.id === id);
     if (!account || account.active === false) throw new Error('الحساب غير موجود أو موقوف.');
     const normalizedReference = reference?.trim().toLowerCase();
