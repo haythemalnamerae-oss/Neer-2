@@ -149,7 +149,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <h3 className="text-base sm:text-lg font-black text-[#132A1C] font-serif-display">
                 نظرة عامة على الإنفاق
               </h3>
-              <span className="text-xs sm:text-sm text-[#486857] font-bold">شهرياً</span>
+              <span className="text-xs sm:text-sm text-[#486857] font-bold">حسب السجلات الحالية</span>
             </div>
 
             {/* Donut Chart with Total Inside */}
@@ -320,7 +320,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   -{formatCurrency(exp.totalWithTax, dataStore.getFundById(exp.fundId)?.currency || settings.currency)}
                 </span>
                 <span className="text-xs neu-inset-sm px-3 py-1 rounded-full text-[#285539] font-bold inline-block mt-1">
-                  {exp.status === 'approved' ? 'معتمد' : 'تحت المراجعة'}
+                  {exp.status === 'approved' ? 'معتمد' : exp.status === 'settled' ? 'تمت التسوية' : exp.status === 'rejected' ? 'مرفوض — غير محتسب' : 'بانتظار الاعتماد'}
                 </span>
               </div>
             </div>
@@ -401,11 +401,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                   <td className="p-4 text-center">
                     <span className={`text-xs font-bold px-3 py-1.5 rounded-full neu-inset-sm ${
-                      exp.status === 'approved' ? 'text-[#215134]' :
+                      exp.status === 'approved' || exp.status === 'settled' ? 'text-[#215134]' :
                       exp.status === 'rejected' ? 'text-[#96372B]' :
                       'text-[#5F3874]'
                     }`}>
-                      {exp.status === 'approved' ? 'معتمد ومطابق' : exp.status === 'rejected' ? 'مرفوض' : 'بانتظار التدقيق'}
+                      {exp.status === 'settled' ? 'تمت التسوية' : exp.status === 'approved' ? 'معتمد' : exp.status === 'rejected' ? 'مرفوض' : 'بانتظار الاعتماد'}
                     </span>
                   </td>
                 </tr>
