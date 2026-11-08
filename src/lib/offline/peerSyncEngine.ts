@@ -186,12 +186,13 @@ export class PeerSyncEngine {
 
     // 4. Merge Standing Accounts
     const localStanding = dataStore.getStandingAccounts();
-    const standingMap = new Map<string, StandingAccount>(localStanding.map((s) => [s.id, s]));
+    const getOpeningBalance = (account: StandingAccount): number => account.openingBalance ?? Number(((account.currentBalance || 0) - (account.entries || []).reduce((sum, entry) => sum + (entry.type === 'charge' ? entry.amount : -entry.amount), 0)).toFixed(2));
+    const standingMap = new Map<string, StandingAccount>(localStanding.map((s) => [s.id, { ...s, openingBalance: getOpeningBalance(s) }]));
     for (const remoteStand of payload.data.standingAccounts || []) {
       report.totalEntitiesProcessed++;
       const localStand = standingMap.get(remoteStand.id);
       if (!localStand) {
-        standingMap.set(remoteStand.id, remoteStand);
+        standingMap.set(remoteStand.id, { ...remoteStand, openingBalance: getOpeningBalance(remoteStand) });
         continue;
       }
 
@@ -245,7 +246,7 @@ export class PeerSyncEngine {
         notes: localStand.notes || remoteStand.notes,
         currency: localStand.currency || remoteStand.currency,
         direction: localStand.direction,
-        openingBalance: localStand.openingBalance ?? remoteStand.openingBalance,
+        openingBalance: getOpeningBalance(localStand),
         active: localStand.active === false || remoteStand.active === false ? false : true,
         entries: mergedEntries.sort((a, b) => (b.createdAt || b.date).localeCompare(a.createdAt || a.date)),
       };
