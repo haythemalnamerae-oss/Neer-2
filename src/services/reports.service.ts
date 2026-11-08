@@ -2,6 +2,12 @@ import { dataStore } from '../lib/storage';
 import { EXPENSE_CATEGORY_CONFIG } from '../lib/utils/format';
 import { hasPermission } from '../lib/rbac/permissions';
 
+const toCsvCell = (value: unknown): string => {
+  const raw = String(value ?? '');
+  const safe = typeof value === 'string' && /^[\\s]*[=+@-]/.test(raw) ? "'" + raw : raw;
+  return '"' + safe.replaceAll('"', '""') + '"';
+};
+
 export class ReportsService {
   public static getDashboardMetrics() {
     const tasks = dataStore.getTasks();
@@ -91,21 +97,21 @@ export class ReportsService {
 
     const rows = expenses.map((e) => [
       e.code,
-      `"${e.fundName}"`,
+      e.fundName,
       e.amount,
       e.taxAmount,
       e.totalWithTax,
       EXPENSE_CATEGORY_CONFIG[e.category]?.label || e.category,
-      `"${e.vendorName}"`,
-      `"${e.invoiceNumber}"`,
+      e.vendorName,
+      e.invoiceNumber,
       e.status,
       e.specialAuditRequired ? 'نعم' : 'لا',
-      `"${(e.approvalNotes || '').replaceAll('"', '""')}"`,
+      e.approvalNotes || '',
       e.submittedAt,
-      `"${e.submittedBy}"`,
+      e.submittedBy,
     ]);
 
-    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const csvContent = '\uFEFF' + [headers.map(toCsvCell).join(','), ...rows.map((row) => row.map(toCsvCell).join(','))].join('\n');
     return csvContent;
   }
 
