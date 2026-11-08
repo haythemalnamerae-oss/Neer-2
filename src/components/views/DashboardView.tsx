@@ -42,12 +42,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     });
   }, []);
 
+  const settings = dataStore.getSettings();
   const expenses = dataStore.getExpenses();
   const funds = dataStore.getFunds();
   const users = dataStore.getUsers();
   const tasks = dataStore.getTasks();
 
-  const matchingCurrencyFunds = funds.filter((fund) => fund.currency === dataStore.getSettings().currency);
+  const matchingCurrencyFunds = funds.filter((fund) => fund.currency === settings.currency);
   const otherCurrencyFundCount = funds.length - matchingCurrencyFunds.length;
   const totalFundsBalance = matchingCurrencyFunds.reduce((sum, fund) => sum + fund.currentBalance, 0);
   const activeExpenses = expenses.filter((expense) => expense.status !== 'rejected');
@@ -83,7 +84,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </span>
               <div className="flex items-center gap-3 mt-2 flex-wrap">
                 <span className="text-3xl sm:text-5xl font-black text-[#132A1C] font-mono tracking-tight">
-                  {formatCurrency(totalFundsBalance)}
+                  {formatCurrency(totalFundsBalance, settings.currency)}
                 </span>
                 <span className="neu-inset-sm text-[#486857] text-xs sm:text-sm font-bold px-3.5 py-1.5 rounded-full">الرصيد الحالي</span>
               </div>
@@ -96,7 +97,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <p className="text-sm font-bold text-[#284C36]">إجمالي الأرصدة المتاحة في العهد</p>
             <p className="text-xs text-[#587565] mt-1">يعرض الرصيد الفعلي المسجل حالياً، دون نسب نمو أو منحنى تاريخي غير مستند إلى سجل مالي.</p>
             <div className="mt-3 flex items-center justify-between text-xs text-[#486857]">
-              <span>عدد العهد بعملة المنشأة ({dataStore.getSettings().currency})</span><strong className="font-mono">{matchingCurrencyFunds.length}</strong>
+              <span>عدد العهد بعملة المنشأة ({settings.currency})</span><strong className="font-mono">{matchingCurrencyFunds.length}</strong>
             </div>
             {otherCurrencyFundCount > 0 && <p className="text-[11px] text-amber-700 mt-2">هناك {otherCurrencyFundCount} عهد بعملات أخرى؛ لم تُجمع مع هذا الرصيد لتجنب خلط العملات.</p>}
           </div>
@@ -190,7 +191,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                   <span className="text-xs text-[#4F6E5E] font-semibold">إجمالي المصروفات</span>
                   <span className="text-base sm:text-lg font-black text-[#142B1D] font-mono mt-1">
-                    {formatCurrency(totalExpenses)}
+                    {formatCurrency(totalExpenses, settings.currency)}
                   </span>
                 </div>
               </div>
@@ -316,7 +317,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
               <div className="text-left shrink-0">
                 <span className="text-base sm:text-lg font-black text-[#142B1D] font-mono block dir-ltr">
-                  -{formatCurrency(exp.totalWithTax)}
+                  -{formatCurrency(exp.totalWithTax, dataStore.getFundById(exp.fundId)?.currency || settings.currency)}
                 </span>
                 <span className="text-xs neu-inset-sm px-3 py-1 rounded-full text-[#285539] font-bold inline-block mt-1">
                   {exp.status === 'approved' ? 'معتمد' : 'تحت المراجعة'}
@@ -433,7 +434,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             const userTasks = tasks.filter((t) => t.assigneeId === u.id);
             const userCompleted = userTasks.filter((t) => t.status === 'completed' || t.status === 'approved').length;
             const userPaused = userTasks.filter((t) => t.isPaused).length;
-            const completionRate = userTasks.length > 0 ? Math.round((userCompleted / userTasks.length) * 100) : 100;
             const hasDueDateEvidence = userTasks.some((task) => Boolean(task.dueDate));
 
             return (
