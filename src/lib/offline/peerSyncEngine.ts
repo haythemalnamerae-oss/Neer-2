@@ -195,13 +195,15 @@ export class PeerSyncEngine {
         continue;
       }
 
-      if (localStand.currency && remoteStand.currency && localStand.currency !== remoteStand.currency) {
+      const currencyConflict = Boolean(localStand.currency && remoteStand.currency && localStand.currency !== remoteStand.currency);
+      const directionConflict = localStand.direction !== remoteStand.direction;
+      if (currencyConflict) {
         report.hasConflicts = true;
-        report.conflictDetails.push(`اختلاف عملة حساب المورد ${localStand.name} بين الجهازين؛ تم الاحتفاظ بعملة الجهاز المحلي.`);
+        report.conflictDetails.push(`اختلاف عملة حساب المورد ${localStand.name} بين الجهازين؛ تم الاحتفاظ بعملة الجهاز المحلي وعدم دمج حركات العملة المختلفة.`);
       }
-      if (localStand.direction !== remoteStand.direction) {
+      if (directionConflict) {
         report.hasConflicts = true;
-        report.conflictDetails.push(`اختلاف طبيعة الحساب ${localStand.name} (لنا/علينا) بين الجهازين؛ تم الاحتفاظ بالتصنيف المحلي.`);
+        report.conflictDetails.push(`اختلاف طبيعة الحساب ${localStand.name} (لنا/علينا) بين الجهازين؛ تم الاحتفاظ بالتصنيف المحلي وعدم دمج الحركات المتعارضة.`);
       }
       if (localStand.openingBalance !== undefined && remoteStand.openingBalance !== undefined && localStand.openingBalance !== remoteStand.openingBalance) {
         report.hasConflicts = true;
@@ -211,7 +213,7 @@ export class PeerSyncEngine {
       const mergedEntries = [...(localStand.entries || [])];
       const entryIds = new Map(mergedEntries.map((entry) => [entry.id, entry]));
       const referenceEntries = new Map(mergedEntries.filter((entry) => entry.reference?.trim()).map((entry) => [entry.reference!.trim().toLowerCase(), entry]));
-      for (const remoteEntry of remoteStand.entries || []) {
+      for (const remoteEntry of (currencyConflict || directionConflict ? [] : (remoteStand.entries || []))) {
         const sameId = entryIds.get(remoteEntry.id);
         if (sameId) {
           if (sameId.amount !== remoteEntry.amount || sameId.type !== remoteEntry.type || sameId.reference !== remoteEntry.reference) {
