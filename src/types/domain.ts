@@ -351,7 +351,7 @@ export interface Expense {
   standingDirection?: 'receivable' | 'payable' | 'receivable_for_us' | 'payable_by_us';
 }
 
-export type SettlementStatus = 'draft' | 'under_review' | 'audited' | 'approved' | 'closed';
+export type SettlementStatus = 'draft' | 'under_review' | 'audited' | 'approved' | 'closed' | 'rejected';
 
 export interface Settlement {
   id: string;
