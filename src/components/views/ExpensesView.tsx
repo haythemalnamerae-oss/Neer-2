@@ -100,7 +100,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
             توثيق المصروفات والضريبة المضافة
           </h2>
           <p className="text-xs sm:text-sm text-[#4F6C5B] mt-1 font-medium">
-            إجمالي المبالغ المسجلة: <strong className="text-[#152B1E] font-mono dir-ltr">{formatCurrency(totalAmount)}</strong> (بما فيها <strong className="dir-ltr font-mono">{formatCurrency(totalTax)}</strong> ضريبة {settings.taxRate}%)
+            إجمالي المبالغ المسجلة: <strong className="text-[#152B1E] font-mono dir-ltr">{formatCurrency(totalAmount, settings.currency)}</strong> (بما فيها <strong className="dir-ltr font-mono">{formatCurrency(totalTax, settings.currency)}</strong> ضريبة {settings.taxRate}%)
           </p>
         </div>
 
@@ -210,15 +210,15 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
                     </td>
 
                     <td className="p-4 font-mono font-semibold text-[#1C3527]">
-                      {formatCurrency(exp.amount)}
+                      {formatCurrency(exp.amount, settings.currency)}
                     </td>
 
                     <td className="p-4 font-mono text-[#547363]">
-                      {formatCurrency(exp.taxAmount)}
+                      {formatCurrency(exp.taxAmount, settings.currency)}
                     </td>
 
                     <td className="p-4 font-mono font-black text-[#132A1C] text-base">
-                      {formatCurrency(exp.totalWithTax)}
+                      {formatCurrency(exp.totalWithTax, settings.currency)}
                     </td>
 
                     <td className="p-4">
