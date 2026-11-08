@@ -87,13 +87,14 @@ export const FundsView: React.FC<FundsViewProps> = ({
 
   const handleConfirmReplenish = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!replenishModalFund || parseFloat(replenishAmount) <= 0) return;
-
-    dataStore.replenishFund(
-      replenishModalFund.id,
-      parseFloat(replenishAmount),
-      replenishNotes || 'تغذية رصيد تعويضية للعهدة النقدية'
-    );
+    const amount = Number(replenishAmount);
+    if (!replenishModalFund || !Number.isFinite(amount) || amount <= 0) return;
+    try {
+      dataStore.replenishFund(replenishModalFund.id, amount, replenishNotes || 'تغذية رصيد تعويضية للعهدة النقدية');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'تعذر تغذية العهدة.');
+      return;
+    }
     setReplenishModalFund(null);
     setReplenishAmount('10000');
     setReplenishNotes('');
@@ -119,8 +120,8 @@ export const FundsView: React.FC<FundsViewProps> = ({
       receivedBy: currentUser.name,
       date: new Date().toISOString().split('T')[0],
       notes: receiptNotes || undefined,
-      fundId: receiptFundId || undefined,
-      fundName: funds.find((fund) => fund.id === receiptFundId)?.name,
+      fundId: receiptType === 'cash_box' ? receiptFundId : undefined,
+      fundName: receiptType === 'cash_box' ? funds.find((fund) => fund.id === receiptFundId)?.name : undefined,
     });
 
     setIsReceiptModalOpen(false);
@@ -131,7 +132,11 @@ export const FundsView: React.FC<FundsViewProps> = ({
   };
 
   const handleCoverDeficit = (expenseId: string) => {
-    dataStore.coverDeficitExpenseFromCash(expenseId, currentUser.name);
+    try {
+      dataStore.coverDeficitExpenseFromCash(expenseId, currentUser.name);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'تعذر تغطية العجز من الصندوق.');
+    }
   };
 
   return (
@@ -264,7 +269,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
       {activeTab === 'funds' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {funds.map((fund) => {
-            const ratio = Math.round((fund.currentBalance / fund.totalAllocation) * 100);
+            const ratio = fund.totalAllocation > 0 ? Math.round((fund.currentBalance / fund.totalAllocation) * 100) : 0;
             const isWarning = ratio <= fund.warningThreshold;
             const isDepleted = fund.currentBalance <= 0;
 
@@ -314,7 +319,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
                       className={`h-full rounded-full transition-all duration-300 ${
                         isDepleted ? 'bg-[#A03E33]' : isWarning ? 'bg-[#9C6322]' : 'bg-[#3D694E]'
                       }`}
-                      style={{ width: `${Math.max(ratio, 0)}%` }}
+                      style={{ width: `${Math.min(100, Math.max(ratio, 0))}%` }}
                     />
                   </div>
                 </div>
