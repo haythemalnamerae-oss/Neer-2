@@ -165,7 +165,7 @@ export const StandingAccountDetailsModal: React.FC<StandingAccountDetailsModalPr
             <div className="space-y-2">
               {linkedTasks.map((task) => (
                 <div key={task.id} className="neu-raised rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <div><strong className="text-slate-800">{task.title}</strong><span className="block text-slate-500 mt-1">{task.assigneeName} {task.dueDate ? `• ${task.dueDate}` : ''}</span></div>
+                  <div><strong className="text-slate-800">{task.title}</strong><span className="block text-slate-500 mt-1">{task.taskType || 'مهمة مرتبطة'} • {task.assigneeName} {task.dueDate ? `• ${task.dueDate}` : ''}</span>{task.location && <span className="block text-slate-500 mt-1">الموقع: {task.location}</span>}</div>
                   <span className="px-2.5 py-1 rounded-lg neu-inset-sm text-slate-700">{task.status === 'completed' || task.status === 'approved' ? 'مكتملة' : task.status === 'in_progress' || task.status === 'started' ? 'قيد التنفيذ' : task.status === 'cancelled' ? 'ملغاة' : 'مفتوحة'}</span>
                 </div>
               ))}
