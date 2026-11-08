@@ -1742,7 +1742,7 @@ export class OpsDataStore {
     if (!Number.isFinite(nextSettings.taxRate) || nextSettings.taxRate < 0 || nextSettings.taxRate > 100) throw new Error('نسبة الضريبة يجب أن تكون بين 0 و100.');
     if (!Number.isFinite(nextSettings.fundWarningThresholdPercent) || nextSettings.fundWarningThresholdPercent < 0 || nextSettings.fundWarningThresholdPercent > 100) throw new Error('حد إنذار العهد يجب أن يكون بين 0 و100.');
     if (!Number.isFinite(nextSettings.singleExpenseLimit) || nextSettings.singleExpenseLimit < 0) throw new Error('حد الصرف الفردي غير صالح.');
-    if (this.funds.some((fund) => fund.currency !== nextSettings.currency)) throw new Error('لا يمكن تغيير عملة النظام مع وجود عهد بعملة مختلفة؛ يلزم إعداد خطة تحويل ومطابقة أرصدة قبل التغيير.');
+    if (newSettings.currency !== undefined && newSettings.currency !== this.settings.currency && this.funds.some((fund) => fund.currency !== nextSettings.currency)) throw new Error('لا يمكن تغيير عملة النظام مع وجود عهد بعملة مختلفة؛ يلزم إعداد خطة تحويل ومطابقة أرصدة قبل التغيير.');
     this.settings = nextSettings;
     safeSet(STORAGE_KEYS.SETTINGS, this.settings);
     this.logAudit('تحديث إعدادات النظام', 'update', 'system', 'sys-cfg', 'تم تحديث سياسات ومعايير التشغيل بنجاح.');
