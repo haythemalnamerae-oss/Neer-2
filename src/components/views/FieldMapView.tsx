@@ -623,7 +623,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
 
               {/* Primary Execution Control Buttons */}
               <div className="space-y-2 pt-2 border-t border-slate-100">
-                {selectedTask.status === 'scheduled' && (
+                {canEditTask && selectedTask.status === 'scheduled' && (
                   <button
                     onClick={() => handleStartTaskWithLocation(selectedTask)}
                     className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-[#2A443B] hover:bg-[#1f332c] text-white text-xs font-bold font-sans-inter transition-all shadow-md cursor-pointer active:scale-95"
@@ -633,7 +633,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
                   </button>
                 )}
 
-                {selectedTask.status === 'in_progress' && (
+                {canEditTask && selectedTask.status === 'in_progress' && (
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => handlePauseTask(selectedTask)}
@@ -652,7 +652,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
                   </div>
                 )}
 
-                {selectedTask.status === 'paused' && (
+                {canEditTask && selectedTask.status === 'paused' && (
                   <button
                     onClick={() => handleResumeTask(selectedTask)}
                     className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md cursor-pointer active:scale-95"
