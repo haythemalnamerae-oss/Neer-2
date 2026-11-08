@@ -18,7 +18,7 @@ export class ReportsService {
     const totalSpentFunds = funds.reduce((sum, f) => sum + f.spentBalance, 0);
     const fundsWarningCount = funds.filter((f) => f.status === 'warning' || f.status === 'depleted').length;
 
-    const totalExpensesAmount = expenses.reduce((sum, e) => sum + e.totalWithTax, 0);
+    const totalExpensesAmount = expenses.filter((expense) => expense.status !== 'rejected').reduce((sum, expense) => sum + expense.totalWithTax, 0);
     const pendingExpensesCount = expenses.filter((e) => e.status === 'pending_approval').length;
     const pendingExpensesAmount = expenses
       .filter((e) => e.status === 'pending_approval')
@@ -46,7 +46,7 @@ export class ReportsService {
   }
 
   public static getExpenseCategoryBreakdown() {
-    const expenses = dataStore.getExpenses();
+    const expenses = dataStore.getExpenses().filter((expense) => expense.status !== 'rejected');
     const totals: Record<string, { label: string; amount: number; count: number }> = {};
 
     expenses.forEach((exp) => {
@@ -69,11 +69,12 @@ export class ReportsService {
 
   public static exportExpensesToCSV(): string {
     const expenses = dataStore.getExpenses();
+    const settings = dataStore.getSettings();
     const headers = [
       'رمز المصروف',
       'العهدة النقدية',
-      'المبلغ الأساسي (AED)',
-      'ضريبة القيمة المضافة 5%',
+      `المبلغ الأساسي (${settings.currency})`,
+      `ضريبة القيمة المضافة (${settings.taxRate}%)`,
       'الإجمالي شامل الضريبة',
       'التصنيف',
       'المورد / المحل',
@@ -111,7 +112,7 @@ export class ReportsService {
         const userTasks = tasks.filter((t) => t.assigneeId === user.id);
         const completedTasks = userTasks.filter((t) => t.status === 'completed' || t.status === 'approved').length;
         const inProgressTasks = userTasks.filter((t) => t.status === 'in_progress').length;
-        const userExpenses = expenses.filter((e) => e.submittedBy === user.name);
+        const userExpenses = expenses.filter((e) => e.submittedBy === user.name && e.status !== 'rejected');
         const totalSpent = userExpenses.reduce((sum, e) => sum + e.totalWithTax, 0);
         const completionRate = userTasks.length > 0 ? Math.round((completedTasks / userTasks.length) * 100) : 100;
 
@@ -169,7 +170,7 @@ export class ReportsService {
       return {
         fund: f,
         expensesCount: fundExpenses.length,
-        totalExpenses: fundExpenses.reduce((sum, e) => sum + e.totalWithTax, 0),
+        totalExpenses: fundExpenses.filter((expense) => expense.status !== 'rejected').reduce((sum, expense) => sum + expense.totalWithTax, 0),
         receiptsCount: fundReceipts.length,
         totalReceipts: fundReceipts.reduce((sum, r) => sum + r.amount, 0),
         fundExpenses,
