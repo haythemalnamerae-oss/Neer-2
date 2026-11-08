@@ -373,6 +373,8 @@ export class PeerSyncEngine {
       actualStartTime: local.actualStartTime || remote.actualStartTime,
       actualEndTime: local.actualEndTime || remote.actualEndTime,
       spentAmount: Math.max(local.spentAmount || 0, remote.spentAmount || 0),
+      standingAccountId: local.standingAccountId || remote.standingAccountId,
+      standingAccountName: local.standingAccountName || remote.standingAccountName,
     };
   }
 }
