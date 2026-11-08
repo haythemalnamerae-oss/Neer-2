@@ -47,17 +47,32 @@ async function authRequest<T>(path: string, body: unknown): Promise<T> {
   return payload as T;
 }
 
-export function getSession(): ApiSession | null {
+function readStoredSession(): ApiSession | null {
   try {
     const raw = localStorage.getItem(SESSION_KEY);
     if (!raw) return null;
     const value = JSON.parse(raw) as ApiSession;
-    if (value.expiresAt < Date.now() + 30_000) return null;
+    if (!value || typeof value.accessToken !== 'string' || typeof value.refreshToken !== 'string' ||
+        typeof value.userId !== 'string' || typeof value.organizationId !== 'string' ||
+        typeof value.expiresAt !== 'number') return null;
     return value;
   } catch { return null; }
 }
 
+export function getSession(): ApiSession | null {
+  const value = readStoredSession();
+  if (!value) return null;
+  // Keep expired sessions when a refresh token exists so the gate can renew them
+  // instead of incorrectly forcing the user to sign in again.
+  if (value.expiresAt < Date.now() && !value.refreshToken) {
+    clearSession();
+    return null;
+  }
+  return value;
+}
+
 function saveSession(value: ApiSession) { localStorage.setItem(SESSION_KEY, JSON.stringify(value)); }
+let refreshInFlight: Promise<ApiSession> | null = null;
 export function clearSession() { localStorage.removeItem(SESSION_KEY); }
 
 async function getMemberships(userId: string, token: string) {
@@ -95,10 +110,37 @@ export async function signIn(email: string, password: string): Promise<ApiSessio
 }
 
 export async function refreshSession(session: ApiSession): Promise<ApiSession> {
-  const auth = await authRequest<AuthResponse>('token?grant_type=refresh_token', { refresh_token: session.refreshToken });
-  const next = { ...session, accessToken: auth.access_token, refreshToken: auth.refresh_token, expiresAt: Date.now() + auth.expires_in * 1000 };
-  saveSession(next);
-  return next;
+  if (refreshInFlight) return refreshInFlight;
+
+  const stored = readStoredSession();
+  const base = stored && stored.userId === session.userId &&
+    stored.organizationId === session.organizationId ? stored : session;
+
+  if (base.expiresAt >= Date.now() + 30_000) return base;
+  if (!base.refreshToken) {
+    clearSession();
+    throw new SessionError('انتهت الجلسة. يرجى تسجيل الدخول مرة أخرى.');
+  }
+
+  refreshInFlight = (async () => {
+    const auth = await authRequest<AuthResponse>('token?grant_type=refresh_token', { refresh_token: base.refreshToken });
+    const next = {
+      ...base,
+      accessToken: auth.access_token,
+      refreshToken: auth.refresh_token,
+      expiresAt: Date.now() + auth.expires_in * 1000,
+      userId: auth.user.id || base.userId,
+      email: auth.user.email || base.email,
+    };
+    saveSession(next);
+    return next;
+  })();
+
+  try {
+    return await refreshInFlight;
+  } finally {
+    refreshInFlight = null;
+  }
 }
 
 export async function apiRequest<T>(session: ApiSession, path: string, init: RequestInit = {}): Promise<T> {
