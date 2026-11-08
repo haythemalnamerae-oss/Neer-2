@@ -587,15 +587,20 @@ export class OpsDataStore {
     if (status === 'rejected') {
       const refunds = targetExpense.cascadeSplit
         ? [
-            { fundId: targetExpense.cascadeSplit.primaryFundId, amount: targetExpense.cascadeSplit.primaryAmount },
-            { fundId: targetExpense.cascadeSplit.secondaryFundId, amount: targetExpense.cascadeSplit.secondaryAmount },
+            { fundId: targetExpense.cascadeSplit.primaryFundId, amount: targetExpense.cascadeSplit.primaryAmount, spentAmount: targetExpense.cascadeSplit.primaryAmount },
+            { fundId: targetExpense.cascadeSplit.secondaryFundId, amount: targetExpense.cascadeSplit.secondaryAmount, spentAmount: targetExpense.cascadeSplit.secondaryAmount },
           ]
-        : [{ fundId: targetExpense.fundId, amount: targetExpense.isDeficit ? Math.max(0, targetExpense.totalWithTax - (targetExpense.deficitAmount || 0)) : targetExpense.totalWithTax }];
+        : [{
+            fundId: targetExpense.fundId,
+            amount: targetExpense.isDeficit ? Math.max(0, targetExpense.totalWithTax - (targetExpense.deficitAmount || 0)) : targetExpense.totalWithTax,
+            spentAmount: targetExpense.totalWithTax,
+          }];
       this.funds = this.funds.map((fund) => {
         const refund = refunds.filter((item) => item.fundId === fund.id).reduce((sum, item) => sum + item.amount, 0);
-        if (refund <= 0) return fund;
+        const spentReduction = refunds.filter((item) => item.fundId === fund.id).reduce((sum, item) => sum + item.spentAmount, 0);
+        if (refund <= 0 && spentReduction <= 0) return fund;
         const newBalance = fund.currentBalance + refund;
-        const newSpent = Math.max(0, fund.spentBalance - refund);
+        const newSpent = Math.max(0, fund.spentBalance - spentReduction);
         const percentage = fund.totalAllocation > 0 ? (newBalance / fund.totalAllocation) * 100 : 0;
         return { ...fund, currentBalance: newBalance, spentBalance: newSpent,
           status: newBalance <= 0 ? 'depleted' : percentage <= fund.warningThreshold ? 'warning' : 'active' };
