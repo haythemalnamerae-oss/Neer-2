@@ -8,9 +8,10 @@ import { formatCurrency } from '../../lib/utils/format';
 interface StandingAccountDetailsModalProps {
   account: StandingAccount | null;
   onClose: () => void;
+  canManage: boolean;
 }
 
-export const StandingAccountDetailsModal: React.FC<StandingAccountDetailsModalProps> = ({ account, onClose }) => {
+export const StandingAccountDetailsModal: React.FC<StandingAccountDetailsModalProps> = ({ account, onClose, canManage }) => {
   const [mode, setMode] = useState<'charge' | 'settlement'>('charge');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
@@ -72,7 +73,7 @@ export const StandingAccountDetailsModal: React.FC<StandingAccountDetailsModalPr
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="neu-raised rounded-2xl p-4 space-y-3">
+        {canManage && <form onSubmit={handleSubmit} className="neu-raised rounded-2xl p-4 space-y-3">
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => setMode('charge')} className={`px-4 py-2 rounded-xl text-xs font-bold ${mode === 'charge' ? 'neu-inset text-emerald-900' : 'neu-raised text-slate-600'}`}>
               {isPayable ? 'إضافة فاتورة / شراء آجل' : 'إضافة مبلغ مستحق لنا'}
@@ -112,28 +113,34 @@ export const StandingAccountDetailsModal: React.FC<StandingAccountDetailsModalPr
           <div className="flex justify-end">
             <Button type="submit" variant="primary" size="md">{mode === 'charge' ? 'تسجيل الحركة على الحساب' : (isPayable ? 'تأكيد السداد' : 'تأكيد التحصيل')}</Button>
           </div>
-        </form>
+        </form>}
 
         <div className="space-y-2">
           <h4 className="font-black text-sm text-slate-800">كشف حركة الحساب</h4>
+          {!canManage && <p className="text-xs text-slate-500">صلاحية العرض فقط؛ لا يمكنك إضافة حركات أو تسويات على هذا الحساب.</p>}
           {entries.length === 0 ? <p className="text-xs text-slate-500 neu-inset-sm rounded-xl p-4">لا توجد حركات بعد. سيظهر هنا كل شراء وفاتورة وسداد أو تحصيل.</p> : (
             <div className="overflow-x-auto">
               <table className="w-full text-right text-xs">
-                <thead><tr className="border-b text-slate-500"><th className="p-2">التاريخ</th><th className="p-2">البيان</th><th className="p-2">المرجع</th><th className="p-2">مدين</th><th className="p-2">تسوية</th><th className="p-2">الرصيد</th></tr></thead>
+                <thead><tr className="border-b text-slate-500"><th className="p-2">التاريخ</th><th className="p-2">البيان</th><th className="p-2">المرجع</th><th className="p-2">إضافة</th><th className="p-2">تسوية</th><th className="p-2">الرصيد</th></tr></thead>
                 <tbody>
-                  {entries.slice().reverse().map((entry) => {
-                    const index = entries.slice().reverse().findIndex((item) => item.id === entry.id);
-                    const prior = entries.slice().reverse().slice(0, index + 1).reduce((sum, item) => sum + (item.type === 'charge' ? item.amount : -item.amount), current.openingBalance ?? 0);
-                    const expense = entry.expenseId ? linkedExpenses.find((item) => item.id === entry.expenseId) : undefined;
-                    return <tr key={entry.id} className="border-b border-slate-200/70">
-                      <td className="p-2 whitespace-nowrap">{entry.date}</td>
-                      <td className="p-2 min-w-40">{entry.description}{expense && <span className="block text-[10px] text-slate-500">{expense.code}</span>}</td>
-                      <td className="p-2">{entry.reference || '—'}</td>
-                      <td className="p-2 font-mono">{entry.type === 'charge' ? formatCurrency(entry.amount, currency) : '—'}</td>
-                      <td className="p-2 font-mono">{entry.type === 'settlement' ? formatCurrency(entry.amount, currency) : '—'}</td>
-                      <td className="p-2 font-mono font-bold">{formatCurrency(prior, currency)}</td>
-                    </tr>;
-                  })}
+                  {(() => {
+                    let runningBalance = current.openingBalance ?? current.currentBalance ?? 0;
+                    const chronologicalRows = entries.slice().reverse().map((entry) => {
+                      runningBalance += entry.type === 'charge' ? entry.amount : -entry.amount;
+                      return { entry, balance: runningBalance };
+                    });
+                    return chronologicalRows.reverse().map(({ entry, balance: rowBalance }) => {
+                      const expense = entry.expenseId ? linkedExpenses.find((item) => item.id === entry.expenseId) : undefined;
+                      return <tr key={entry.id} className="border-b border-slate-200/70">
+                        <td className="p-2 whitespace-nowrap">{entry.date}</td>
+                        <td className="p-2 min-w-40">{entry.description}{expense && <span className="block text-[10px] text-slate-500">{expense.code}</span>}</td>
+                        <td className="p-2">{entry.reference || '—'}</td>
+                        <td className="p-2 font-mono">{entry.type === 'charge' ? formatCurrency(entry.amount, currency) : '—'}</td>
+                        <td className="p-2 font-mono">{entry.type === 'settlement' ? formatCurrency(entry.amount, currency) : '—'}</td>
+                        <td className="p-2 font-mono font-bold">{formatCurrency(rowBalance, currency)}</td>
+                      </tr>;
+                    });
+                  })()}
                 </tbody>
               </table>
             </div>
