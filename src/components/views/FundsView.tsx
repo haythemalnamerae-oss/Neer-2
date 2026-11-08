@@ -854,7 +854,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
                   type="text"
                   value={receiptSource}
                   onChange={(e) => setReceiptSource(e.target.value)}
-                  placeholder="مثال: العميل شركة الأفق / مبيعات فرع الرياض"
+                  placeholder="مثال: اسم العميل أو الجهة الموردة"
                   className="w-full px-3.5 py-2.5 text-sm"
                   required
                 />
