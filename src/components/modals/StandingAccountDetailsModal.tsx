@@ -117,8 +117,8 @@ export const StandingAccountDetailsModal: React.FC<StandingAccountDetailsModalPr
             </label>
           )}
           <label className="block text-xs font-bold text-slate-700 space-y-1">
-            <span>{mode === 'charge' ? 'رقم الفاتورة / المرجع' : 'بيان السداد أو التحصيل'}</span>
-            <input value={reference} onChange={(event) => setReference(event.target.value)} placeholder="رقم الفاتورة أو ملاحظات" className="w-full neu-inset rounded-xl px-3 py-2.5" />
+            <span>{mode === 'charge' ? 'رقم الفاتورة / المرجع (اختياري)' : 'رقم سند السداد / التحصيل *'}</span>
+            <input required={mode === 'settlement'} value={reference} onChange={(event) => setReference(event.target.value)} placeholder={mode === 'settlement' ? 'رقم السند أو مرجع التحويل' : 'رقم الفاتورة أو المرجع'} className="w-full neu-inset rounded-xl px-3 py-2.5" />
           </label>
           <div className="flex justify-end">
             <Button type="submit" variant="primary" size="md">{mode === 'charge' ? 'تسجيل الحركة على الحساب' : (isPayable ? 'تأكيد السداد' : 'تأكيد التحصيل')}</Button>
