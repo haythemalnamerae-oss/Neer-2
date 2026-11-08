@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { dataStore } from '../../lib/storage';
 import { SettlementsService } from '../../services/settlements.service';
 import { Modal } from '../ui/modal';
@@ -14,24 +14,34 @@ interface NewSettlementModalProps {
 export const NewSettlementModal: React.FC<NewSettlementModalProps> = ({ isOpen, onClose }) => {
   const funds = dataStore.getFunds();
   const expenses = dataStore.getExpenses();
+  const existingSettlements = dataStore.getSettlements();
+  const today = new Date().toISOString().split('T')[0];
+  const monthStart = `${today.slice(0, 7)}-01`;
 
   const [fundId, setFundId] = useState(funds[0]?.id || '');
-  const [periodStart, setPeriodStart] = useState('2026-09-01');
-  const [periodEnd, setPeriodEnd] = useState('2026-09-15');
-  const [notes, setNotes] = useState('تسوية الدورة النصف شهرية الأولى لشهر سبتمبر 2026');
+  const [periodStart, setPeriodStart] = useState(monthStart);
+  const [periodEnd, setPeriodEnd] = useState(today);
+  const [notes, setNotes] = useState('');
 
   const selectedFund = funds.find((f) => f.id === fundId);
-
-  // Calculate expenses for this fund that are approved
-  const eligibleExpenses = expenses.filter(
-    (e) => e.fundId === fundId && (e.status === 'approved' || e.status === 'pending_approval')
-  );
-  const totalExpensesAmount = eligibleExpenses.reduce((s, e) => s + e.totalWithTax, 0);
+  const alreadyIncludedIds = useMemo(() => new Set(
+    existingSettlements.filter((settlement) => settlement.status !== 'rejected')
+      .flatMap((settlement) => settlement.expenseIds)
+  ), [existingSettlements]);
+  const eligibleExpenses = useMemo(() => expenses.filter((expense) =>
+    expense.fundId === fundId &&
+    expense.status === 'approved' &&
+    Boolean(expense.expenseDate) &&
+    expense.expenseDate! >= periodStart &&
+    expense.expenseDate! <= periodEnd &&
+    !alreadyIncludedIds.has(expense.id)
+  ), [expenses, fundId, periodStart, periodEnd, alreadyIncludedIds]);
+  const totalExpensesAmount = eligibleExpenses.reduce((sum, expense) => sum + expense.totalWithTax, 0);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fundId || !periodStart || !periodEnd) {
-      alert('يرجى تحديد العهدة وتواريخ دورة التسوية');
+    if (!fundId || !periodStart || !periodEnd || periodStart > periodEnd || eligibleExpenses.length === 0) {
+      alert('تحقق من العهدة والفترة، وتأكد من وجود فواتير معتمدة غير مسواة ضمنها.');
       return;
     }
 
@@ -40,6 +50,7 @@ export const NewSettlementModal: React.FC<NewSettlementModalProps> = ({ isOpen, 
       periodStart,
       periodEnd,
       notes,
+      expenseIds: eligibleExpenses.map((expense) => expense.id),
     });
 
     onClose();
@@ -77,13 +88,13 @@ export const NewSettlementModal: React.FC<NewSettlementModalProps> = ({ isOpen, 
               <span className="font-extrabold text-slate-800 dir-ltr font-mono">{formatCurrency(selectedFund.totalAllocation)}</span>
             </div>
             <div className="flex justify-between text-xs sm:text-sm">
-              <span className="text-slate-600 font-medium">إجمالي الفواتير قيد التسوية:</span>
+              <span className="text-slate-600 font-medium">الفواتير المعتمدة غير المسواة:</span>
               <span className="font-extrabold text-emerald-800 dir-ltr font-mono">
-                {eligibleExpenses.length} فواتير - {formatCurrency(totalExpensesAmount)}
+                {eligibleExpenses.length} فاتورة - {formatCurrency(totalExpensesAmount)}
               </span>
             </div>
             <div className="flex justify-between text-xs sm:text-sm pt-2.5 border-t border-black/[0.04]">
-              <span className="font-bold text-slate-700">الرصيد المتبقي لإعادة التغذية:</span>
+              <span className="font-bold text-slate-700">الرصيد الحالي للعهدة:</span>
               <span className="font-black text-emerald-800 dir-ltr font-mono text-sm sm:text-base">
                 {formatCurrency(selectedFund.currentBalance)}
               </span>
@@ -104,9 +115,11 @@ export const NewSettlementModal: React.FC<NewSettlementModalProps> = ({ isOpen, 
             label="نهاية فترة التسوية *"
             value={periodEnd}
             onChange={(e) => setPeriodEnd(e.target.value)}
+            min={periodStart}
             required
           />
         </div>
+        <p className="text-xs text-slate-500">تُضمّن الفواتير المعتمدة فقط التي لها تاريخ مصروف داخل الفترة، وتُستبعد الفواتير المرفوضة أو المعلقة أو المحجوزة في تسوية أخرى.</p>
 
         <div className="space-y-1.5">
           <label className="block text-xs font-bold text-slate-700">ملاحظات التدقيق والمطابقة</label>
@@ -123,7 +136,7 @@ export const NewSettlementModal: React.FC<NewSettlementModalProps> = ({ isOpen, 
             إلغاء
           </Button>
           <Button variant="primary" size="md" type="submit">
-            تقديم طلب التسوية
+            تقديم طلب التسوية ({eligibleExpenses.length})
           </Button>
         </div>
       </form>
