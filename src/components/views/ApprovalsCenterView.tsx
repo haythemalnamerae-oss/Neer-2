@@ -298,13 +298,13 @@ export const ApprovalsCenterView: React.FC<ApprovalsCenterViewProps> = ({ onSele
                       variant="success"
                       size="sm"
                       onClick={() => handleApproveSettlement(s.id)}
-                      disabled={settings.requireDualApprovalForSettlements && s.status === 'audited' && s.auditedBy === currentUser.name}
+                      disabled={settings.requireDualApprovalForSettlements && s.status === 'audited' && (s.auditedById ? s.auditedById === currentUser.id : s.auditedBy === currentUser.name)}
                       icon={<CheckCircle2 className="w-4.5 h-4.5 stroke-[2.2]" />}
                       className="text-xs sm:text-sm font-bold min-h-[42px] px-4"
                     >
                       {settings.requireDualApprovalForSettlements ? (s.status === 'audited' ? 'الاعتماد النهائي' : 'التدقيق الأولي') : 'اعتماد التسوية'}
                     </Button>
-                    {settings.requireDualApprovalForSettlements && s.status === 'audited' && s.auditedBy === currentUser.name && <span className="text-xs text-amber-700">يلزم معتمد مختلف عن المدقق الأول</span>}
+                    {settings.requireDualApprovalForSettlements && s.status === 'audited' && (s.auditedById ? s.auditedById === currentUser.id : s.auditedBy === currentUser.name) && <span className="text-xs text-amber-700">يلزم معتمد مختلف عن المدقق الأول</span>}
                   </div>
                 </div>
               ))}
