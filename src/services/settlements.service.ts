@@ -24,23 +24,41 @@ export class SettlementsService {
 
   public static create(data: CreateSettlementPayload): Settlement {
     const fund = dataStore.getFundById(data.fundId);
-    const expenses = dataStore.getExpenses().filter((e) => e.fundId === data.fundId);
-    const selectedExpenseIds = data.expenseIds || expenses.map((e) => e.id);
-    const totalExpenses = data.totalExpenses ?? expenses
-      .filter((e) => selectedExpenseIds.includes(e.id))
-      .reduce((sum, e) => sum + e.totalWithTax, 0);
-    const advanceAmount = data.advanceAmount ?? (fund ? fund.totalAllocation : 0);
-    const remainingAmount = data.remainingAmount ?? (fund ? fund.currentBalance : Math.max(0, advanceAmount - totalExpenses));
+    if (!fund) throw new Error('العهدة المحددة غير موجودة.');
+    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(data.periodStart) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(data.periodEnd) || data.periodStart > data.periodEnd) {
+      throw new Error('حدد فترة تسوية صحيحة.');
+    }
+    const activeSettlementIds = new Set(
+      dataStore.getSettlements()
+        .filter((settlement) => settlement.status !== 'rejected')
+        .flatMap((settlement) => settlement.expenseIds)
+    );
+    const eligibleExpenses = dataStore.getExpenses().filter((expense) =>
+      expense.fundId === data.fundId &&
+      expense.status === 'approved' &&
+      Boolean(expense.expenseDate) &&
+      expense.expenseDate! >= data.periodStart &&
+      expense.expenseDate! <= data.periodEnd &&
+      !activeSettlementIds.has(expense.id)
+    );
+    const selectedExpenseIds = data.expenseIds?.length
+      ? data.expenseIds
+      : eligibleExpenses.map((expense) => expense.id);
+    const selected = selectedExpenseIds.map((id) => eligibleExpenses.find((expense) => expense.id === id));
+    if (!selected.length || selected.some((expense) => !expense)) {
+      throw new Error('لا توجد فواتير معتمدة وغير مسواة ضمن الفترة المحددة، أو أن بعض الفواتير محجوزة في تسوية أخرى.');
+    }
+    const totalExpenses = selected.reduce((sum, expense) => sum + (expense?.totalWithTax || 0), 0);
 
     return dataStore.addSettlement({
       fundId: data.fundId,
-      fundName: fund ? fund.name : 'العهدة النقدية',
-      holderName: fund ? fund.holderName : 'المسؤول الميداني',
+      fundName: fund.name,
+      holderName: fund.holderName,
       periodStart: data.periodStart,
       periodEnd: data.periodEnd,
-      advanceAmount,
+      advanceAmount: fund.totalAllocation,
       totalExpenses,
-      remainingAmount,
+      remainingAmount: fund.currentBalance,
       expenseIds: selectedExpenseIds,
       expensesCount: selectedExpenseIds.length,
       auditNotes: data.auditNotes || data.notes || '',
