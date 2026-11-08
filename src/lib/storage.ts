@@ -1525,7 +1525,10 @@ export class OpsDataStore {
     if (selectedIds.length === 0) throw new Error('لا توجد مصروفات معتمدة ضمن التسوية.');
     const selectedExpenses = selectedIds.map((id) => this.expenses.find((expense) => expense.id === id));
     if (selectedExpenses.some((expense) => !expense || expense.fundId !== fund.id || expense.status !== 'approved')) throw new Error('تحتوي التسوية على مصروف غير معتمد أو تابع لعهدة أخرى.');
-    if (selectedExpenses.some((expense) => !expense?.expenseDate || expense.expenseDate < settlementData.periodStart || expense.expenseDate > settlementData.periodEnd)) throw new Error('توجد فاتورة خارج فترة التسوية أو بلا تاريخ مصروف موثق.');
+    if (selectedExpenses.some((expense) => {
+      const expenseDate = expense?.expenseDate || expense?.submittedAt.match(/^\\d{4}-\\d{2}-\\d{2}/)?.[0];
+      return !expenseDate || expenseDate < settlementData.periodStart || expenseDate > settlementData.periodEnd;
+    })) throw new Error('توجد فاتورة خارج فترة التسوية أو بلا تاريخ مصروف موثق.');
     const verifiedTotal = selectedExpenses.reduce((sum, expense) => sum + (expense?.totalWithTax || 0), 0);
     const newSettlement: Settlement = {
       ...settlementData,
