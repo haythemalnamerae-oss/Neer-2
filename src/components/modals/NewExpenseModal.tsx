@@ -138,7 +138,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!canCreateExpense) { alert('لا تملك صلاحية تسجيل المصروفات.'); return; }
-    if (!fundId || numAmount <= 0 || !description.trim() || !vendorName.trim() || !invoiceNumber.trim()) {
+    if (!fundId || numAmount <= 0 || !description.trim() || !vendorName.trim() || (settings.requireInvoiceNumber && !invoiceNumber.trim())) {
       alert('يرجى ملء جميع الحقول المطلوبة');
       return;
     }
@@ -395,11 +395,11 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
             helperText="يمكنك الاختيار من الموردين المعتادين أو كتابة مورد جديد مباشرة"
           />
           <Input
-            label="رقم الفاتورة الضريبية *"
+            label={settings.requireInvoiceNumber ? 'رقم الفاتورة الضريبية *' : 'رقم الفاتورة (اختياري)'}
             placeholder="مثال: INV-2026-884"
             value={invoiceNumber}
             onChange={(e) => setInvoiceNumber(e.target.value)}
-            required
+            required={settings.requireInvoiceNumber}
           />
         </div>
 
@@ -438,6 +438,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
             <input
               type="checkbox"
               checked={hasReceipt}
+              required={settings.requireReceiptForExpense}
               onChange={(e) => setHasReceipt(e.target.checked)}
               className="w-5 h-5 accent-[#345c47] rounded cursor-pointer"
             />
