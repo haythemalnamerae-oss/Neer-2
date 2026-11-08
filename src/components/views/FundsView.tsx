@@ -14,12 +14,13 @@ import {
   Phone,
   Store,
 } from 'lucide-react';
-import { PettyCashFund } from '../../types/domain';
+import { PettyCashFund, StandingAccount } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
 import { hasPermission } from '../../lib/rbac/permissions';
 import { formatCurrency } from '../../lib/utils/format';
 import { Button } from '../ui/button';
 import { NewStandingAccountModal } from '../modals/NewStandingAccountModal';
+import { StandingAccountDetailsModal } from '../modals/StandingAccountDetailsModal';
 
 interface FundsViewProps {
   onOpenNewFund: () => void;
@@ -49,6 +50,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
 
   // New Standing Account State
   const [isStandingModalOpen, setIsStandingModalOpen] = useState(false);
+  const [selectedStandingAccount, setSelectedStandingAccount] = useState<StandingAccount | null>(null);
   const [standingSearch, setStandingSearch] = useState('');
   const [standingFilter, setStandingFilter] = useState<'all' | 'payable' | 'receivable'>('all');
 
@@ -647,6 +649,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
                   <th className="p-3.5">المورد المعتاد والتواصل</th>
                   <th className="p-3.5">التصنيف</th>
                   <th className="p-3.5">الموقف المالي (لنا / علينا)</th>
+                  <th className="p-3.5">الرصيد المستحق</th>
                   <th className="p-3.5">الحد الشهري / المعتاد</th>
                   <th className="p-3.5">ملاحظات</th>
                   <th className="p-3.5 text-center">إجراءات</th>
@@ -675,6 +678,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
                           {acc.code || 'STD'}
                         </span>
                         <strong className="text-[#1A2E22]">{acc.name}</strong>
+                        {acc.active === false && <span className="block text-[10px] text-rose-700 mt-1">حساب موقوف — السجل محفوظ</span>}
                       </td>
 
                       <td className="p-3.5 text-slate-700 font-medium">
@@ -709,8 +713,12 @@ export const FundsView: React.FC<FundsViewProps> = ({
                         )}
                       </td>
 
+                      <td className="p-3.5 font-mono font-black text-[#192E21]">
+                        {formatCurrency(acc.currentBalance ?? acc.openingBalance ?? 0, acc.currency || settings.currency)}
+                      </td>
+
                       <td className="p-3.5 font-mono text-[#192E21] font-bold">
-                        {acc.monthlyLimit ? formatCurrency(acc.monthlyLimit) : acc.defaultAmount ? formatCurrency(acc.defaultAmount) : 'بدون سقف محدد'}
+                        {acc.monthlyLimit ? formatCurrency(acc.monthlyLimit, acc.currency || settings.currency) : acc.defaultAmount ? formatCurrency(acc.defaultAmount, acc.currency || settings.currency) : 'بدون سقف محدد'}
                       </td>
 
                       <td className="p-3.5 text-[#556F60]">
@@ -718,18 +726,16 @@ export const FundsView: React.FC<FundsViewProps> = ({
                       </td>
 
                       <td className="p-3.5 text-center">
-                        {canEditFund && <button
-                          type="button"
-                          onClick={() => {
-                            if (confirm(`هل أنت متأكد من حذف الحساب "${acc.name}"؟`)) {
-                              dataStore.deleteStandingAccount(acc.id);
+                        <div className="flex items-center justify-center gap-2">
+                          <button type="button" onClick={() => setSelectedStandingAccount(acc)} className="px-3 py-2 rounded-xl neu-raised text-emerald-800 font-bold whitespace-nowrap" title="فتح كشف الحساب">كشف الحساب</button>
+                          {canEditFund && acc.active !== false && <button type="button" onClick={() => {
+                            if (window.confirm(`سيتم إيقاف حساب ${acc.name} مع الاحتفاظ بجميع حركاته. هل تريد المتابعة؟`)) {
+                              try { dataStore.deleteStandingAccount(acc.id); } catch (error) { window.alert(error instanceof Error ? error.message : 'تعذر إيقاف الحساب.'); }
                             }
-                          }}
-                          className="w-8 h-8 rounded-xl neu-raised text-rose-600 hover:text-rose-800 active:neu-inset inline-flex items-center justify-center transition cursor-pointer"
-                          title="حذف هذا الحساب"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>}
+                          }} className="w-8 h-8 rounded-xl neu-raised text-rose-600 hover:text-rose-800 active:neu-inset inline-flex items-center justify-center transition cursor-pointer" title="إيقاف الحساب">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -913,6 +919,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
         isOpen={isStandingModalOpen}
         onClose={() => setIsStandingModalOpen(false)}
       />
+      <StandingAccountDetailsModal account={selectedStandingAccount} onClose={() => setSelectedStandingAccount(null)} />
     </div>
   );
 };
