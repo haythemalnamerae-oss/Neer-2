@@ -243,6 +243,7 @@ export class OpsDataStore {
   public addFund(fund: Omit<PettyCashFund, 'id' | 'code' | 'spentBalance' | 'currentBalance' | 'status' | 'lastReplenishedDate'>): PettyCashFund {
     if (!hasPermission(this.getCurrentUser().role, 'funds', 'create')) throw new Error('لا تملك صلاحية إنشاء عهدة.');
     if (!Number.isFinite(fund.totalAllocation) || fund.totalAllocation <= 0) throw new Error('مبلغ تخصيص العهدة غير صالح.');
+    if (fund.currency !== this.settings.currency) throw new Error('عملة العهدة يجب أن تطابق عملة المنشأة؛ لا يتم التحويل بين العملات تلقائياً.');
     if (!Number.isFinite(fund.warningThreshold) || fund.warningThreshold < 0 || fund.warningThreshold > 100) throw new Error('نسبة تنبيه الرصيد يجب أن تكون بين 0 و100.');
     const holder = this.users.find((user) => user.id === fund.holderId && user.active);
     if (!holder) throw new Error('يجب اختيار أمين عهدة نشط.');
@@ -265,6 +266,7 @@ export class OpsDataStore {
   public replenishFund(fundId: string, addedAmount: number, notes?: string): void {
     if (!hasPermission(this.getCurrentUser().role, 'funds', 'edit')) throw new Error('لا تملك صلاحية تغذية العهد.');
     if (!Number.isFinite(addedAmount) || addedAmount <= 0 || !this.funds.some((fund) => fund.id === fundId)) throw new Error('بيانات تغذية العهدة غير صالحة.');
+    if (this.funds.find((fund) => fund.id === fundId)?.currency !== this.settings.currency) throw new Error('عملة العهدة تختلف عن عملة المنشأة؛ راجع إعداد العملة قبل تسجيل التغذية.');
     this.funds = this.funds.map((f) => {
       if (f.id === fundId) {
         const newBalance = f.currentBalance + addedAmount;
@@ -323,6 +325,7 @@ export class OpsDataStore {
 
     const primaryFund = this.funds.find((f) => f.id === expenseData.fundId);
     if (!primaryFund) throw new Error('العهدة المحددة غير موجودة.');
+    if (primaryFund.currency !== this.settings.currency) throw new Error('عملة العهدة تختلف عن عملة المنشأة؛ لا يمكن تسجيل مصروف دون تسوية إعداد العملة.');
     if (currentUser.role === 'field_officer' && primaryFund.holderId !== currentUser.id) throw new Error('لا يمكنك تسجيل مصروف على عهدة غير مسندة إليك.');
     if (expenseData.taskId) {
       const linkedTask = this.tasks.find((task) => task.id === expenseData.taskId);
@@ -339,6 +342,7 @@ export class OpsDataStore {
     if (expenseData.cascadeDeduction && expenseData.secondaryFundId && totalWithTax > avail1) {
       const secondaryFund = this.funds.find((f) => f.id === expenseData.secondaryFundId);
       if (!secondaryFund || secondaryFund.id === primaryFund.id) throw new Error('العهدة البديلة غير صالحة.');
+      if (secondaryFund.currency !== primaryFund.currency) throw new Error('لا يمكن السحب المتسلسل بين عهدتين بعملتين مختلفتين.');
       if (currentUser.role === 'field_officer' && secondaryFund.holderId !== currentUser.id) throw new Error('لا يمكنك استخدام عهدة بديلة غير مسندة إليك.');
       const neededFromSecondary = Number((totalWithTax - avail1).toFixed(2));
       if (secondaryFund.currentBalance < neededFromSecondary) throw new Error('رصيد العهدة البديلة لا يكفي لتغطية الفرق.');
@@ -505,6 +509,7 @@ export class OpsDataStore {
     if (!Number.isFinite(data.amount) || data.amount <= 0) throw new Error('مبلغ المقبوض غير صالح.');
     if (data.type === 'cash_box' && !data.fundId) throw new Error('يجب تحديد الصندوق المستلم للمقبوض.');
     if (data.fundId && !this.funds.some((fund) => fund.id === data.fundId)) throw new Error('الصندوق المحدد غير موجود.');
+    if (data.type === 'cash_box' && this.funds.find((fund) => fund.id === data.fundId)?.currency !== this.settings.currency) throw new Error('عملة الصندوق تختلف عن عملة المنشأة.');
     const newReceipt: CashReceipt = {
       ...data,
       id: `cr-${Date.now()}`,
