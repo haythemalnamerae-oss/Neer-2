@@ -36,9 +36,8 @@ export class SettlementsService {
     const eligibleExpenses = dataStore.getExpenses().filter((expense) =>
       expense.fundId === data.fundId &&
       expense.status === 'approved' &&
-      Boolean(expense.expenseDate) &&
-      expense.expenseDate! >= data.periodStart &&
-      expense.expenseDate! <= data.periodEnd &&
+      (expense.expenseDate || expense.submittedAt.match(/^\\d{4}-\\d{2}-\\d{2}/)?.[0] || '') >= data.periodStart &&
+      (expense.expenseDate || expense.submittedAt.match(/^\\d{4}-\\d{2}-\\d{2}/)?.[0] || '') <= data.periodEnd &&
       !activeSettlementIds.has(expense.id)
     );
     const selectedExpenseIds = data.expenseIds?.length
