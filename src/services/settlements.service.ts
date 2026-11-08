@@ -25,7 +25,7 @@ export class SettlementsService {
   public static create(data: CreateSettlementPayload): Settlement {
     const fund = dataStore.getFundById(data.fundId);
     if (!fund) throw new Error('العهدة المحددة غير موجودة.');
-    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(data.periodStart) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(data.periodEnd) || data.periodStart > data.periodEnd) {
+    if (!/^\d{4}-\\d{2}-\\d{2}$/.test(data.periodStart) || !/^\d{4}-\\d{2}-\\d{2}$/.test(data.periodEnd) || data.periodStart > data.periodEnd) {
       throw new Error('حدد فترة تسوية صحيحة.');
     }
     const activeSettlementIds = new Set(
@@ -36,8 +36,8 @@ export class SettlementsService {
     const eligibleExpenses = dataStore.getExpenses().filter((expense) =>
       expense.fundId === data.fundId &&
       expense.status === 'approved' &&
-      (expense.expenseDate || expense.submittedAt.match(/^\\d{4}-\\d{2}-\\d{2}/)?.[0] || '') >= data.periodStart &&
-      (expense.expenseDate || expense.submittedAt.match(/^\\d{4}-\\d{2}-\\d{2}/)?.[0] || '') <= data.periodEnd &&
+      (expense.expenseDate || expense.submittedAt.match(/^\d{4}-\\d{2}-\\d{2}/)?.[0] || '') >= data.periodStart &&
+      (expense.expenseDate || expense.submittedAt.match(/^\d{4}-\\d{2}-\\d{2}/)?.[0] || '') <= data.periodEnd &&
       !activeSettlementIds.has(expense.id)
     );
     const selectedExpenseIds = data.expenseIds?.length
