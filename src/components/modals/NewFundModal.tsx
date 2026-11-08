@@ -16,7 +16,7 @@ export const NewFundModal: React.FC<NewFundModalProps> = ({ isOpen, onClose }) =
   const [name, setName] = useState('');
   const [holderId, setHolderId] = useState('');
   const [totalAllocation, setTotalAllocation] = useState('20000');
-  const [warningThreshold, setWarningThreshold] = useState('25');
+  const [warningThreshold, setWarningThreshold] = useState(String(settings.fundWarningThresholdPercent));
   const [purpose, setPurpose] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
