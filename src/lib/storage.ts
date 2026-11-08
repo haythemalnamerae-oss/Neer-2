@@ -768,7 +768,7 @@ export class OpsDataStore {
       if (existingAccountInvoice && !existingAccountInvoice.expenseId) {
         this.standingAccounts = this.standingAccounts.map((item) => item.id === account.id ? {
           ...item,
-          entries: (item.entries || []).map((entry) => entry.id === existingAccountInvoice.id ? { ...entry, expenseId: targetExpense.id } : entry),
+          entries: (item.entries || []).map((entry) => entry.id === existingAccountInvoice.id ? { ...entry, expenseId: targetExpense.id, fundId: targetExpense.fundId, fundName: targetExpense.fundName } : entry),
         } : item);
         safeSet(STORAGE_KEYS.STANDING_ACCOUNTS, this.standingAccounts);
       } else if (!existingAccountInvoice) {
