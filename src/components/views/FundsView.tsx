@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { PettyCashFund, StandingAccount, CashReceipt, Expense } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
+import { hasPermission } from '../../lib/rbac/permissions';
 import { formatCurrency } from '../../lib/utils/format';
 import { Button } from '../ui/button';
 import { NewStandingAccountModal } from '../modals/NewStandingAccountModal';
@@ -40,10 +41,6 @@ export const FundsView: React.FC<FundsViewProps> = ({
   const [replenishNotes, setReplenishNotes] = useState('');
 
   // Direct Spend from Fund State ("الضغط على عهدة معينة وإضافة صرف من العهدة ويكتب السبب")
-  const [directSpendFund, setDirectSpendFund] = useState<PettyCashFund | null>(null);
-  const [directSpendAmount, setDirectSpendAmount] = useState('');
-  const [directSpendReason, setDirectSpendReason] = useState('');
-  const [directSpendVendor, setDirectSpendVendor] = useState('مشتريات نقدية فورية');
 
   // New Cash Receipt State
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
@@ -51,6 +48,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
   const [receiptSource, setReceiptSource] = useState('');
   const [receiptType, setReceiptType] = useState<'order_payment' | 'cash_box' | 'purchase_advance' | 'other'>('cash_box');
   const [receiptNotes, setReceiptNotes] = useState('');
+  const [receiptFundId, setReceiptFundId] = useState('');
 
   // New Standing Account State
   const [isStandingModalOpen, setIsStandingModalOpen] = useState(false);
@@ -58,9 +56,23 @@ export const FundsView: React.FC<FundsViewProps> = ({
   const [standingFilter, setStandingFilter] = useState<'all' | 'payable' | 'receivable'>('all');
 
   const currentUser = dataStore.getCurrentUser();
-  const funds = dataStore.getFunds();
-  const expenses = dataStore.getExpenses();
-  const cashReceipts = dataStore.getCashReceipts();
+  const canCreateFund = hasPermission(currentUser.role, 'funds', 'create');
+  const canEditFund = hasPermission(currentUser.role, 'funds', 'edit');
+  const canCreateExpense = hasPermission(currentUser.role, 'expenses', 'create');
+  const canApproveExpense = hasPermission(currentUser.role, 'expenses', 'approve');
+  const canCreateSettlement = hasPermission(currentUser.role, 'settlements', 'create');
+  const allFunds = dataStore.getFunds();
+  const funds = currentUser.role === 'field_officer'
+    ? allFunds.filter((fund) => fund.holderId === currentUser.id)
+    : allFunds;
+  const allExpenses = dataStore.getExpenses();
+  const expenses = currentUser.role === 'field_officer'
+    ? allExpenses.filter((expense) => expense.submittedBy === currentUser.name || funds.some((fund) => fund.id === expense.fundId))
+    : allExpenses;
+  const allCashReceipts = dataStore.getCashReceipts();
+  const cashReceipts = currentUser.role === 'field_officer'
+    ? allCashReceipts.filter((receipt) => receipt.receivedBy === currentUser.name || funds.some((fund) => fund.id === receipt.fundId))
+    : allCashReceipts;
   const standingAccounts = dataStore.getStandingAccounts();
 
   // Deficit / Negative balance expenses
@@ -96,6 +108,11 @@ export const FundsView: React.FC<FundsViewProps> = ({
       return;
     }
 
+    if (receiptType === 'cash_box' && !receiptFundId) {
+      alert('حدد العهدة أو الصندوق الذي سيُضاف إليه المبلغ المقبوض.');
+      return;
+    }
+
     dataStore.addCashReceipt({
       amount: amt,
       source: receiptSource.trim(),
@@ -103,40 +120,15 @@ export const FundsView: React.FC<FundsViewProps> = ({
       receivedBy: currentUser.name,
       date: new Date().toISOString().split('T')[0],
       notes: receiptNotes || undefined,
+      fundId: receiptFundId || undefined,
+      fundName: funds.find((fund) => fund.id === receiptFundId)?.name,
     });
 
     setIsReceiptModalOpen(false);
     setReceiptAmount('');
     setReceiptSource('');
     setReceiptNotes('');
-  };
-
-  const handleConfirmDirectSpend = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!directSpendFund) return;
-    const amt = parseFloat(directSpendAmount);
-    if (!amt || amt <= 0 || !directSpendReason.trim()) {
-      alert('يرجى إدخال مبلغ صحيح وتدوين سبب الصرف');
-      return;
-    }
-
-    dataStore.addExpense({
-      fundId: directSpendFund.id,
-      fundName: directSpendFund.name,
-      amount: amt,
-      category: 'materials',
-      description: directSpendReason.trim(),
-      invoiceNumber: `VCH-${Math.floor(1000 + Math.random() * 9000)}`,
-      vendorName: directSpendVendor || 'مشتريات نقدية فورية',
-      hasReceipt: false,
-      allowDeficit: true,
-    });
-
-    alert(`تم تسجيل صرف ${amt} ${directSpendFund.currency} من ${directSpendFund.name} بنجاح!`);
-    setDirectSpendFund(null);
-    setDirectSpendAmount('');
-    setDirectSpendReason('');
-    setDirectSpendVendor('مشتريات نقدية فورية');
+    setReceiptFundId('');
   };
 
   const handleCoverDeficit = (expenseId: string) => {
@@ -167,26 +159,26 @@ export const FundsView: React.FC<FundsViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap shrink-0">
-          <button
+          {canEditFund && <button
             onClick={() => setIsReceiptModalOpen(true)}
             className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold font-sans-inter transition-all border border-white/20 cursor-pointer shadow-xs active:scale-95"
           >
             <ArrowDownLeft className="w-4 h-4 ml-1" />
             <span>توريد مقبوضات</span>
-          </button>
-          <button
+          </button>}
+          {canCreateSettlement && <button
             onClick={onOpenNewSettlement}
             className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold font-sans-inter transition-all border border-white/20 cursor-pointer shadow-xs active:scale-95"
           >
             <span>طلب تسوية</span>
-          </button>
-          <button
+          </button>}
+          {canCreateFund && <button
             onClick={onOpenNewFund}
             className="flex items-center gap-1.5 px-5 py-2.5 rounded-2xl bg-[#F4F7F5] hover:bg-white text-[#2A443B] text-xs font-bold font-sans-inter transition-all shadow-md cursor-pointer active:scale-95"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
             <span>عهدة جديدة</span>
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -353,16 +345,8 @@ export const FundsView: React.FC<FundsViewProps> = ({
                     عرض الفواتير
                   </Button>
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setDirectSpendFund(fund)}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition shadow-xs cursor-pointer active:scale-95"
-                      title="صرف مباشر من العهدة وتدوين السبب"
-                    >
-                      <Minus className="w-3.5 h-3.5" />
-                      <span>صرف من العهدة</span>
-                    </button>
-                    <Button
+                    {canCreateExpense && <Button variant="outline" size="sm" onClick={() => onSelectView('expenses')} className="text-xs">تسجيل فاتورة</Button>}
+                    {canEditFund && <Button
                       variant="primary"
                       size="sm"
                       onClick={() => setReplenishModalFund(fund)}
@@ -370,7 +354,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
                       className="text-xs font-bold"
                     >
                       تغذية الرصيد
-                    </Button>
+                    </Button>}
                   </div>
                 </div>
               </div>
@@ -454,7 +438,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
 
                     <td className="p-3.5 text-center">
                       {!exp.isCoveredFromCash ? (
-                        <Button
+                        {canApproveExpense && <Button
                           variant="success"
                           size="sm"
                           onClick={() => handleCoverDeficit(exp.id)}
@@ -462,7 +446,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
                           className="text-xs sm:text-sm font-bold min-h-[42px] px-4"
                         >
                           تغطية المبلغ من الصندوق
-                        </Button>
+                        </Button>}
                       ) : (
                         <span className="text-[#597565] text-xs font-medium">الحساب مسوّى</span>
                       )}
@@ -497,7 +481,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
               </p>
             </div>
 
-            <Button
+            {canEditFund && <Button
               variant="primary"
               size="sm"
               onClick={() => setIsReceiptModalOpen(true)}
@@ -505,7 +489,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
               className="text-xs font-bold"
             >
               تسجيل مقبوض جديد
-            </Button>
+            </Button>}
           </div>
 
           <div className="overflow-x-auto">
@@ -590,7 +574,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
               </p>
             </div>
 
-            <Button
+            {canEditFund && <Button
               variant="primary"
               size="sm"
               onClick={() => setIsStandingModalOpen(true)}
@@ -598,7 +582,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
               className="text-xs font-bold"
             >
               إضافة حساب معتاد / مورد جديد
-            </Button>
+            </Button>}
           </div>
 
           {/* Search and Filters Bar */}
@@ -715,7 +699,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
                       </td>
 
                       <td className="p-3.5 text-center">
-                        <button
+                        {canEditFund && <button
                           type="button"
                           onClick={() => {
                             if (confirm(`هل أنت متأكد من حذف الحساب "${acc.name}"؟`)) {
@@ -726,7 +710,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
                           title="حذف هذا الحساب"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        </button>}
                       </td>
                     </tr>
                   ))}
@@ -759,7 +743,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
 
             <form onSubmit={handleConfirmReplenish} className="space-y-4 text-xs sm:text-sm">
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-[#233B2D]">المبلغ المضاف (AED) *</label>
+                <label className="block text-xs font-bold text-[#233B2D]">المبلغ المضاف ({dataStore.getSettings().currency}) *</label>
                 <input
                   type="number"
                   value={replenishAmount}
@@ -826,7 +810,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
 
             <form onSubmit={handleCreateCashReceipt} className="space-y-4 text-xs sm:text-sm">
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-[#233B2D]">المبلغ المقبوض (AED) *</label>
+                <label className="block text-xs font-bold text-[#233B2D]">المبلغ المقبوض ({dataStore.getSettings().currency}) *</label>
                 <input
                   type="number"
                   value={receiptAmount}
@@ -835,6 +819,14 @@ export const FundsView: React.FC<FundsViewProps> = ({
                   className="w-full px-3.5 py-2.5 text-sm font-mono"
                   required
                 />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-[#233B2D]">الصندوق أو العهدة المستلمة للمبلغ</label>
+                <select value={receiptFundId} onChange={(e) => setReceiptFundId(e.target.value)} className="w-full px-3.5 py-2.5 text-sm">
+                  <option value="">غير محدد</option>
+                  {funds.map((fund) => <option key={fund.id} value={fund.id}>{fund.name} — {fund.holderName}</option>)}
+                </select>
               </div>
 
               <div className="space-y-1.5">
@@ -890,93 +882,6 @@ export const FundsView: React.FC<FundsViewProps> = ({
                   icon={<Plus className="w-3.5 h-3.5 ml-1" />}
                 >
                   حفظ في الصندوق
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Direct Spend from Fund ("الضغط على عهدة معينة وإضافة صرف من العهدة ويكتب السبب") */}
-      {directSpendFund && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="neu-raised-lg rounded-3xl p-6 sm:p-7 max-w-md w-full space-y-4 animate-in fade-in duration-200 bg-[#E5EBE7]">
-            <div className="flex items-center justify-between pb-3 border-b border-[#C8D3CC]/50">
-              <div className="flex items-center gap-2 text-rose-700">
-                <Minus className="w-5 h-5" />
-                <h3 className="text-base font-black text-[#1A2E22] font-serif-display">
-                  تسجيل صرف مباشر من: {directSpendFund.name}
-                </h3>
-              </div>
-              <button
-                onClick={() => setDirectSpendFund(null)}
-                className="text-[#648071] hover:text-[#192E21] p-1 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-3 rounded-2xl bg-slate-100 text-xs text-slate-700 flex items-center justify-between">
-              <span>الرصيد المتاح حالياً:</span>
-              <strong className="text-emerald-800 font-extrabold">
-                {directSpendFund.currentBalance} {directSpendFund.currency}
-              </strong>
-            </div>
-
-            <form onSubmit={handleConfirmDirectSpend} className="space-y-4 text-xs">
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-[#233B2D]">مبلغ الصرف ({directSpendFund.currency}) *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  placeholder="0.00"
-                  value={directSpendAmount}
-                  onChange={(e) => setDirectSpendAmount(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-sm font-bold text-slate-800"
-                  autoFocus
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-[#233B2D]">سبب الصرف / بيان المصروف *</label>
-                <textarea
-                  rows={2}
-                  required
-                  value={directSpendReason}
-                  onChange={(e) => setDirectSpendReason(e.target.value)}
-                  placeholder="اكتب سبب الصرف بدقة (مثال: شراء قطع غيار عاجلة، بنزين للموقع، بوفيه للمشرفين)..."
-                  className="w-full px-3.5 py-2.5 text-xs text-slate-800"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-[#233B2D]">اسم المستفيد / المحل / المورد</label>
-                <input
-                  type="text"
-                  value={directSpendVendor}
-                  onChange={(e) => setDirectSpendVendor(e.target.value)}
-                  placeholder="مثال: بقالة الحي، محطة وقود، شركة المواد..."
-                  className="w-full px-3.5 py-2 text-xs"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#C8D3CC]/50">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  type="button"
-                  onClick={() => setDirectSpendFund(null)}
-                >
-                  إلغاء
-                </Button>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  type="submit"
-                  icon={<Minus className="w-3.5 h-3.5 ml-1" />}
-                >
-                  تأكيد خصم الصرف
                 </Button>
               </div>
             </form>
