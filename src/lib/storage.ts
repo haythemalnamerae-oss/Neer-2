@@ -344,6 +344,14 @@ export class OpsDataStore {
     if (linkedStandingAccount && linkedStandingAccount.direction !== 'payable' && linkedStandingAccount.direction !== 'payable_by_us') throw new Error('المصروفات لا تُسجل على حساب من نوع «لنا»؛ استخدم حساب مورد من نوع «علينا».');
     const isSupplierCredit = Boolean(linkedStandingAccount);
     if (isSupplierCredit && (expenseData.cascadeDeduction || expenseData.allowDeficit)) throw new Error('شراء الآجل على حساب المورد لا يستخدم السحب المتسلسل أو تسجيل العجز؛ تتم التسوية عند السداد.');
+    const expenseMonth = (expenseData.expenseDate || new Date().toISOString().slice(0, 10)).slice(0, 7);
+    const linkedAccountMonthTotal = linkedStandingAccount ? (
+      this.expenses.filter((expense) => expense.standingAccountId === linkedStandingAccount.id && expense.status !== 'rejected' && (expense.expenseDate || expense.submittedAt.slice(0, 10)).startsWith(expenseMonth))
+        .reduce((sum, expense) => sum + expense.totalWithTax, 0) +
+      (linkedStandingAccount.entries || []).filter((entry) => entry.type === 'charge' && !entry.expenseId && entry.date.startsWith(expenseMonth))
+        .reduce((sum, entry) => sum + entry.amount, 0)
+    ) : 0;
+    const exceedsStandingMonthlyLimit = Boolean(linkedStandingAccount?.monthlyLimit && linkedAccountMonthTotal + totalWithTax > linkedStandingAccount.monthlyLimit);
     const avail1 = primaryFund.currentBalance;
 
     let cascadeSplit: Expense['cascadeSplit'] = undefined;
@@ -451,7 +459,7 @@ export class OpsDataStore {
       taxAmount,
       totalWithTax,
       status: 'pending_approval',
-      specialAuditRequired: totalWithTax > this.settings.singleExpenseLimit,
+      specialAuditRequired: totalWithTax > this.settings.singleExpenseLimit || exceedsStandingMonthlyLimit,
       submittedAt: new Date().toLocaleString('ar-AE'),
       expenseDate: expenseData.expenseDate || new Date().toISOString().split('T')[0],
       submittedBy: currentUser.name,
@@ -749,7 +757,7 @@ export class OpsDataStore {
     const targetExpense = this.expenses.find((expense) => expense.id === expenseId);
     if (!targetExpense || targetExpense.status !== 'pending_approval' || !['approved', 'rejected'].includes(status)) throw new Error('حالة المصروف لا تسمح بهذا الإجراء.');
     if (status === 'rejected' && !reason?.trim()) throw new Error('يجب تسجيل سبب رفض المصروف.');
-    if (status === 'approved' && targetExpense.specialAuditRequired && !reason?.trim()) throw new Error('هذا المصروف تجاوز حد الصرف الفردي؛ أضف ملاحظة التدقيق قبل الاعتماد.');
+    if (status === 'approved' && targetExpense.specialAuditRequired && !reason?.trim()) throw new Error('هذا المصروف تجاوز حد الصرف الفردي أو الشهري؛ أضف ملاحظة التدقيق قبل الاعتماد.');
     const linkedAccountForApproval = status === 'approved' && targetExpense.standingAccountId
       ? this.standingAccounts.find((item) => item.id === targetExpense.standingAccountId)
       : undefined;
