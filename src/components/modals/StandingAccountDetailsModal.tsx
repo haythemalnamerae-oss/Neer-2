@@ -48,7 +48,7 @@ export const StandingAccountDetailsModal: React.FC<StandingAccountDetailsModalPr
           window.alert('حدد العهدة أو الصندوق الذي تمت منه التسوية.');
           return;
         }
-        dataStore.settleStandingAccount(current.id, value, fundId, date, description || reference);
+        dataStore.settleStandingAccount(current.id, value, fundId, date, reference);
       }
       setAmount('');
       setDescription('');
