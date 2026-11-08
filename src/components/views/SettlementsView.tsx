@@ -164,13 +164,13 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
                   variant="success"
                   size="sm"
                   onClick={() => handleApprove(st.id)}
-                  disabled={requiresDualApproval && st.status === 'audited' && st.auditedBy === currentUser.name}
+                  disabled={requiresDualApproval && st.status === 'audited' && (st.auditedById ? st.auditedById === currentUser.id : st.auditedBy === currentUser.name)}
                   icon={<CheckCircle2 className="w-4.5 h-4.5 stroke-[2.2]" />}
                   className="text-xs sm:text-sm font-bold min-h-[40px]"
                 >
                   {requiresDualApproval ? (st.status === 'audited' ? 'الاعتماد النهائي' : 'التدقيق الأولي') : 'اعتماد التسوية'}
                 </Button>
-                {requiresDualApproval && st.status === 'audited' && st.auditedBy === currentUser.name && <span className="text-xs text-amber-700">يلزم معتمد مختلف عن المدقق الأول</span>}
+                {requiresDualApproval && st.status === 'audited' && (st.auditedById ? st.auditedById === currentUser.id : st.auditedBy === currentUser.name) && <span className="text-xs text-amber-700">يلزم معتمد مختلف عن المدقق الأول</span>}
                 <Button
                   variant="danger"
                   size="sm"
