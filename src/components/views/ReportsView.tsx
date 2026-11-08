@@ -339,7 +339,7 @@ export const ReportsView: React.FC = () => {
                               </div>
 
                               <div className="text-left font-mono font-black text-sm text-slate-900 dir-ltr">
-                                {formatCurrency(exp.totalWithTax, settings.currency)}
+                                {formatCurrency(exp.fundExpenseAmount, item.fund.currency)}
                               </div>
                             </div>
                           ))}
