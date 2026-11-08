@@ -22,6 +22,16 @@ import { Button } from '../ui/button';
 import { NewStandingAccountModal } from '../modals/NewStandingAccountModal';
 import { StandingAccountDetailsModal } from '../modals/StandingAccountDetailsModal';
 
+const getStandingCategoryLabel = (category: string): string => ({
+  materials: 'بقالة ومستلزمات',
+  vendor: 'مورد وتوريدات',
+  hospitality: 'بوفيه وضيافة',
+  transport: 'نقل ومواصلات',
+  fuel: 'وقود ومحروقات',
+  maintenance: 'صيانة',
+  other: 'أخرى',
+}[category] || category);
+
 interface FundsViewProps {
   onOpenNewFund: () => void;
   onOpenNewSettlement: () => void;
@@ -682,15 +692,13 @@ export const FundsView: React.FC<FundsViewProps> = ({
                       </td>
 
                       <td className="p-3.5 text-slate-700 font-medium">
-                        {acc.vendorName ? (
+                        {acc.vendorName || acc.contactPhone || acc.address ? (
                           <div className="space-y-0.5">
                             <span className="font-bold text-slate-900 block">{acc.vendorName}</span>
                             {acc.contactPhone && (
-                              <span className="text-[11px] text-emerald-800 font-mono flex items-center gap-1">
-                                <Phone className="w-3 h-3" />
-                                {acc.contactPhone}
-                              </span>
+                              <span className="text-[11px] text-emerald-800 font-mono flex items-center gap-1"><Phone className="w-3 h-3" />{acc.contactPhone}</span>
                             )}
+                            {acc.address && <span className="text-[11px] text-slate-500 block">{acc.address}</span>}
                           </div>
                         ) : (
                           <span className="text-slate-400">—</span>
@@ -698,7 +706,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
                       </td>
 
                       <td className="p-3.5 text-[#3D5B4A] font-medium">
-                        {acc.category}
+                        {getStandingCategoryLabel(acc.category)}
                       </td>
 
                       <td className="p-3.5">
