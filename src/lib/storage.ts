@@ -1595,6 +1595,7 @@ export class OpsDataStore {
         ...item,
         status: 'audited',
         auditedBy: currentUser.name,
+        auditedById: currentUser.id,
         auditedAt: new Date().toLocaleString('ar-AE'),
         auditNotes: notes || item.auditNotes,
       } : item);
@@ -1612,7 +1613,7 @@ export class OpsDataStore {
 
     if (this.settings.requireDualApprovalForSettlements && settlement.status === 'audited') {
       if (!settlement.auditedBy) throw new Error('لا يوجد مدقق أول مسجل لهذه التسوية؛ أعد إرسالها للمراجعة.');
-      if (settlement.auditedBy === currentUser.name) throw new Error('يشترط أن يكون الاعتماد النهائي بواسطة شخص مختلف عن المدقق الأول.');
+      if ((settlement.auditedById && settlement.auditedById === currentUser.id) || (!settlement.auditedById && settlement.auditedBy === currentUser.name)) throw new Error('يشترط أن يكون الاعتماد النهائي بواسطة مستخدم مختلف عن المدقق الأول.');
     }
 
     this.settlements = this.settlements.map((item) => item.id === settlementId ? {
