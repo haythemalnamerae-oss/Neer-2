@@ -282,6 +282,9 @@ export class OpsDataStore {
   }
 
   public updateFund(fundId: string, updates: Partial<PettyCashFund>): void {
+    if (!hasPermission(this.getCurrentUser().role, 'funds', 'edit')) throw new Error('لا تملك صلاحية تعديل العهد.');
+    if (!this.funds.some((fund) => fund.id === fundId)) throw new Error('العهدة المحددة غير موجودة.');
+    if (updates.currentBalance !== undefined && (!Number.isFinite(updates.currentBalance) || updates.currentBalance < 0)) throw new Error('رصيد العهدة غير صالح.');
     this.funds = this.funds.map((f) => {
       if (f.id === fundId) {
         return { ...f, ...updates };
