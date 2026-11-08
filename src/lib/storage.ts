@@ -684,7 +684,6 @@ export class OpsDataStore {
     if (amount > balance) throw new Error('مبلغ التسوية أكبر من الرصيد المستحق.');
     const payable = account.direction === 'payable' || account.direction === 'payable_by_us';
     if (payable && amount > fund.currentBalance) throw new Error('رصيد العهدة لا يكفي لسداد المورد.');
-    if (!payable && amount + (fund.cashBoxBalance || 0) > Number.MAX_SAFE_INTEGER) throw new Error('قيمة التحصيل غير صالحة.');
 
     if (payable) {
       this.funds = this.funds.map((item) => item.id === fundId ? {
