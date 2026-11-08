@@ -73,8 +73,8 @@ export const FundsView: React.FC<FundsViewProps> = ({
   const standingAccounts = dataStore.getStandingAccounts();
 
   // Deficit / Negative balance expenses
-  const deficitExpenses = expenses.filter((e) => e.isDeficit);
-  const pendingDeficitExpenses = deficitExpenses.filter((e) => !e.isCoveredFromCash);
+  const deficitExpenses = expenses.filter((expense) => expense.isDeficit && expense.status !== 'rejected');
+  const pendingDeficitExpenses = deficitExpenses.filter((expense) => !expense.isCoveredFromCash && expense.status === 'approved');
 
   // Financial aggregates
   const totalAllocated = funds.reduce((s, f) => s + f.totalAllocation, 0);
@@ -448,7 +448,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
                     </td>
 
                     <td className="p-3.5 text-center">
-                      {!exp.isCoveredFromCash && canApproveExpense ? (
+                      {!exp.isCoveredFromCash && exp.status === 'approved' && canApproveExpense ? (
                         <Button
                           variant="success"
                           size="sm"
@@ -461,7 +461,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
                       ) : exp.isCoveredFromCash ? (
                         <span className="text-[#597565] text-xs font-medium">الحساب مسوّى</span>
                       ) : (
-                        <span className="text-slate-500 text-xs">بانتظار المراجعة المالية</span>
+                        <span className="text-slate-500 text-xs">بانتظار اعتماد الفاتورة</span>
                       )}
                     </td>
                   </tr>
