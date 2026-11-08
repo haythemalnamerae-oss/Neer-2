@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Users,
   Phone,
   Mail,
+  Search,
+  ClipboardList,
 } from 'lucide-react';
 import { dataStore } from '../../lib/storage';
 import { ROLE_LABELS } from '../../lib/rbac/permissions';
@@ -10,9 +12,20 @@ import { formatCurrency } from '../../lib/utils/format';
 import { Badge } from '../ui/badge';
 
 export const TeamView: React.FC = () => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
   const users = dataStore.getUsers();
   const tasks = dataStore.getTasks();
   const funds = dataStore.getFunds();
+  const visibleUsers = useMemo(() => users.filter((user) => {
+    if (roleFilter !== 'all' && user.role !== roleFilter) return false;
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return true;
+    return [user.name, user.department, user.email, user.phone, user.roleTitleAr]
+      .some((value) => (value || '').toLowerCase().includes(query));
+  }), [users, roleFilter, searchQuery]);
+  const activeUsers = users.filter((user) => user.active).length;
+  const activeTasks = tasks.filter((task) => !['completed', 'approved', 'cancelled'].includes(task.status)).length;
 
   return (
     <div className="space-y-7 animate-in fade-in duration-200">
@@ -29,14 +42,31 @@ export const TeamView: React.FC = () => {
           </p>
         </div>
 
-        <Badge variant="purple" size="md">
-          {users.length} مستخدمين مسجلين
-        </Badge>
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="purple" size="md">{users.length} أعضاء</Badge>
+          <Badge variant="success" size="md">{activeUsers} نشطون</Badge>
+          <Badge variant="info" size="md">{activeTasks} مهام مفتوحة</Badge>
+        </div>
       </div>
 
-      {/* Grid of Users */}
+      <div className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-[1fr_220px]">
+        <label className="relative block">
+          <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="ابحث بالاسم أو القسم أو وسيلة التواصل" className="min-h-11 w-full rounded-xl border border-slate-200 pr-9 pl-3 text-sm" />
+        </label>
+        <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} className="min-h-11 rounded-xl border border-slate-200 px-3 text-sm">
+          <option value="all">كل الأدوار</option>
+          <option value="admin">مدير النظام</option>
+          <option value="ops_manager">مدير العمليات</option>
+          <option value="finance_officer">المسؤول المالي</option>
+          <option value="field_officer">المسؤول الميداني</option>
+          <option value="viewer">مراقب</option>
+        </select>
+      </div>
+
+      {/* Team members */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {users.map((user) => {
+        {visibleUsers.map((user) => {
           const userTasks = tasks.filter((t) => t.assigneeId === user.id);
           const activeTasks = userTasks.filter((t) => t.status !== 'completed' && t.status !== 'approved');
           const userFunds = funds.filter((f) => f.holderId === user.id);
@@ -96,6 +126,12 @@ export const TeamView: React.FC = () => {
             </div>
           );
         })}
+        {visibleUsers.length === 0 && (
+          <div className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">
+            <ClipboardList className="mx-auto mb-2 h-7 w-7 text-slate-400" />
+            لا يوجد أعضاء يطابقون البحث والتصفية.
+          </div>
+        )}
       </div>
     </div>
   );
