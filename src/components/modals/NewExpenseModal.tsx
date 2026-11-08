@@ -115,7 +115,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
   const exceedsLimit = totalWithTax > settings.singleExpenseLimit;
   const currentExpenseMonth = new Date().toISOString().slice(0, 7);
   const selectedAccountMonthTotal = selectedStandingAccount ? (
-    expenses.filter((expense) => expense.standingAccountId === selectedStandingAccount.id && expense.status !== 'rejected' && (expense.expenseDate || '').startsWith(currentExpenseMonth))
+    expenses.filter((expense) => expense.standingAccountId === selectedStandingAccount.id && expense.status !== 'rejected' && (expense.expenseDate || expense.submittedAt?.slice(0, 10) || '').startsWith(currentExpenseMonth))
       .reduce((sum, expense) => sum + expense.totalWithTax, 0) +
     (selectedStandingAccount.entries || []).filter((entry) => entry.type === 'charge' && !entry.expenseId && entry.date.startsWith(currentExpenseMonth))
       .reduce((sum, entry) => sum + entry.amount, 0)
