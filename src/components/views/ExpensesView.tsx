@@ -193,18 +193,18 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
                 return (
                   <tr key={exp.id} className="hover:neu-inset transition">
                     <td className="p-4">
-                      <span className="font-mono font-bold text-[#152B1E] block text-sm">{exp.code}</span>
-                      <span className="text-xs text-[#5C7969] font-mono block mt-1">
-                        رقم: {exp.invoiceNumber}
-                      </span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono font-bold text-[#152B1E] text-sm">{exp.code}</span>
+                        {exp.specialAuditRequired && <Badge variant="danger" size="sm">تدقيق خاص</Badge>}
+                      </div>
+                      <span className="text-xs text-[#5C7969] font-mono block mt-1">رقم: {exp.invoiceNumber || 'غير محدد'}</span>
                     </td>
 
                     <td className="p-4 max-w-xs">
                       <span className="font-bold text-[#132A1C] block text-sm">{exp.vendorName}</span>
                       <span className="text-xs text-[#506E5D] block truncate mt-1">{exp.description}</span>
-                      <span className="text-xs text-[#285539] font-bold block mt-1">
-                        {catCfg.label}
-                      </span>
+                      <span className="text-xs text-[#285539] font-bold block mt-1">{catCfg.label}</span>
+                      {exp.approvalNotes && <span className="text-[11px] text-slate-500 block mt-1">ملاحظة التدقيق: {exp.approvalNotes}</span>}
                     </td>
 
                     <td className="p-4">
