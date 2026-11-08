@@ -1586,15 +1586,45 @@ export class OpsDataStore {
     if (!settlement || !['under_review', 'audited'].includes(settlement.status)) throw new Error('التسوية غير موجودة أو سبق اعتمادها.');
     const selected = settlement.expenseIds.map((id) => this.expenses.find((expense) => expense.id === id));
     if (selected.some((expense) => !expense || expense.status !== 'approved' || expense.fundId !== settlement.fundId)) throw new Error('تعذر الاعتماد: تغيرت حالة إحدى الفواتير أو لم تعد مطابقة للتسوية.');
+
+    const notes = [settlement.auditNotes, auditNotes?.trim()].filter(Boolean).join(' | ');
+    if (this.settings.requireDualApprovalForSettlements && settlement.status === 'under_review') {
+      this.settlements = this.settlements.map((item) => item.id === settlementId ? {
+        ...item,
+        status: 'audited',
+        auditedBy: currentUser.name,
+        auditedAt: new Date().toLocaleString('ar-AE'),
+        auditNotes: notes || item.auditNotes,
+      } : item);
+      safeSet(STORAGE_KEYS.SETTLEMENTS, this.settlements);
+      this.logAudit('تدقيق تسوية - المرحلة الأولى', 'approve', 'settlement', settlementId, `تم التدقيق الأولي بواسطة ${currentUser.name}، وتنتظر اعتماداً نهائياً من مستخدم آخر.`);
+      this.addNotification({
+        title: 'تسوية جاهزة للاعتماد النهائي',
+        message: `أكمل ${currentUser.name} التدقيق الأولي للتسوية ${settlement.code}. يلزم معتمد آخر لإغلاقها.`,
+        type: 'info',
+        targetView: 'settlements',
+      });
+      this.notify();
+      return;
+    }
+
+    if (this.settings.requireDualApprovalForSettlements && settlement.status === 'audited') {
+      if (!settlement.auditedBy) throw new Error('لا يوجد مدقق أول مسجل لهذه التسوية؛ أعد إرسالها للمراجعة.');
+      if (settlement.auditedBy === currentUser.name) throw new Error('يشترط أن يكون الاعتماد النهائي بواسطة شخص مختلف عن المدقق الأول.');
+    }
+
     this.settlements = this.settlements.map((item) => item.id === settlementId ? {
-      ...item, status: 'approved', approvedBy: currentUser.name,
-      approvedAt: new Date().toLocaleString('ar-AE'), auditNotes: auditNotes || item.auditNotes,
+      ...item,
+      status: 'approved',
+      approvedBy: currentUser.name,
+      approvedAt: new Date().toLocaleString('ar-AE'),
+      auditNotes: notes || item.auditNotes,
     } : item);
     const selectedIds = new Set(settlement.expenseIds);
     this.expenses = this.expenses.map((expense) => selectedIds.has(expense.id) ? { ...expense, status: 'settled' } : expense);
     safeSet(STORAGE_KEYS.SETTLEMENTS, this.settlements);
     safeSet(STORAGE_KEYS.EXPENSES, this.expenses);
-    this.logAudit('اعتماد تسوية عهدة', 'approve', 'settlement', settlementId, `تم اعتماد وإغلاق التسوية وطباعة السند`);
+    this.logAudit('اعتماد نهائي لتسوية عهدة', 'approve', 'settlement', settlementId, `تم الاعتماد النهائي وإغلاق التسوية بواسطة ${currentUser.name}`);
     this.notify();
   }
 
