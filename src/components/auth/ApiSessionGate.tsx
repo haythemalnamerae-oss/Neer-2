@@ -40,8 +40,8 @@ export const ApiSessionGate: React.FC<{ children: React.ReactNode }> = ({ childr
   if (session && ready && !error) return <>{children}</>;
 
   return (
-    <main dir="rtl" className="min-h-screen bg-[#EAF0EC] px-4 py-10 flex items-center justify-center font-['Cairo',sans-serif]">
-      <section className="w-full max-w-md rounded-3xl bg-white p-7 shadow-xl">
+    <main dir="rtl" className="min-h-screen bg-[#E5EBE7] px-4 py-10 flex items-center justify-center font-['Almarai',sans-serif]">
+      <section className="w-full max-w-md rounded-3xl bg-[#F4F7F5] p-7 shadow-xl border border-white/60">
         <div className="mb-6 text-center">
           <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-800 text-2xl font-black text-white">ن</div>
           <h1 className="text-2xl font-black text-slate-900">نير</h1>

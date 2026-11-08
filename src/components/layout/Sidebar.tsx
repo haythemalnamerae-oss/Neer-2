@@ -16,6 +16,8 @@ import {
   X,
   Target,
   Sparkles,
+  MapPin,
+  Trophy,
 } from 'lucide-react';
 import { User } from '../../types/domain';
 import { hasPermission } from '../../lib/rbac/permissions';
@@ -34,6 +36,7 @@ const navigation = [
     group: 'العمليات والمهام الميدانية',
     items: [
       { id: 'daily', label: 'مركز القيادة اليومي', icon: Target, module: 'dashboard' },
+      { id: 'map', label: 'خريطة المهام والمواقع', icon: MapPin, module: 'tasks' },
       { id: 'approvals', label: 'مركز الاعتمادات', icon: FileCheck2, module: 'tasks' },
       { id: 'dashboard', label: 'مؤشرات الأداء', icon: LayoutDashboard, module: 'dashboard' },
       { id: 'tasks', label: 'المهام والمشاريع', icon: CheckSquare, module: 'tasks' },
@@ -44,6 +47,7 @@ const navigation = [
   {
     group: 'المنظومة المالية والعهد',
     items: [
+      { id: 'performance', label: 'تقييم الإنجازات والعهد', icon: Trophy, module: 'reports' },
       { id: 'funds', label: 'العهد والأرصدة', icon: Wallet, module: 'funds' },
       { id: 'expenses', label: 'المصروفات والفواتير', icon: Receipt, module: 'expenses' },
       { id: 'settlements', label: 'التسويات المحاسبية', icon: FileCheck2, module: 'settlements' },

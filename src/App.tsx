@@ -13,6 +13,8 @@ import { DailyCommandCenterView } from './components/views/DailyCommandCenterVie
 import { ApprovalsCenterView } from './components/views/ApprovalsCenterView';
 import { DashboardView } from './components/views/DashboardView';
 import { TasksView } from './components/views/TasksView';
+import { FieldMapView } from './components/views/FieldMapView';
+import { PerformanceEvaluationView } from './components/views/PerformanceEvaluationView';
 import { FollowUpsView } from './components/views/FollowUpsView';
 import { FundsView } from './components/views/FundsView';
 import { ExpensesView } from './components/views/ExpensesView';
@@ -90,7 +92,7 @@ export default function App() {
 
   return (
     <div
-      className="min-h-screen text-slate-800 flex font-['Cairo',sans-serif] antialiased selection:bg-[#2A443B] selection:text-white dir-rtl transition-colors duration-200"
+      className="min-h-screen text-slate-800 flex font-['Almarai',sans-serif] antialiased selection:bg-[#2A443B] selection:text-white dir-rtl transition-colors duration-200"
       style={{
         backgroundColor: '#E5EBE7',
       }}
@@ -127,6 +129,18 @@ export default function App() {
               onViewChain={handleViewChain}
               onSelectView={handleSelectView}
             />
+          )}
+
+          {currentView === 'map' && (
+            <FieldMapView
+              onSelectTask={handleSelectTask}
+              onOpenNewTask={handleOpenNewTask}
+              onRecordOutcome={handleRecordOutcome}
+            />
+          )}
+
+          {currentView === 'performance' && (
+            <PerformanceEvaluationView />
           )}
 
           {currentView === 'approvals' && (

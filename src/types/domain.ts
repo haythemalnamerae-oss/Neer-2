@@ -62,6 +62,7 @@ export interface TaskStep {
   status: TaskStepStatus;
   plannedTime?: string;
   completedAt?: string;
+  nextStepDate?: string;
   notes?: string;
   order: number;
 }
@@ -117,6 +118,13 @@ export interface TaskAttachment {
   type: string; // 'image' | 'pdf' | 'doc' | 'receipt' | 'other'
   uploadedBy: string;
   uploadedAt: string;
+  location?: string; // موقع الرفع الفعلي
+  geoCoordinates?: { lat: number; lng: number }; // إحداثيات الـ GPS عند الرفع
+  accuracyMeters?: number;
+  standingAccountId?: string; // ربط بالحساب المعتاد (مثل البقالة أو المورد)
+  vendorName?: string;
+  invoiceAmount?: number;
+  notes?: string;
 }
 
 export interface TaskComment {
@@ -204,6 +212,10 @@ export interface Task {
   // Attachments & Discussion
   attachments?: TaskAttachment[];
   comments?: TaskComment[];
+
+  // Linked Vendor / Standing Account (مثل البقالة أو مورد معين)
+  standingAccountId?: string;
+  standingAccountName?: string;
 }
 
 export type FundStatus = 'active' | 'warning' | 'depleted' | 'closed';
@@ -241,16 +253,37 @@ export interface CashReceipt {
   createdAt: string;
 }
 
+export interface StandingAccountInvoice {
+  id: string;
+  invoiceNumber: string;
+  amount: number;
+  date: string;
+  imageUrl?: string;
+  location?: string;
+  geoCoordinates?: { lat: number; lng: number };
+  taskId?: string;
+  taskTitle?: string;
+  uploadedBy?: string;
+  uploadedAt?: string;
+  notes?: string;
+}
+
 export interface StandingAccount {
   id: string;
   code?: string;
-  name: string; // e.g. "بقالة ومستلزمات", "بوفية وضيافة", "مواصلات ومترو", "باص ونقل", "بنزين ووقود", "شحن وتوصيل"
+  name: string; // e.g. "بقالة ومستلزمات", "بوفية وضيافة", "مواصلات ومترو", "باص ونقل", "بنزين ووقود", "شحن وتوصيل", "مؤسسة التوريدات السريعة"
   category: string;
+  vendorName?: string; // اسم المورد المعتاد أو صاحب المحل
+  contactPhone?: string; // رقم هاتف التواصل المباشر
+  accountType?: 'grocery' | 'vendor' | 'transport' | 'hospitality' | 'utility' | 'maintenance' | 'other';
   direction: 'receivable' | 'payable' | 'receivable_for_us' | 'payable_by_us'; // "لنا" / "علينا"
   monthlyLimit?: number;
   defaultAmount?: number;
+  currentBalance?: number;
   notes?: string;
   active?: boolean;
+  invoices?: StandingAccountInvoice[];
+  totalInvoiced?: number;
 }
 
 export type ExpenseCategory = 

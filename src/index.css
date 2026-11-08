@@ -2,22 +2,24 @@
 
 @layer base {
   :root {
-    --font-sans: 'Cairo', 'IBM Plex Sans Arabic', -apple-system, BlinkMacSystemFont, sans-serif;
-    --font-serif: 'Cairo', 'Playfair Display', serif;
-    color: #1a2e26;
+    --font-sans: 'Almarai', 'Tajawal', 'Readex Pro', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-serif: 'Almarai', 'Tajawal', sans-serif;
+    color: #17261f;
     background-color: #E5EBE7;
     font-family: var(--font-sans);
+    letter-spacing: 0;
   }
 
   html, body {
     margin: 0;
     padding: 0;
     background-color: #E5EBE7;
-    color: #1a2e26;
-    font-family: var(--font-sans);
+    color: #17261f;
+    font-family: 'Almarai', 'Tajawal', 'Readex Pro', -apple-system, BlinkMacSystemFont, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     min-height: 100vh;
+    letter-spacing: 0;
   }
 }
 
@@ -27,7 +29,21 @@
 .text-forest { color: #2A443B; }
 .bg-cream-card { background-color: #F4F7F5; }
 
-/* Exact Specification: Inner White Cards (Exact Hex: #F4F7F5, border-radius: 24px, Soft Depth Shadows) */
+/* Official Enterprise Typography: Almarai / Tajawal for authoritative institutional presentation */
+.font-serif-hero,
+.font-serif-display,
+.font-serif {
+  font-family: 'Almarai', 'Tajawal', sans-serif !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.01em !important;
+}
+
+.font-sans-inter,
+.font-sans {
+  font-family: 'Almarai', 'Tajawal', 'Readex Pro', sans-serif !important;
+}
+
+/* Inner White Cards (Exact Hex: #F4F7F5, border-radius: 24px, Soft Depth Shadows) */
 .inner-white-card,
 .neu-raised-lg,
 .neu-raised {
@@ -67,29 +83,20 @@
   transform: translateY(-1px);
 }
 
-/* Primary Hero Typography */
-.font-serif-hero {
-  font-family: 'Cairo', 'Playfair Display', serif;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-}
-
-.font-sans-inter {
-  font-family: 'Cairo', 'IBM Plex Sans Arabic', 'Inter', sans-serif;
-}
-
-/* Form inputs matching the soft cream aesthetics */
+/* Form inputs matching the official enterprise aesthetics */
 input[type="text"], input[type="number"], input[type="date"], input[type="time"], input[type="email"],
 input[type="password"], input[type="search"], textarea, select {
+  font-family: 'Almarai', 'Tajawal', sans-serif !important;
   background-color: #FFFFFF !important;
-  border: 1px solid rgba(42, 68, 59, 0.15) !important;
-  color: #1a2e26 !important;
-  border-radius: 16px !important;
+  border: 1px solid rgba(42, 68, 59, 0.16) !important;
+  color: #17261f !important;
+  border-radius: 14px !important;
   padding: 0.75rem 1rem !important;
   font-size: 0.875rem !important;
+  font-weight: 500 !important;
   outline: none !important;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 6px rgba(22, 44, 34, 0.03) !important;
+  box-shadow: 0 1px 4px rgba(22, 44, 34, 0.03) !important;
 }
 
 input:focus, textarea:focus, select:focus {
@@ -105,6 +112,7 @@ table {
 }
 
 thead th {
+  font-family: 'Almarai', 'Tajawal', sans-serif !important;
   background-color: rgba(42, 68, 59, 0.05) !important;
   color: #2A443B !important;
   font-weight: 700 !important;
@@ -122,9 +130,10 @@ tbody tr:hover {
 }
 
 tbody td {
+  font-family: 'Almarai', 'Tajawal', sans-serif !important;
   padding: 0.875rem 1rem !important;
   border-bottom: 1px solid rgba(42, 68, 59, 0.05) !important;
-  color: #1a2e26;
+  color: #17261f;
   font-size: 0.875rem;
 }
 

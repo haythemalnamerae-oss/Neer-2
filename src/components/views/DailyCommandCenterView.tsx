@@ -139,16 +139,29 @@ export const DailyCommandCenterView: React.FC<DailyCommandCenterViewProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0 w-full sm:w-auto z-10">
+          <div className="flex items-center gap-2.5 shrink-0 w-full sm:w-auto z-10 flex-wrap">
+            <button
+              onClick={() => onSelectView('map')}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-3 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-xs sm:text-sm font-bold font-sans-inter transition-all border border-white/20 cursor-pointer shadow-xs active:scale-95"
+            >
+              <MapPin className="w-4 h-4 text-emerald-300" />
+              <span>خريطة المواقع الميدانية</span>
+            </button>
+            <button
+              onClick={() => onSelectView('performance')}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-3 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-xs sm:text-sm font-bold font-sans-inter transition-all border border-white/20 cursor-pointer shadow-xs active:scale-95"
+            >
+              <span>تقييم الإنجازات</span>
+            </button>
             <button
               onClick={() => onOpenNewExpense()}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-xs sm:text-sm font-bold font-sans-inter transition-all border border-white/20 cursor-pointer shadow-xs active:scale-95"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-xs sm:text-sm font-bold font-sans-inter transition-all border border-white/20 cursor-pointer shadow-xs active:scale-95"
             >
               <span>تسجيل فاتورة</span>
             </button>
             <button
               onClick={onOpenNewTask}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-[#F4F7F5] hover:bg-white text-[#2A443B] text-xs sm:text-sm font-bold font-sans-inter transition-all shadow-md cursor-pointer active:scale-95"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-[#F4F7F5] hover:bg-white text-[#2A443B] text-xs sm:text-sm font-bold font-sans-inter transition-all shadow-md cursor-pointer active:scale-95"
             >
               <Plus className="w-4.5 h-4.5 stroke-[2.5]" />
               <span>مهمة جديدة</span>

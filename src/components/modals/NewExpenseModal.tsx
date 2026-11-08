@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { dataStore } from '../../lib/storage';
-import { ExpenseCategory } from '../../types/domain';
+import { ExpenseCategory, StandingAccount } from '../../types/domain';
 import { formatCurrency, EXPENSE_CATEGORY_CONFIG } from '../../lib/utils/format';
 import { Modal } from '../ui/modal';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
-import { AlertTriangle, Layers, UploadCloud, CheckCircle2, Wallet, Tag } from 'lucide-react';
+import { SmartSelect } from '../ui/SmartSelect';
+import { NewStandingAccountModal } from './NewStandingAccountModal';
+import { AlertTriangle, Layers, UploadCloud, CheckCircle2, Wallet, Tag, Plus } from 'lucide-react';
 
 interface NewExpenseModalProps {
   isOpen: boolean;
@@ -28,6 +30,23 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
   const tasks = dataStore.getTasks();
   const settings = dataStore.getSettings();
   const standingAccounts = dataStore.getStandingAccounts();
+  const expenses = dataStore.getExpenses();
+
+  const [isAddStandingModalOpen, setIsAddStandingModalOpen] = useState(false);
+
+  // Extract past vendors + routine vendors for smart search & autocomplete
+  const pastVendors = Array.from(
+    new Set([
+      ...expenses.map((e) => e.vendorName),
+      ...standingAccounts.map((a) => a.vendorName || a.name),
+      'بقالة الحي ومستلزمات الموقع',
+      'سوبرماركت المدينة',
+      'شركة البرق للكهربائيات',
+      'محطة بترول أدنوك / الإمارات',
+      'كافتيريا واستراحة الموقع',
+      'مؤسسة التوريدات المعتمدة',
+    ].filter((v): v is string => Boolean(v && v.trim())))
+  );
 
   // Find best matching fund:
   const getInitialFundId = () => {
@@ -95,8 +114,18 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
       if (acc.defaultAmount && !amount) {
         setAmount(String(acc.defaultAmount));
       }
-      setVendorName(acc.direction === 'receivable' ? 'تحصيل من عميل' : 'مشتريات تشغيلية');
+      setVendorName(acc.vendorName || acc.name);
     }
+  };
+
+  const handleStandingAccountCreated = (newAcc: StandingAccount) => {
+    setSelectedStandingAccId(newAcc.id);
+    setDescription(newAcc.name);
+    setCategory(newAcc.category as ExpenseCategory);
+    if (newAcc.defaultAmount && !amount) {
+      setAmount(String(newAcc.defaultAmount));
+    }
+    setVendorName(newAcc.vendorName || newAcc.name);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -159,61 +188,69 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
     >
       <form onSubmit={handleSubmit} className="space-y-4.5 text-xs sm:text-sm">
         {/* Quick Standing Accounts Selector */}
-        {standingAccounts.length > 0 && (
-          <div className="space-y-2 p-4 neu-inset-sm rounded-2xl">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-extrabold text-slate-800 flex items-center gap-1.5">
-                <Tag className="w-4 h-4 text-emerald-700" />
-                <span>حسابات الصرف الدائمة والمتكررة (Standing Accounts):</span>
-              </span>
+        <div className="space-y-2.5 p-4 neu-inset-sm rounded-2xl">
+          <div className="flex items-center justify-between text-xs flex-wrap gap-2">
+            <span className="font-extrabold text-slate-800 flex items-center gap-1.5">
+              <Tag className="w-4 h-4 text-emerald-700" />
+              <span>حسابات المصروفات الاعتيادية والموردين المعتادين (بقالة، بوفيه، وقود):</span>
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsAddStandingModalOpen(true)}
+                className="neu-raised text-[11px] font-extrabold text-emerald-800 px-2.5 py-1 rounded-xl hover:text-emerald-950 flex items-center gap-1 cursor-pointer active:neu-inset transition"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>إضافة حساب معتاد جديد</span>
+              </button>
               {selectedStandingAccId && (
                 <button
                   type="button"
                   onClick={() => setSelectedStandingAccId('')}
-                  className="text-xs text-emerald-800 font-bold hover:underline cursor-pointer"
+                  className="text-xs text-rose-700 font-bold hover:underline cursor-pointer px-1"
                 >
                   إلغاء التحديد
                 </button>
               )}
             </div>
-            <div className="flex flex-wrap gap-2 pt-1">
-              {standingAccounts.map((acc) => (
-                <button
-                  key={acc.id}
-                  type="button"
-                  onClick={() => handleSelectStandingAccount(acc.id)}
-                  className={`text-xs px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    selectedStandingAccId === acc.id
-                      ? 'neu-inset text-emerald-800 bg-[#EAF0EC] font-black'
-                      : 'neu-raised text-slate-700 hover:text-slate-900'
-                  }`}
-                >
-                  <span>{acc.name}</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-extrabold ${acc.direction === 'receivable' ? 'bg-emerald-100 text-emerald-800' : 'bg-black/5 text-slate-600'}`}>
-                    {acc.direction === 'receivable' ? 'لنا' : 'علينا'}
-                  </span>
-                </button>
-              ))}
-            </div>
           </div>
-        )}
 
-        {/* Fund Selection */}
-        <div className="space-y-1.5">
-          <label className="block text-xs font-bold text-slate-700">العهدة النقدية المصروف منها *</label>
-          <select
-            value={fundId}
-            onChange={(e) => setFundId(e.target.value)}
-            className="w-full neu-inset px-4 py-2.5 min-h-[46px] rounded-2xl text-xs sm:text-sm text-slate-800 font-semibold focus:outline-hidden"
-            required
-          >
-            {funds.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name} (الرصيد المتاح: {formatCurrency(f.currentBalance, f.currency)} - المسؤول: {f.holderName})
-              </option>
+          <div className="flex flex-wrap gap-2 pt-1">
+            {standingAccounts.map((acc) => (
+              <button
+                key={acc.id}
+                type="button"
+                onClick={() => handleSelectStandingAccount(acc.id)}
+                className={`text-xs px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  selectedStandingAccId === acc.id
+                    ? 'neu-inset text-emerald-800 bg-[#EAF0EC] font-black'
+                    : 'neu-raised text-slate-700 hover:text-slate-900'
+                }`}
+              >
+                <span>{acc.name}</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-extrabold ${acc.direction === 'receivable' ? 'bg-emerald-100 text-emerald-800' : 'bg-black/5 text-slate-600'}`}>
+                  {acc.direction === 'receivable' ? 'لنا' : 'علينا'}
+                </span>
+              </button>
             ))}
-          </select>
+          </div>
         </div>
+
+        {/* Fund Selection via SmartSelect */}
+        <SmartSelect
+          label="العهدة النقدية المصروف منها *"
+          placeholder="اختر العهدة النقدية..."
+          options={funds.map((f) => ({
+            value: f.id,
+            label: f.name,
+            sublabel: `المسؤول: ${f.holderName}`,
+            badge: `متاح: ${formatCurrency(f.currentBalance, f.currency)}`,
+          }))}
+          value={fundId}
+          onChange={(val) => setFundId(val)}
+          creatable={false}
+          required
+        />
 
         {/* Amount & Tax Live Calculation */}
         <div className="p-4 sm:p-5 neu-raised rounded-3xl space-y-4">
@@ -227,20 +264,19 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
               onChange={(e) => setAmount(e.target.value)}
               required
             />
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700">تصنيف المصروف *</label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value as ExpenseCategory)}
-                className="w-full neu-inset px-4 py-2.5 min-h-[46px] rounded-2xl text-xs sm:text-sm text-slate-800 font-semibold focus:outline-hidden"
-              >
-                {Object.entries(EXPENSE_CATEGORY_CONFIG).map(([catKey, catVal]) => (
-                  <option key={catKey} value={catKey}>
-                    {catVal.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <SmartSelect
+              label="تصنيف المصروف *"
+              placeholder="اختر أو ابحث عن التصنيف..."
+              options={Object.entries(EXPENSE_CATEGORY_CONFIG).map(([catKey, catVal]) => ({
+                value: catKey,
+                label: catVal.label,
+                icon: '🏷️',
+              }))}
+              value={category}
+              onChange={(val) => setCategory(val as ExpenseCategory)}
+              creatable={false}
+              required
+            />
           </div>
 
           {/* Live Calculation Display */}
@@ -334,12 +370,15 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
 
         {/* Invoice & Vendor */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Input
+          <SmartSelect
             label="اسم المورد / المحل التجاري *"
-            placeholder="مثال: شركة البرق للكهربائيات"
+            placeholder="ابحث أو اكتب اسم المورد / البقالة..."
+            options={pastVendors}
             value={vendorName}
-            onChange={(e) => setVendorName(e.target.value)}
+            onChange={(val) => setVendorName(val)}
+            creatable={true}
             required
+            helperText="يمكنك الاختيار من الموردين المعتادين أو كتابة مورد جديد مباشرة"
           />
           <Input
             label="رقم الفاتورة الضريبية *"
@@ -364,24 +403,24 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
         </div>
 
         {/* Linked Task & Receipt */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-          <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700">ربط بمهمة ميدانية (اختياري)</label>
-            <select
-              value={taskId}
-              onChange={(e) => setTaskId(e.target.value)}
-              className="w-full neu-inset px-4 py-2.5 min-h-[46px] rounded-2xl text-xs sm:text-sm text-slate-800 font-semibold focus:outline-hidden"
-            >
-              <option value="">بدون ربط بمهمة</option>
-              {tasks.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.title} ({t.location})
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+          <SmartSelect
+            label="ربط بمهمة ميدانية (اختياري)"
+            placeholder="ابحث برقم المهمة أو العنوان..."
+            options={[
+              { value: '', label: 'بدون ربط بمهمة' },
+              ...tasks.map((t) => ({
+                value: t.id,
+                label: `${t.code || ''} - ${t.title}`,
+                sublabel: `${t.location} | المكلف: ${t.assigneeName}`,
+              })),
+            ]}
+            value={taskId}
+            onChange={(val) => setTaskId(val)}
+            creatable={false}
+          />
 
-          <label className="flex items-center gap-3 p-3 neu-inset-sm rounded-2xl cursor-pointer mt-4 sm:mt-0">
+          <label className="flex items-center gap-3 p-3 neu-inset-sm rounded-2xl cursor-pointer mt-6">
             <input
               type="checkbox"
               checked={hasReceipt}
@@ -406,6 +445,13 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
           </Button>
         </div>
       </form>
+
+      {/* Routine / Standing Account Quick Add Modal */}
+      <NewStandingAccountModal
+        isOpen={isAddStandingModalOpen}
+        onClose={() => setIsAddStandingModalOpen(false)}
+        onSuccess={handleStandingAccountCreated}
+      />
     </Modal>
   );
 };

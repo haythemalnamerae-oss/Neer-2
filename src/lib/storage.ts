@@ -274,6 +274,18 @@ export class OpsDataStore {
     this.notify();
   }
 
+  public updateFund(fundId: string, updates: Partial<PettyCashFund>): void {
+    this.funds = this.funds.map((f) => {
+      if (f.id === fundId) {
+        return { ...f, ...updates };
+      }
+      return f;
+    });
+    safeSet(STORAGE_KEYS.FUNDS, this.funds);
+    this.logAudit('تحديث بيانات عهدة', 'update', 'fund', fundId, 'تحديث رصيد أو حالة العهدة النقدية');
+    this.notify();
+  }
+
   // --- Expenses ---
   public getExpenses(): Expense[] {
     return [...this.expenses];
@@ -491,7 +503,7 @@ export class OpsDataStore {
     return newReceipt;
   }
 
-  // --- Standing Recurring Accounts ---
+  // --- Standing Recurring Accounts (حسابات المصروفات الاعتيادية والموردين) ---
   public getStandingAccounts(): StandingAccount[] {
     return [...this.standingAccounts];
   }
@@ -500,11 +512,34 @@ export class OpsDataStore {
     const newAcc: StandingAccount = {
       ...acc,
       id: `std-${Date.now()}`,
+      code: acc.code || `STD-${Math.floor(100 + Math.random() * 900)}`,
+      active: acc.active !== undefined ? acc.active : true,
     };
-    this.standingAccounts = [...this.standingAccounts, newAcc];
+    this.standingAccounts = [newAcc, ...this.standingAccounts];
     safeSet(STORAGE_KEYS.STANDING_ACCOUNTS, this.standingAccounts);
+    this.logAudit('إضافة حساب مصروف اعتيادي / مورد', 'create', 'fund', newAcc.id, `تم إنشاء حساب ${newAcc.name}`);
     this.notify();
     return newAcc;
+  }
+
+  public updateStandingAccount(id: string, updates: Partial<StandingAccount>): void {
+    this.standingAccounts = this.standingAccounts.map((a) => {
+      if (a.id === id) {
+        return { ...a, ...updates };
+      }
+      return a;
+    });
+    safeSet(STORAGE_KEYS.STANDING_ACCOUNTS, this.standingAccounts);
+    this.logAudit('تحديث حساب مصروف اعتيادي', 'update', 'fund', id, `تم تحديث بيانات الحساب`);
+    this.notify();
+  }
+
+  public deleteStandingAccount(id: string): void {
+    const target = this.standingAccounts.find((a) => a.id === id);
+    this.standingAccounts = this.standingAccounts.filter((a) => a.id !== id);
+    safeSet(STORAGE_KEYS.STANDING_ACCOUNTS, this.standingAccounts);
+    this.logAudit('حذف حساب مصروف اعتيادي', 'delete', 'fund', id, `تم حذف الحساب ${target?.name || ''}`);
+    this.notify();
   }
 
   public updateExpenseStatus(expenseId: string, status: ExpenseStatus, reason?: string): void {
@@ -617,7 +652,7 @@ export class OpsDataStore {
     this.notify();
   }
 
-  public startTask(taskId: string): void {
+  public startTask(taskId: string, coords?: { lat: number; lng: number }): void {
     const currentUser = this.getCurrentUser();
     const now = new Date().toISOString();
     this.tasks = this.tasks.map((t) => {
@@ -627,11 +662,15 @@ export class OpsDataStore {
           status: 'in_progress',
           actualStartTime: now,
           isPaused: false,
+          geoCoordinates: coords || t.geoCoordinates,
+          mapsUrl: coords ? `https://www.google.com/maps?q=${coords.lat},${coords.lng}` : t.mapsUrl,
           history: [
             ...t.history,
             {
               id: `h-${Date.now()}`,
-              action: 'بدء تنفيذ المهمة الميدانية وتوثيق وقت البدء الفعلي',
+              action: coords
+                ? `بدء تنفيذ المهمة وتوثيق الوقت الفعلي وموقع التنفيذ GPS (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`
+                : 'بدء تنفيذ المهمة الميدانية وتوثيق وقت البدء الفعلي',
               performedBy: currentUser.name,
               timestamp: new Date().toLocaleString('ar-AE'),
             }
@@ -641,7 +680,7 @@ export class OpsDataStore {
       return t;
     });
     safeSet(STORAGE_KEYS.TASKS, this.tasks);
-    this.logAudit('بدء مهمة', 'update', 'task', taskId, 'بدء التنفيذ الفعلي للمهمة');
+    this.logAudit('بدء مهمة', 'update', 'task', taskId, coords ? `بدء التنفيذ الفعلي مع إحداثيات GPS (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})` : 'بدء التنفيذ الفعلي للمهمة');
     this.notify();
   }
 
@@ -876,7 +915,7 @@ export class OpsDataStore {
     this.notify();
   }
 
-  public updateTaskStepStatus(taskId: string, stepId: string, status: TaskStep['status'], notes?: string): void {
+  public updateTaskStepStatus(taskId: string, stepId: string, status: TaskStep['status'], notes?: string, nextStepDate?: string): void {
     const currentUser = this.getCurrentUser();
     this.tasks = this.tasks.map((t) => {
       if (t.id === taskId && t.steps) {
@@ -886,6 +925,7 @@ export class OpsDataStore {
               ...s,
               status,
               notes: notes !== undefined ? notes : s.notes,
+              nextStepDate: nextStepDate !== undefined ? nextStepDate : s.nextStepDate,
               completedAt: status === 'completed' ? new Date().toLocaleString('ar-AE') : s.completedAt,
             };
           }
@@ -898,7 +938,7 @@ export class OpsDataStore {
             ...t.history,
             {
               id: `h-${Date.now()}`,
-              action: `تحديث مرحلة العمل [${t.steps.find((s) => s.id === stepId)?.title}]: ${status}`,
+              action: `تحديث مرحلة العمل [${t.steps.find((s) => s.id === stepId)?.title}]: ${status}${nextStepDate ? ` (موعد الخطوة القادمة: ${nextStepDate})` : ''}`,
               performedBy: currentUser.name,
               timestamp: new Date().toLocaleString('ar-AE'),
             }

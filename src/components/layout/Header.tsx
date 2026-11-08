@@ -1,9 +1,15 @@
-import React, { useState } from 'react';
-import { Bell, Code2, Menu, Plus, Shield, CheckCircle2, AlertTriangle, Info, LogOut, Search } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Bell, Code2, Menu, Plus, Shield, CheckCircle2, AlertTriangle, Info, LogOut, Type } from 'lucide-react';
 import { dataStore } from '../../lib/storage';
 import { User } from '../../types/domain';
 import { ROLE_LABELS } from '../../lib/rbac/permissions';
 import { clearSession } from '../../lib/api/session';
+
+const OFFICIAL_FONTS = [
+  { id: 'almarai', label: 'المراعي', fullName: 'خط المراعي (الرسمي المعتمد)', family: "'Almarai', sans-serif" },
+  { id: 'tajawal', label: 'تجوال', fullName: 'خط تجوال (حكومي رصين)', family: "'Tajawal', sans-serif" },
+  { id: 'readex', label: 'ريديكس', fullName: 'خط ريديكس برو (مؤسسي حديث)', family: "'Readex Pro', sans-serif" },
+];
 
 interface HeaderProps {
   currentUser: User;
@@ -23,6 +29,17 @@ export const Header: React.FC<HeaderProps> = ({
   currentView,
 }) => {
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const [showFontDropdown, setShowFontDropdown] = useState(false);
+  const [currentFontId, setCurrentFontId] = useState<string>(() => {
+    return localStorage.getItem('ops_app_font') || 'almarai';
+  });
+
+  useEffect(() => {
+    const selected = OFFICIAL_FONTS.find((f) => f.id === currentFontId) || OFFICIAL_FONTS[0];
+    document.documentElement.style.fontFamily = selected.family;
+    document.body.style.fontFamily = selected.family;
+    localStorage.setItem('ops_app_font', selected.id);
+  }, [currentFontId]);
   const notifications = dataStore.getNotifications();
   const unreadCount = notifications.filter((item) => !item.isRead).length;
 
@@ -102,6 +119,57 @@ export const Header: React.FC<HeaderProps> = ({
             <Code2 className="h-4 w-4 text-emerald-300" />
             <span className="hidden md:inline">أكواد النظام</span>
           </button>
+
+          {/* Official Font Selector Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowFontDropdown((v) => !v)}
+              title="اختيار الخط الرسمي المعتمد"
+              className="flex h-10 items-center gap-1.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 px-2.5 sm:px-3 text-xs font-bold text-white transition-all cursor-pointer"
+            >
+              <Type className="h-4 w-4 text-emerald-300" />
+              <span className="hidden md:inline">
+                {OFFICIAL_FONTS.find((f) => f.id === currentFontId)?.label || 'المراعي'}
+              </span>
+            </button>
+
+            {showFontDropdown && (
+              <div
+                className="absolute left-0 mt-2.5 w-60 rounded-[22px] bg-[#F4F7F5] p-2.5 text-slate-800 z-50 border border-white/80 animate-in fade-in duration-150"
+                style={{
+                  boxShadow: '0 16px 36px rgba(0, 0, 0, 0.25)',
+                }}
+              >
+                <div className="px-2.5 py-1.5 border-b border-slate-200/60 mb-1.5 text-right">
+                  <span className="text-[11px] font-bold text-[#2A443B] block">الخطوط الرسمية المعتمدة:</span>
+                  <span className="text-[10px] text-slate-500">اختر الخط الأنسب لطابع المؤسسة</span>
+                </div>
+                <div className="space-y-1">
+                  {OFFICIAL_FONTS.map((font) => {
+                    const isSelected = currentFontId === font.id;
+                    return (
+                      <button
+                        key={font.id}
+                        onClick={() => {
+                          setCurrentFontId(font.id);
+                          setShowFontDropdown(false);
+                        }}
+                        style={{ fontFamily: font.family }}
+                        className={`w-full text-right px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#2A443B] text-white shadow-xs'
+                            : 'hover:bg-slate-200/60 text-slate-800'
+                        }`}
+                      >
+                        <span>{font.fullName}</span>
+                        {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Notifications with circular count badge */}
           <div className="relative">

@@ -4,6 +4,7 @@ import { TaskPriority, TaskTypeClassification, TaskStep } from '../../types/doma
 import { Modal } from '../ui/modal';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
+import { SmartSelect } from '../ui/SmartSelect';
 import { Plus, Trash2, MapPin, Layers, Users, Clock } from 'lucide-react';
 
 interface NewTaskModalProps {
@@ -12,6 +13,11 @@ interface NewTaskModalProps {
 }
 
 export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) => {
+  const users = dataStore.getUsers();
+  const funds = dataStore.getFunds();
+  const currentUser = dataStore.getCurrentUser();
+  const allExistingTasks = dataStore.getTasks();
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [taskTypeCategory, setTaskTypeCategory] = useState<TaskTypeClassification>('field');
@@ -19,8 +25,8 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
   const [priority, setPriority] = useState<TaskPriority>('medium');
-  const [assigneeId, setAssigneeId] = useState('');
-  const [supervisorId, setSupervisorId] = useState('');
+  const [assigneeIds, setAssigneeIds] = useState<string[]>([users[0]?.id || '']);
+  const [supervisorIds, setSupervisorIds] = useState<string[]>([]);
   const [locationRequired, setLocationRequired] = useState(true);
   const [dueDate, setDueDate] = useState('');
   const [dueTime, setDueTime] = useState('14:00');
@@ -31,6 +37,11 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
   const [category, setCategory] = useState('صيانة وتشغيل');
   const [budget, setBudget] = useState('2000');
   const [fundId, setFundId] = useState('');
+  const [taskFundAmount, setTaskFundAmount] = useState('');
+  const [secondaryFundId, setSecondaryFundId] = useState('');
+  const [isSubTask, setIsSubTask] = useState(false);
+  const [parentTaskId, setParentTaskId] = useState('');
+  const [requiresApproval, setRequiresApproval] = useState(true);
   const [checklistText, setChecklistText] = useState('فصل وتأمين الموقع\nفحص المكونات وتركيب القطع\nالتشغيل التجريبي وتوقيع المحضر');
   
   // Dynamic steps sequence (الخطوات التكميلية المتسلسلة)
@@ -41,9 +52,32 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
   ]);
   const [newStepInput, setNewStepInput] = useState('');
 
-  const users = dataStore.getUsers();
-  const funds = dataStore.getFunds();
-  const currentUser = dataStore.getCurrentUser();
+  const recentTaskTypes: string[] = Array.from(
+    new Set(allExistingTasks.map((t) => t.taskType).filter((type): type is string => Boolean(type)))
+  ).slice(0, 5);
+  const commonTaskTypes = [
+    'صيانة وتشغيل ميداني',
+    'زيارة عميل / تفتيش دوري',
+    'توريد وتركيب معدات',
+    'تحصيل وصرف مالي',
+    'إيداع بنكي للمتحصلات',
+    'شراء مواد ومستلزمات',
+    'فحص سلامة وجودة HSE',
+    'مهمة عاجلة وطارئة',
+  ];
+  const allSuggestedTypes = Array.from(new Set([...recentTaskTypes, ...commonTaskTypes]));
+
+  const pastLocations = Array.from(
+    new Set([
+      ...allExistingTasks.map((t) => t.location),
+      'المقر الرئيسي - أبوظبي',
+      'مصفح الصناعية 4B',
+      'موقع مشروع الريم',
+      'فرع دبي - القوز',
+      'مستودع الشارقة المركزي',
+      'المكتب الرئيسي / عن بعد',
+    ].filter((loc): loc is string => Boolean(loc && loc.trim())))
+  );
 
   const handleAddStep = () => {
     if (!newStepInput.trim()) return;
@@ -63,8 +97,9 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
       return;
     }
 
-    const assignedUser = users.find((u) => u.id === (assigneeId || users[0].id)) || users[0];
-    const supervisorUser = users.find((u) => u.id === supervisorId);
+    const primaryAssigneeId = assigneeIds[0] || users[0].id;
+    const assignedUser = users.find((u) => u.id === primaryAssigneeId) || users[0];
+    const supervisorUsers = users.filter((u) => supervisorIds.includes(u.id));
 
     const checklistItems = checklistText
       .split('\n')
@@ -83,9 +118,53 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
       status: 'pending',
     }));
 
-    dataStore.addTask({
+    // Build tags with additional assignees if multiple were picked
+    const additionalAssigneesNames = users
+      .filter((u) => assigneeIds.slice(1).includes(u.id))
+      .map((u) => u.name);
+
+    const numFundAmount = parseFloat(taskFundAmount) || 0;
+    const selectedFund = funds.find((f) => f.id === fundId);
+    let effectiveFundId = fundId || undefined;
+
+    // Handle multi-fund depletion split if fund amount exceeds primary fund balance
+    if (selectedFund && numFundAmount > 0) {
+      if (numFundAmount > selectedFund.currentBalance && secondaryFundId) {
+        const secondaryFund = funds.find((f) => f.id === secondaryFundId);
+        const avail1 = selectedFund.currentBalance;
+        const neededFromSecondary = numFundAmount - avail1;
+
+        // Deduct full balance of fund 1
+        dataStore.updateFund(selectedFund.id, {
+          currentBalance: 0,
+          spentBalance: selectedFund.spentBalance + avail1,
+          status: 'depleted',
+        });
+
+        // Deduct remainder from fund 2
+        if (secondaryFund) {
+          const newBal2 = Math.max(0, secondaryFund.currentBalance - neededFromSecondary);
+          dataStore.updateFund(secondaryFund.id, {
+            currentBalance: newBal2,
+            spentBalance: secondaryFund.spentBalance + neededFromSecondary,
+            status: newBal2 <= 0 ? 'depleted' : (newBal2 / secondaryFund.totalAllocation) * 100 <= secondaryFund.warningThreshold ? 'warning' : 'active',
+          });
+        }
+      } else if (numFundAmount <= selectedFund.currentBalance) {
+        const newBal = selectedFund.currentBalance - numFundAmount;
+        dataStore.updateFund(selectedFund.id, {
+          currentBalance: newBal,
+          spentBalance: selectedFund.spentBalance + numFundAmount,
+          status: newBal <= 0 ? 'depleted' : (newBal / selectedFund.totalAllocation) * 100 <= selectedFund.warningThreshold ? 'warning' : 'active',
+        });
+      }
+    }
+
+    const createdTask = dataStore.addTask({
       title,
-      description,
+      description: additionalAssigneesNames.length > 0 
+        ? `${description}\n[فريق العمل المشارك: ${additionalAssigneesNames.join('، ')}]`
+        : description,
       priority,
       status: 'scheduled',
       taskTypeCategory,
@@ -99,18 +178,41 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
       assigneeAvatar: assignedUser.avatar,
       creatorId: currentUser.id,
       creatorName: currentUser.name,
-      supervisors: supervisorUser ? [{ id: supervisorUser.id, name: supervisorUser.name, role: supervisorUser.role }] : [],
+      supervisors: supervisorUsers.map((u) => ({ id: u.id, name: u.name, role: u.roleTitleAr || u.role })),
       locationRequired,
       dueDate,
       startDate: startDate || new Date().toISOString().split('T')[0],
       location: location || 'المكتب الرئيسي / عن بعد',
       category,
       budget: parseFloat(budget) || 0,
-      tags: [taskType, category, location ? location.split('-')[0].trim() : 'إداري'],
+      tags: [
+        taskType,
+        category,
+        location ? location.split('-')[0].trim() : 'إداري',
+        ...(isSubTask ? ['مهمة فرعية'] : []),
+        ...additionalAssigneesNames,
+      ],
       checklist: checklistItems,
       steps: initialSteps,
-      fundId: fundId || undefined,
+      fundId: effectiveFundId,
+      taskFundAmount: numFundAmount > 0 ? numFundAmount : undefined,
+      taskFundSpent: 0,
+      taskFundRemaining: numFundAmount > 0 ? numFundAmount : undefined,
+      parentTaskId: isSubTask && parentTaskId ? parentTaskId : undefined,
     });
+
+    // If sub-task of existing task, link to parent task's subtasks array as well!
+    if (isSubTask && parentTaskId) {
+      dataStore.addSubTask(parentTaskId, {
+        title,
+        assigneeId: assignedUser.id,
+        assigneeName: assignedUser.name,
+        status: 'scheduled',
+        requiresApproval,
+        isApproved: false,
+        dueDate,
+      });
+    }
 
     onClose();
     // Reset form
@@ -120,6 +222,10 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
     setClientName('');
     setClientPhone('');
     setProofRequired('');
+    setTaskFundAmount('');
+    setSecondaryFundId('');
+    setIsSubTask(false);
+    setParentTaskId('');
   };
 
   return (
@@ -168,20 +274,17 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
               required
             />
           </div>
-          <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700">التصنيف الفرعي *</label>
-            <select
+          <div className="space-y-1.5 sm:col-span-1">
+            <SmartSelect
+              label="نوع المهمة (بحث واقتراح ذكي) *"
+              placeholder="ابحث أو اكتب نوع المهمة..."
+              options={allSuggestedTypes}
               value={taskType}
-              onChange={(e) => setTaskType(e.target.value)}
-              className="w-full neu-inset px-4 py-2.5 min-h-[46px] rounded-2xl text-xs sm:text-sm text-slate-800 font-semibold focus:outline-hidden"
-            >
-              <option value="صيانة ميدانية">صيانة وتشغيل ميداني</option>
-              <option value="زيارة عميل / تفتيش">زيارة عميل / تفتيش دوري</option>
-              <option value="تسليم وتركيب معدات">توريد وتركيب معدات</option>
-              <option value="تحصيل ومتابعة مالية">تحصيل وصرف مالي</option>
-              <option value="فحص سلامة HSE">فحص سلامة وجودة HSE</option>
-              <option value="أعمال طارئة">مهمة عاجلة وطارئة</option>
-            </select>
+              onChange={(val) => setTaskType(val)}
+              creatable={true}
+              required
+              helperText="يمكنك اختيار نوع معتاد أو كتابة نوع جديد فوراً"
+            />
           </div>
         </div>
 
@@ -220,78 +323,79 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700">الأولوية</label>
-            <select
-              value={priority}
-              onChange={(e) => setPriority(e.target.value as TaskPriority)}
-              className="w-full neu-inset px-4 py-2.5 min-h-[46px] rounded-2xl text-xs sm:text-sm text-slate-800 font-semibold focus:outline-hidden"
-            >
-              <option value="urgent">طارئ جداً (Urgent)</option>
-              <option value="high">عالي (High)</option>
-              <option value="medium">متوسط (Medium)</option>
-              <option value="low">منخفض (Low)</option>
-            </select>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <SmartSelect
+            label="درجة الأولوية *"
+            options={[
+              { value: 'urgent', label: 'طارئ جداً (Urgent)', icon: '🚨' },
+              { value: 'high', label: 'عالي (High)', icon: '⚡' },
+              { value: 'medium', label: 'متوسط (Medium)', icon: '⚖️' },
+              { value: 'low', label: 'منخفض (Low)', icon: '☕' },
+            ]}
+            value={priority}
+            onChange={(val) => setPriority(val as TaskPriority)}
+            creatable={false}
+          />
 
-          <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700">المسؤول التنفيذي المكلّف *</label>
-            <select
-              value={assigneeId}
-              onChange={(e) => setAssigneeId(e.target.value)}
-              className="w-full neu-inset px-4 py-2.5 min-h-[46px] rounded-2xl text-xs sm:text-sm text-slate-800 font-semibold focus:outline-hidden"
-            >
-              <option value="">اختر مسؤولاً تنفيذياً...</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name} - {u.roleTitleAr}
-                </option>
-              ))}
-            </select>
+          <div className="sm:col-span-2">
+            <SmartSelect
+              label="المسؤولون المكلفون بالتنفيذ (اختيار فردي أو متعدد) *"
+              placeholder="ابحث واختر المكلفين بالعمل..."
+              options={users.map((u) => ({
+                value: u.id,
+                label: u.name,
+                sublabel: u.department,
+                badge: u.roleTitleAr,
+              }))}
+              value={assigneeIds}
+              onChange={(vals) => setAssigneeIds(Array.isArray(vals) ? vals : [vals])}
+              isMulti={true}
+              creatable={false}
+              required
+            />
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700">المشرف المتابع (اختياري)</label>
-            <select
-              value={supervisorId}
-              onChange={(e) => setSupervisorId(e.target.value)}
-              className="w-full neu-inset px-4 py-2.5 min-h-[46px] rounded-2xl text-xs sm:text-sm text-slate-800 font-semibold focus:outline-hidden"
-            >
-              <option value="">بدون مشرف متابع محدد</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name} - {u.roleTitleAr}
-                </option>
-              ))}
-            </select>
-          </div>
+          <SmartSelect
+            label="المشرفون المتابعون (اختياري - اختيار متعدد)"
+            placeholder="ابحث واختر المشرفين..."
+            options={users.map((u) => ({
+              value: u.id,
+              label: u.name,
+              sublabel: u.department,
+              badge: u.roleTitleAr,
+            }))}
+            value={supervisorIds}
+            onChange={(vals) => setSupervisorIds(Array.isArray(vals) ? vals : [vals])}
+            isMulti={true}
+            creatable={false}
+          />
 
           <div className="space-y-1.5 flex flex-col justify-end">
-            <label className="flex items-center gap-3 p-3 neu-inset-sm rounded-2xl cursor-pointer">
+            <label className="flex items-center gap-3 p-3.5 neu-inset-sm rounded-2xl cursor-pointer">
               <input
                 type="checkbox"
                 checked={locationRequired}
                 onChange={(e) => setLocationRequired(e.target.checked)}
                 className="w-5 h-5 accent-[#345c47] rounded cursor-pointer"
               />
-              <span className="text-xs font-bold text-slate-700">توثيق الموقع الجغرافي إجباري عند التنفيذ</span>
+              <span className="text-xs font-bold text-slate-700">توثيق الموقع الجغرافي إجباري عند التنفيذ الميداني</span>
             </label>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-1.5 sm:col-span-2">
-            <Input
-              label={locationRequired ? 'موقع العمل الميداني المستهدف *' : 'موقع العمل (اختياري)'}
-              placeholder="مثال: مصفح 4B، أبوظبي / أو عنوان المنشأة"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              required={locationRequired}
-            />
-          </div>
+        <div className="space-y-1.5">
+          <SmartSelect
+            label={locationRequired ? 'موقع العمل الميداني المستهدف *' : 'موقع العمل (اختياري)'}
+            placeholder="ابحث في المواقع السابقة أو اكتب موقعاً جديداً..."
+            options={pastLocations}
+            value={location}
+            onChange={(val) => setLocation(val)}
+            creatable={true}
+            required={locationRequired}
+            helperText="يمكنك اختيار موقع سابق أو كتابة موقع جديد واختياره فوراً"
+          />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 neu-inset-sm p-4 rounded-2xl">
@@ -384,6 +488,51 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
           </div>
         </div>
 
+        {/* Sub-Task Options */}
+        <div className="p-4 rounded-2xl neu-inset-sm space-y-3">
+          <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-800">
+            <input
+              type="checkbox"
+              checked={isSubTask}
+              onChange={(e) => setIsSubTask(e.target.checked)}
+              className="w-4 h-4 rounded-md accent-[#2A443B]"
+            />
+            <span>هل هذه مهمة فرعية تابعة لمهمة رئيسية؟</span>
+          </label>
+
+          {isSubTask && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold text-slate-600">المهمة الرئيسية التابعة لها</label>
+                <select
+                  value={parentTaskId}
+                  onChange={(e) => setParentTaskId(e.target.value)}
+                  className="w-full neu-inset px-3 py-2 rounded-xl text-xs text-slate-800 font-semibold"
+                >
+                  <option value="">اختر المهمة الرئيسية...</option>
+                  {allExistingTasks.filter((t) => !t.parentTaskId).map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.title} ({t.code || 'TSK'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2 pt-5">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={requiresApproval}
+                    onChange={(e) => setRequiresApproval(e.target.checked)}
+                    className="w-4 h-4 rounded-md accent-[#2A443B]"
+                  />
+                  <span>تتطلب موافقة واعتماد المدير</span>
+                </label>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
             type="number"
@@ -391,6 +540,17 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
             value={budget}
             onChange={(e) => setBudget(e.target.value)}
           />
+          <Input
+            type="number"
+            label="المبلغ المسحوب من العهدة للمهمة (اختياري)"
+            placeholder="0"
+            value={taskFundAmount}
+            onChange={(e) => setTaskFundAmount(e.target.value)}
+          />
+        </div>
+
+        {/* Fund Allocation & Multi-Fund Depletion */}
+        <div className="space-y-3">
           <div className="space-y-1.5">
             <label className="block text-xs font-bold text-slate-700">العهدة النقدية المرتبطة (اختياري)</label>
             <select
@@ -401,11 +561,43 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
               <option value="">بدون عهدة محددة</option>
               {funds.map((f) => (
                 <option key={f.id} value={f.id}>
-                  {f.name} (الرصيد: {f.currentBalance} {f.currency})
+                  {f.name} (الرصيد المتاح: {f.currentBalance} {f.currency})
                 </option>
               ))}
             </select>
           </div>
+
+          {/* Cascade warning and second fund choice if fund amount > primary balance */}
+          {fundId && parseFloat(taskFundAmount) > 0 && (() => {
+            const f1 = funds.find((f) => f.id === fundId);
+            const req = parseFloat(taskFundAmount);
+            if (f1 && req > f1.currentBalance) {
+              const shortage = req - f1.currentBalance;
+              return (
+                <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-2">
+                  <div className="font-bold flex items-center gap-1.5">
+                    <span>⚠️ رصيد {f1.name} الحالي هو {f1.currentBalance} {f1.currency} فقط (المبلغ المطلوب: {req} {f1.currency})</span>
+                  </div>
+                  <p className="text-[11px] text-amber-800">
+                    سيتم استهلاك رصيد {f1.name} كاملاً (يصبح رصيدها 0). يرجى اختيار عهدة ثانية لتغطية المتبقي ({shortage} {f1.currency}):
+                  </p>
+                  <select
+                    value={secondaryFundId}
+                    onChange={(e) => setSecondaryFundId(e.target.value)}
+                    className="w-full bg-white border border-amber-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800"
+                  >
+                    <option value="">اختر العهدة الثانوية البديلة...</option>
+                    {funds.filter((f) => f.id !== fundId).map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name} (المتاح: {f.currentBalance} {f.currency})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              );
+            }
+            return null;
+          })()}
         </div>
 
         <div className="space-y-1.5">

@@ -9,11 +9,17 @@ import {
   BadgeAlert,
   CreditCard,
   X,
+  Search,
+  Trash2,
+  Phone,
+  Store,
+  Minus,
 } from 'lucide-react';
 import { PettyCashFund, StandingAccount, CashReceipt, Expense } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
 import { formatCurrency } from '../../lib/utils/format';
 import { Button } from '../ui/button';
+import { NewStandingAccountModal } from '../modals/NewStandingAccountModal';
 
 interface FundsViewProps {
   onOpenNewFund: () => void;
@@ -33,6 +39,12 @@ export const FundsView: React.FC<FundsViewProps> = ({
   const [replenishAmount, setReplenishAmount] = useState('10000');
   const [replenishNotes, setReplenishNotes] = useState('');
 
+  // Direct Spend from Fund State ("الضغط على عهدة معينة وإضافة صرف من العهدة ويكتب السبب")
+  const [directSpendFund, setDirectSpendFund] = useState<PettyCashFund | null>(null);
+  const [directSpendAmount, setDirectSpendAmount] = useState('');
+  const [directSpendReason, setDirectSpendReason] = useState('');
+  const [directSpendVendor, setDirectSpendVendor] = useState('مشتريات نقدية فورية');
+
   // New Cash Receipt State
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [receiptAmount, setReceiptAmount] = useState('');
@@ -42,11 +54,8 @@ export const FundsView: React.FC<FundsViewProps> = ({
 
   // New Standing Account State
   const [isStandingModalOpen, setIsStandingModalOpen] = useState(false);
-  const [standingName, setStandingName] = useState('');
-  const [standingCategory, setStandingCategory] = useState('');
-  const [standingDirection, setStandingDirection] = useState<'payable_by_us' | 'receivable_for_us'>('payable_by_us');
-  const [standingMonthlyLimit, setStandingMonthlyLimit] = useState('');
-  const [standingNotes, setStandingNotes] = useState('');
+  const [standingSearch, setStandingSearch] = useState('');
+  const [standingFilter, setStandingFilter] = useState<'all' | 'payable' | 'receivable'>('all');
 
   const currentUser = dataStore.getCurrentUser();
   const funds = dataStore.getFunds();
@@ -102,28 +111,32 @@ export const FundsView: React.FC<FundsViewProps> = ({
     setReceiptNotes('');
   };
 
-  const handleCreateStandingAccount = (e: React.FormEvent) => {
+  const handleConfirmDirectSpend = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!standingName.trim() || !standingCategory.trim()) {
-      alert('يرجى إدخال اسم وتصنيف الحساب الدائم');
+    if (!directSpendFund) return;
+    const amt = parseFloat(directSpendAmount);
+    if (!amt || amt <= 0 || !directSpendReason.trim()) {
+      alert('يرجى إدخال مبلغ صحيح وتدوين سبب الصرف');
       return;
     }
 
-    dataStore.addStandingAccount({
-      name: standingName.trim(),
-      category: standingCategory.trim(),
-      direction: (standingDirection === 'payable_by_us' ? 'payable' : 'receivable') as any,
-      monthlyLimit: standingMonthlyLimit ? parseFloat(standingMonthlyLimit) : undefined,
-      defaultAmount: standingMonthlyLimit ? parseFloat(standingMonthlyLimit) : undefined,
-      notes: standingNotes || undefined,
-      active: true,
+    dataStore.addExpense({
+      fundId: directSpendFund.id,
+      fundName: directSpendFund.name,
+      amount: amt,
+      category: 'materials',
+      description: directSpendReason.trim(),
+      invoiceNumber: `VCH-${Math.floor(1000 + Math.random() * 9000)}`,
+      vendorName: directSpendVendor || 'مشتريات نقدية فورية',
+      hasReceipt: false,
+      allowDeficit: true,
     });
 
-    setIsStandingModalOpen(false);
-    setStandingName('');
-    setStandingCategory('');
-    setStandingMonthlyLimit('');
-    setStandingNotes('');
+    alert(`تم تسجيل صرف ${amt} ${directSpendFund.currency} من ${directSpendFund.name} بنجاح!`);
+    setDirectSpendFund(null);
+    setDirectSpendAmount('');
+    setDirectSpendReason('');
+    setDirectSpendVendor('مشتريات نقدية فورية');
   };
 
   const handleCoverDeficit = (expenseId: string) => {
@@ -330,7 +343,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex items-center justify-between pt-3 border-t border-[#C8D3CC]/50">
+                <div className="flex items-center justify-between gap-2 pt-3 border-t border-[#C8D3CC]/50 flex-wrap">
                   <Button
                     variant="outline"
                     size="sm"
@@ -339,15 +352,26 @@ export const FundsView: React.FC<FundsViewProps> = ({
                   >
                     عرض الفواتير
                   </Button>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => setReplenishModalFund(fund)}
-                    icon={<RefreshCw className="w-3.5 h-3.5 ml-1" />}
-                    className="text-xs font-bold"
-                  >
-                    تغذية الرصيد
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDirectSpendFund(fund)}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition shadow-xs cursor-pointer active:scale-95"
+                      title="صرف مباشر من العهدة وتدوين السبب"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                      <span>صرف من العهدة</span>
+                    </button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => setReplenishModalFund(fund)}
+                      icon={<RefreshCw className="w-3.5 h-3.5 ml-1" />}
+                      className="text-xs font-bold"
+                    >
+                      تغذية الرصيد
+                    </Button>
+                  </div>
                 </div>
               </div>
             );
@@ -555,14 +579,14 @@ export const FundsView: React.FC<FundsViewProps> = ({
       {/* TAB 4: Standing Accounts (حسابات الصرف الدائمة) */}
       {activeTab === 'standing' && (
         <div className="neu-raised-lg rounded-3xl p-6 sm:p-7 space-y-5">
-          <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-[#C8D3CC]/50">
+          <div className="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-[#C8D3CC]/50">
             <div>
               <h3 className="text-base sm:text-lg font-black text-[#1A2E22] font-serif-display flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-[#2E5577]" />
-                <span>حسابات الصرف الدائمة والمستمرة (Standing Accounts)</span>
+                <span>حسابات المصروفات الاعتيادية والموردين المعتادين (Standing Accounts)</span>
               </h3>
               <p className="text-xs text-[#526F5E] mt-0.5">
-                بنود الصرف الدورية المتكررة (بقالة، بوفية، مواصلات، بنزين، كروت شحن) مع تحديد الموقف المالي (لنا / علينا)
+                حسابات دائمة ومحلات معتادة (بقالة، بوفيه، قطع غيار، وقود، مواصلات) مع ضبط الموقف المالي (لنا / علينا)
               </p>
             </div>
 
@@ -573,63 +597,139 @@ export const FundsView: React.FC<FundsViewProps> = ({
               icon={<Plus className="w-3.5 h-3.5 ml-1" />}
               className="text-xs font-bold"
             >
-              إضافة حساب دائم جديد
+              إضافة حساب معتاد / مورد جديد
             </Button>
+          </div>
+
+          {/* Search and Filters Bar */}
+          <div className="flex items-center justify-between flex-wrap gap-3 pt-1">
+            <div className="relative flex-1 min-w-[220px]">
+              <Search className="w-4 h-4 absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="ابحث بالاسم، المورد، أو التصنيف..."
+                value={standingSearch}
+                onChange={(e) => setStandingSearch(e.target.value)}
+                className="w-full neu-inset pr-10 pl-4 py-2 rounded-2xl text-xs sm:text-sm text-slate-800 focus:outline-hidden"
+              />
+            </div>
+
+            <div className="flex items-center gap-1.5 neu-inset-sm p-1 rounded-2xl text-xs font-bold">
+              {[
+                { id: 'all', label: `الكل (${standingAccounts.length})` },
+                { id: 'payable', label: 'علينا (سداد للمورد)' },
+                { id: 'receivable', label: 'لنا (تحصيل)' },
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => setStandingFilter(f.id as any)}
+                  className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                    standingFilter === f.id
+                      ? 'neu-raised text-emerald-900 font-black'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-right text-xs">
               <thead className="text-[#557161] font-bold border-b border-[#C8D3CC]/50">
                 <tr>
-                  <th className="p-3.5">كود واسم الحساب</th>
-                  <th className="p-3.5">التصنيف الوظيفي</th>
+                  <th className="p-3.5">كود واسم الحساب / البقالة</th>
+                  <th className="p-3.5">المورد المعتاد والتواصل</th>
+                  <th className="p-3.5">التصنيف</th>
                   <th className="p-3.5">الموقف المالي (لنا / علينا)</th>
-                  <th className="p-3.5">الحد الشهري المعتمد</th>
-                  <th className="p-3.5">ملاحظات ونطاق التعامل</th>
-                  <th className="p-3.5 text-center">الحالة</th>
+                  <th className="p-3.5">الحد الشهري / المعتاد</th>
+                  <th className="p-3.5">ملاحظات</th>
+                  <th className="p-3.5 text-center">إجراءات</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#C8D3CC]/30">
-                {standingAccounts.map((acc) => (
-                  <tr key={acc.id} className="hover:neu-inset transition">
-                    <td className="p-3.5">
-                      <span className="font-mono text-[#2B543B] neu-inset-sm px-2 py-0.5 rounded text-[11px] font-bold ml-1">
-                        {acc.code || 'STD'}
-                      </span>
-                      <strong className="text-[#1A2E22]">{acc.name}</strong>
-                    </td>
-
-                    <td className="p-3.5 text-[#3D5B4A] font-medium">
-                      {acc.category}
-                    </td>
-
-                    <td className="p-3.5">
-                      {acc.direction === 'payable' || (acc.direction as string) === 'payable_by_us' ? (
-                        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full neu-inset-sm text-[#915B1F]">
-                          علينا (مستحق سداده للطرف الآخر)
+                {standingAccounts
+                  .filter((acc) => {
+                    if (standingFilter !== 'all') {
+                      if (standingFilter === 'payable' && acc.direction !== 'payable' && (acc.direction as string) !== 'payable_by_us') return false;
+                      if (standingFilter === 'receivable' && acc.direction !== 'receivable' && (acc.direction as string) !== 'receivable_for_us') return false;
+                    }
+                    if (!standingSearch.trim()) return true;
+                    const q = standingSearch.toLowerCase().trim();
+                    return (
+                      acc.name.toLowerCase().includes(q) ||
+                      (acc.vendorName && acc.vendorName.toLowerCase().includes(q)) ||
+                      acc.category.toLowerCase().includes(q) ||
+                      (acc.notes && acc.notes.toLowerCase().includes(q))
+                    );
+                  })
+                  .map((acc) => (
+                    <tr key={acc.id} className="hover:neu-inset transition">
+                      <td className="p-3.5">
+                        <span className="font-mono text-[#2B543B] neu-inset-sm px-2 py-0.5 rounded text-[11px] font-bold ml-1">
+                          {acc.code || 'STD'}
                         </span>
-                      ) : (
-                        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full neu-raised-sm text-[#275338]">
-                          لنا (مستحق تحصيله لصالحنا)
-                        </span>
-                      )}
-                    </td>
+                        <strong className="text-[#1A2E22]">{acc.name}</strong>
+                      </td>
 
-                    <td className="p-3.5 font-mono text-[#192E21] font-bold">
-                      {acc.monthlyLimit ? formatCurrency(acc.monthlyLimit) : acc.defaultAmount ? formatCurrency(acc.defaultAmount) : 'بدون سقف محدد'}
-                    </td>
+                      <td className="p-3.5 text-slate-700 font-medium">
+                        {acc.vendorName ? (
+                          <div className="space-y-0.5">
+                            <span className="font-bold text-slate-900 block">{acc.vendorName}</span>
+                            {acc.contactPhone && (
+                              <span className="text-[11px] text-emerald-800 font-mono flex items-center gap-1">
+                                <Phone className="w-3 h-3" />
+                                {acc.contactPhone}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
 
-                    <td className="p-3.5 text-[#556F60]">
-                      {acc.notes || '—'}
-                    </td>
+                      <td className="p-3.5 text-[#3D5B4A] font-medium">
+                        {acc.category}
+                      </td>
 
-                    <td className="p-3.5 text-center">
-                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full neu-raised-sm text-[#275338]">
-                        نشط ومفعل
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                      <td className="p-3.5">
+                        {acc.direction === 'payable' || (acc.direction as string) === 'payable_by_us' ? (
+                          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full neu-inset-sm text-[#915B1F]">
+                            علينا (مستحق سداده للطرف الآخر)
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full neu-raised-sm text-[#275338]">
+                            لنا (مستحق تحصيله لصالحنا)
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="p-3.5 font-mono text-[#192E21] font-bold">
+                        {acc.monthlyLimit ? formatCurrency(acc.monthlyLimit) : acc.defaultAmount ? formatCurrency(acc.defaultAmount) : 'بدون سقف محدد'}
+                      </td>
+
+                      <td className="p-3.5 text-[#556F60]">
+                        {acc.notes || '—'}
+                      </td>
+
+                      <td className="p-3.5 text-center">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm(`هل أنت متأكد من حذف الحساب "${acc.name}"؟`)) {
+                              dataStore.deleteStandingAccount(acc.id);
+                            }
+                          }}
+                          className="w-8 h-8 rounded-xl neu-raised text-rose-600 hover:text-rose-800 active:neu-inset inline-flex items-center justify-center transition cursor-pointer"
+                          title="حذف هذا الحساب"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
@@ -797,83 +897,67 @@ export const FundsView: React.FC<FundsViewProps> = ({
         </div>
       )}
 
-      {/* Modal: New Standing Account */}
-      {isStandingModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-[#182B20]/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="neu-raised-lg bg-[#EAF0EC] rounded-3xl w-full max-w-md p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150 border-none">
+      {/* Modal: Direct Spend from Fund ("الضغط على عهدة معينة وإضافة صرف من العهدة ويكتب السبب") */}
+      {directSpendFund && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+          <div className="neu-raised-lg rounded-3xl p-6 sm:p-7 max-w-md w-full space-y-4 animate-in fade-in duration-200 bg-[#E5EBE7]">
             <div className="flex items-center justify-between pb-3 border-b border-[#C8D3CC]/50">
-              <div>
-                <h3 className="font-black text-base text-[#192E21] font-serif-display">
-                  إضافة حساب صرف دائم (Standing Account)
+              <div className="flex items-center gap-2 text-rose-700">
+                <Minus className="w-5 h-5" />
+                <h3 className="text-base font-black text-[#1A2E22] font-serif-display">
+                  تسجيل صرف مباشر من: {directSpendFund.name}
                 </h3>
-                <p className="text-xs text-[#526F5E] mt-0.5">
-                  لبنود الصرف المتكررة والمستمرة (بوفية، مواصلات، بقالة)
-                </p>
               </div>
               <button
-                onClick={() => setIsStandingModalOpen(false)}
-                className="w-8 h-8 rounded-xl neu-button flex items-center justify-center text-[#3D5B4A]"
+                onClick={() => setDirectSpendFund(null)}
+                className="text-[#648071] hover:text-[#192E21] p-1 cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateStandingAccount} className="space-y-4 text-xs sm:text-sm">
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-[#233B2D]">اسم الحساب أو المتجر *</label>
-                <input
-                  type="text"
-                  value={standingName}
-                  onChange={(e) => setStandingName(e.target.value)}
-                  placeholder="مثال: بقالة البركة / كروت مترو دبي / كافتيريا النخيل"
-                  className="w-full px-3.5 py-2.5 text-sm"
-                  required
-                />
-              </div>
+            <div className="p-3 rounded-2xl bg-slate-100 text-xs text-slate-700 flex items-center justify-between">
+              <span>الرصيد المتاح حالياً:</span>
+              <strong className="text-emerald-800 font-extrabold">
+                {directSpendFund.currentBalance} {directSpendFund.currency}
+              </strong>
+            </div>
 
+            <form onSubmit={handleConfirmDirectSpend} className="space-y-4 text-xs">
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-[#233B2D]">التصنيف *</label>
-                <input
-                  type="text"
-                  value={standingCategory}
-                  onChange={(e) => setStandingCategory(e.target.value)}
-                  placeholder="ضيافة وبوفيه / نقل ومواصلات / مواد استهلاكية"
-                  className="w-full px-3.5 py-2.5 text-sm"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-[#233B2D]">الموقف المالي (لنا / علينا)</label>
-                <select
-                  value={standingDirection}
-                  onChange={(e) => setStandingDirection(e.target.value as any)}
-                  className="w-full px-3.5 py-2.5 text-sm"
-                >
-                  <option value="payable_by_us">علينا (مستحق سداده للطرف الآخر)</option>
-                  <option value="receivable_for_us">لنا (مستحق تحصيله لصالحنا)</option>
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-[#233B2D]">الحد الشهري التقديري (AED)</label>
+                <label className="block text-xs font-bold text-[#233B2D]">مبلغ الصرف ({directSpendFund.currency}) *</label>
                 <input
                   type="number"
-                  value={standingMonthlyLimit}
-                  onChange={(e) => setStandingMonthlyLimit(e.target.value)}
-                  placeholder="اختياري (سقف الصرف الشهري)"
-                  className="w-full px-3.5 py-2.5 text-sm font-mono"
+                  step="0.01"
+                  required
+                  placeholder="0.00"
+                  value={directSpendAmount}
+                  onChange={(e) => setDirectSpendAmount(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-sm font-bold text-slate-800"
+                  autoFocus
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-[#233B2D]">ملاحظات وشروط التعامل</label>
+                <label className="block text-xs font-bold text-[#233B2D]">سبب الصرف / بيان المصروف *</label>
+                <textarea
+                  rows={2}
+                  required
+                  value={directSpendReason}
+                  onChange={(e) => setDirectSpendReason(e.target.value)}
+                  placeholder="اكتب سبب الصرف بدقة (مثال: شراء قطع غيار عاجلة، بنزين للموقع، بوفيه للمشرفين)..."
+                  className="w-full px-3.5 py-2.5 text-xs text-slate-800"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-[#233B2D]">اسم المستفيد / المحل / المورد</label>
                 <input
                   type="text"
-                  value={standingNotes}
-                  onChange={(e) => setStandingNotes(e.target.value)}
-                  placeholder="مثال: التسوية شهرياً بموجب دفتر الحسابات"
-                  className="w-full px-3.5 py-2.5 text-sm"
+                  value={directSpendVendor}
+                  onChange={(e) => setDirectSpendVendor(e.target.value)}
+                  placeholder="مثال: بقالة الحي، محطة وقود، شركة المواد..."
+                  className="w-full px-3.5 py-2 text-xs"
                 />
               </div>
 
@@ -882,7 +966,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
                   variant="outline"
                   size="sm"
                   type="button"
-                  onClick={() => setIsStandingModalOpen(false)}
+                  onClick={() => setDirectSpendFund(null)}
                 >
                   إلغاء
                 </Button>
@@ -890,15 +974,21 @@ export const FundsView: React.FC<FundsViewProps> = ({
                   variant="primary"
                   size="sm"
                   type="submit"
-                  icon={<Plus className="w-3.5 h-3.5 ml-1" />}
+                  icon={<Minus className="w-3.5 h-3.5 ml-1" />}
                 >
-                  حفظ الحساب
+                  تأكيد خصم الصرف
                 </Button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* Modal: New Standing Account / Routine Vendor */}
+      <NewStandingAccountModal
+        isOpen={isStandingModalOpen}
+        onClose={() => setIsStandingModalOpen(false)}
+      />
     </div>
   );
 };

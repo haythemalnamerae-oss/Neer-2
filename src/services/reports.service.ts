@@ -106,22 +106,76 @@ export class ReportsService {
     const tasks = dataStore.getTasks();
     const expenses = dataStore.getExpenses();
 
-    return users.map((user) => {
-      const userTasks = tasks.filter((t) => t.assigneeId === user.id);
-      const completedTasks = userTasks.filter((t) => t.status === 'completed' || t.status === 'approved').length;
-      const userExpenses = expenses.filter((e) => e.submittedBy === user.name);
-      const totalSpent = userExpenses.reduce((sum, e) => sum + e.totalWithTax, 0);
-      const completionRate = userTasks.length > 0 ? Math.round((completedTasks / userTasks.length) * 100) : 100;
+    return users
+      .map((user) => {
+        const userTasks = tasks.filter((t) => t.assigneeId === user.id);
+        const completedTasks = userTasks.filter((t) => t.status === 'completed' || t.status === 'approved').length;
+        const inProgressTasks = userTasks.filter((t) => t.status === 'in_progress').length;
+        const userExpenses = expenses.filter((e) => e.submittedBy === user.name);
+        const totalSpent = userExpenses.reduce((sum, e) => sum + e.totalWithTax, 0);
+        const completionRate = userTasks.length > 0 ? Math.round((completedTasks / userTasks.length) * 100) : 100;
+
+        // Calculate actual worked hours from logged start and end times
+        let actualWorkMinutes = 0;
+        let onTimeCount = 0;
+
+        userTasks.forEach((t) => {
+          if (t.actualStartTime) {
+            const start = new Date(t.actualStartTime).getTime();
+            const end = t.actualEndTime ? new Date(t.actualEndTime).getTime() : Date.now();
+            if (!isNaN(start) && !isNaN(end) && end > start) {
+              actualWorkMinutes += Math.min(24 * 60, Math.round((end - start) / 60000));
+            }
+          }
+          if ((t.status === 'completed' || t.status === 'approved') && t.actualEndTime && t.dueDate) {
+            const endDay = t.actualEndTime.split('T')[0];
+            if (endDay <= t.dueDate) {
+              onTimeCount++;
+            }
+          }
+        });
+
+        const actualWorkHours = Number((actualWorkMinutes / 60).toFixed(1));
+        const onTimeRate = completedTasks > 0 ? Math.round((onTimeCount / completedTasks) * 100) : 100;
+
+        return {
+          userId: user.id,
+          name: user.name,
+          avatar: user.avatar,
+          department: user.department,
+          assignedTasks: userTasks.length,
+          completedTasks,
+          inProgressTasks,
+          completionRate,
+          actualWorkHours,
+          onTimeRate,
+          totalSpent,
+        };
+      })
+      .sort((a, b) => b.completedTasks - a.completedTasks || b.actualWorkHours - a.actualWorkHours);
+  }
+
+  public static getCustodyTrackingReport() {
+    const funds = dataStore.getFunds();
+    const expenses = dataStore.getExpenses();
+    const receipts = dataStore.getCashReceipts();
+
+    return funds.map((f) => {
+      const fundExpenses = expenses.filter((e) => e.fundId === f.id);
+      const fundReceipts = receipts.filter((r) => r.fundId === f.id);
+      const cascadeExpenses = expenses.filter((e) => e.cascadeSplit?.secondaryFundId === f.id);
+      const openDeficitExpenses = fundExpenses.filter((e) => e.isDeficit && !e.isCoveredFromCash);
 
       return {
-        userId: user.id,
-        name: user.name,
-        avatar: user.avatar,
-        department: user.department,
-        assignedTasks: userTasks.length,
-        completedTasks,
-        completionRate,
-        totalSpent,
+        fund: f,
+        expensesCount: fundExpenses.length,
+        totalExpenses: fundExpenses.reduce((sum, e) => sum + e.totalWithTax, 0),
+        receiptsCount: fundReceipts.length,
+        totalReceipts: fundReceipts.reduce((sum, r) => sum + r.amount, 0),
+        fundExpenses,
+        fundReceipts,
+        cascadeExpenses,
+        openDeficitExpenses,
       };
     });
   }

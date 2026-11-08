@@ -22,6 +22,10 @@ import {
   Send,
   Building,
   Check,
+  UploadCloud,
+  FileText,
+  Image,
+  Trash2,
 } from 'lucide-react';
 import { Task, TaskStatus, TaskStepStatus } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
@@ -48,16 +52,25 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
 }) => {
   if (!isOpen || !task) return null;
 
-  const [activeTab, setActiveTab] = useState<'details' | 'steps' | 'subtasks' | 'daily_updates' | 'checklist' | 'history'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'steps' | 'subtasks' | 'daily_updates' | 'checklist' | 'attachments' | 'history'>('details');
   const [isPausePromptOpen, setIsPausePromptOpen] = useState(false);
   const [pauseReasonInput, setPauseReasonInput] = useState('');
   const [dailyNoteInput, setDailyNoteInput] = useState('');
   const [newSubTaskTitle, setNewSubTaskTitle] = useState('');
   const [newSubTaskAssignee, setNewSubTaskAssignee] = useState('');
   const [stepNoteInputs, setStepNoteInputs] = useState<Record<string, string>>({});
+  const [deferringStepId, setDeferringStepId] = useState<string | null>(null);
+  const [deferredDateInput, setDeferredDateInput] = useState('');
+  const [isLocating, setIsLocating] = useState(false);
+
+  // Attachment states
+  const [attachmentDocType, setAttachmentDocType] = useState('فاتورة شراء');
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
 
   const currentUser = dataStore.getCurrentUser();
   const users = dataStore.getUsers();
+  const allExpenses = dataStore.getExpenses();
+  const taskExpenses = allExpenses.filter((e) => e.taskId === task.id);
 
   const statusCfg = TASK_STATUS_CONFIG[task.status] || { label: task.status, badgeColor: 'neu-inset-sm text-slate-700' };
   const priorityCfg = TASK_PRIORITY_CONFIG[task.priority] || { label: task.priority, badgeColor: 'neu-raised text-slate-700' };
@@ -73,7 +86,26 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   const catCfg = categoryLabels[task.taskTypeCategory || 'field'] || categoryLabels.field;
 
   const handleStartTask = () => {
-    dataStore.startTask(task.id);
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      setIsLocating(true);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setIsLocating(false);
+          dataStore.startTask(task.id, {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+          });
+        },
+        (err) => {
+          setIsLocating(false);
+          console.warn('Geolocation not acquired:', err);
+          dataStore.startTask(task.id);
+        },
+        { timeout: 6000, enableHighAccuracy: true }
+      );
+    } else {
+      dataStore.startTask(task.id);
+    }
   };
 
   const handleConfirmPause = () => {
@@ -100,6 +132,17 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   const handleStepStatusChange = (stepId: string, status: TaskStepStatus) => {
     const note = stepNoteInputs[stepId];
     dataStore.updateTaskStepStatus(task.id, stepId, status, note);
+  };
+
+  const handleConfirmDeferStep = (stepId: string) => {
+    if (!deferredDateInput) {
+      alert('يرجى تحديد تاريخ الخطوة القادمة');
+      return;
+    }
+    const note = stepNoteInputs[stepId] || 'تم تأجيل الخطوة للموعد المحدد';
+    dataStore.updateTaskStepStatus(task.id, stepId, 'deferred', note, deferredDateInput);
+    setDeferringStepId(null);
+    setDeferredDateInput('');
   };
 
   const handleAddSubTask = (e: React.FormEvent) => {
@@ -186,6 +229,17 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                       موقع إجباري
                     </span>
                   )}
+                  {task.geoCoordinates && (
+                    <a
+                      href={task.mapsUrl || `https://www.google.com/maps?q=${task.geoCoordinates.lat},${task.geoCoordinates.lng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] neu-raised text-emerald-800 hover:text-emerald-950 px-2 py-0.5 rounded-md font-extrabold flex items-center gap-1"
+                      title="عرض موقع التنفيذ الميداني على خرائط جوجل"
+                    >
+                      <span>📍 موقع GPS موثق</span>
+                    </a>
+                  )}
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Calendar className="w-4 h-4 text-slate-500" />
@@ -207,9 +261,10 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                   variant="primary"
                   size="sm"
                   onClick={handleStartTask}
+                  disabled={isLocating}
                   icon={<Play className="w-4 h-4 ml-1" />}
                 >
-                  بدء المهمة
+                  {isLocating ? 'جارٍ تحديد الموقع...' : 'بدء المهمة'}
                 </Button>
               )}
 
@@ -373,6 +428,16 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveTab('attachments')}
+            className={`py-2 px-3.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'attachments' ? 'neu-raised text-emerald-800 font-black' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <UploadCloud className="w-4 h-4" />
+            <span>المستندات والفواتير ({task.attachments ? task.attachments.length : 0})</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('history')}
             className={`py-2 px-3.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'history' ? 'neu-raised text-emerald-800 font-black' : 'text-slate-600 hover:text-slate-900'
@@ -443,6 +508,66 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                   <DollarSign className="w-4 h-4 text-emerald-700" />
                   <span>ربط مصروف / فاتورة</span>
                 </button>
+              </div>
+
+              {/* Linked Expenses Breakdown with Deficit Reconciliation */}
+              <div className="space-y-3 pt-2">
+                <h4 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">
+                  المصروفات والفواتير المرتبطة بالمهمة ({taskExpenses.length})
+                </h4>
+
+                {taskExpenses.length > 0 ? (
+                  <div className="space-y-2">
+                    {taskExpenses.map((exp) => (
+                      <div key={exp.id} className="p-3.5 neu-raised rounded-2xl flex items-center justify-between flex-wrap gap-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-extrabold text-xs sm:text-sm text-slate-800">{exp.description}</span>
+                            <span className="text-[11px] neu-inset-sm px-2 py-0.5 rounded-md text-slate-600 font-mono">
+                              فاتورة #{exp.invoiceNumber}
+                            </span>
+                            {exp.isDeficit && !exp.isCoveredFromCash && (
+                              <span className="text-[10px] bg-rose-100 text-rose-800 border border-rose-300 px-2 py-0.5 rounded-md font-black animate-pulse">
+                                عجز سالب: {formatCurrency(exp.deficitAmount || 0)}
+                              </span>
+                            )}
+                            {exp.isDeficit && exp.isCoveredFromCash && (
+                              <span className="text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-md font-bold">
+                                تمت التغطية من الصندوق
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-slate-500 flex items-center gap-3 flex-wrap">
+                            <span>العهدة: {exp.fundName}</span>
+                            <span>المورد: {exp.vendorName}</span>
+                            <span>التاريخ: {exp.submittedAt}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono font-black text-sm text-slate-800 dir-ltr">
+                            {formatCurrency(exp.totalWithTax)}
+                          </span>
+                          {exp.isDeficit && !exp.isCoveredFromCash && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                dataStore.coverDeficitExpenseFromCash(exp.id, currentUser.name);
+                              }}
+                              className="neu-raised px-3 py-1.5 rounded-xl text-xs font-black text-emerald-800 hover:text-emerald-950 active:neu-inset transition-all cursor-pointer"
+                            >
+                              تغطية المبلغ من الصندوق
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="neu-inset-sm p-4 rounded-2xl text-center text-xs text-slate-500">
+                    لم يتم تسجيل مصروفات أو فواتير لهذه المهمة بعد.
+                  </div>
+                )}
               </div>
 
               {/* Tags */}
@@ -527,14 +652,66 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                             >
                               <AlertTriangle className="w-4 h-4" />
                             </button>
+                            <button
+                              onClick={() => {
+                                setDeferringStepId(step.id);
+                                setDeferredDateInput(step.nextStepDate || new Date(Date.now() + 86400000).toISOString().split('T')[0]);
+                              }}
+                              className={`w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-all ${
+                                step.status === 'deferred'
+                                  ? 'neu-inset text-amber-700'
+                                  : 'neu-raised text-slate-600 hover:text-amber-700'
+                              }`}
+                              title="أُجلت (تحديد موعد الخطوة القادمة)"
+                            >
+                              <Clock className="w-4 h-4" />
+                            </button>
                           </div>
                         </div>
 
+                        {/* Inline Deferral Date Picker if active */}
+                        {deferringStepId === step.id && (
+                          <div className="p-3 neu-inset-sm rounded-2xl space-y-2 mt-2 bg-amber-50/50">
+                            <span className="text-xs font-bold text-amber-900 block">
+                              تأجيل المرحلة وتحديد موعد الخطوة القادمة:
+                            </span>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <input
+                                type="date"
+                                value={deferredDateInput}
+                                onChange={(e) => setDeferredDateInput(e.target.value)}
+                                className="neu-inset px-3 py-1.5 rounded-xl text-xs text-slate-800 font-mono"
+                              />
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={() => handleConfirmDeferStep(step.id)}
+                              >
+                                تأكيد التأجيل
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setDeferringStepId(null)}
+                              >
+                                إلغاء
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
                         {/* Step Details & Notes */}
-                        <div className="flex items-center justify-between text-xs text-slate-600 pt-2 border-t border-black/[0.04]">
-                          <span>
-                            {step.completedAt ? `تاريخ الإنجاز: ${step.completedAt}` : 'لم تكتمل بعد'}
-                          </span>
+                        <div className="flex items-center justify-between text-xs text-slate-600 pt-2 border-t border-black/[0.04] flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            <span>
+                              {step.completedAt ? `تاريخ الإنجاز: ${step.completedAt}` : 'لم تكتمل بعد'}
+                            </span>
+                            {step.nextStepDate && (
+                              <span className="text-amber-800 neu-raised px-2.5 py-0.5 rounded-lg font-bold">
+                                📅 موعد الخطوة القادمة: {step.nextStepDate}
+                              </span>
+                            )}
+                          </div>
                           {step.notes && (
                             <span className="text-slate-800 neu-inset-sm px-3 py-1 rounded-xl font-medium">
                               ملاحظات: {step.notes}
@@ -719,7 +896,122 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
             </div>
           )}
 
-          {/* TAB 6: History */}
+          {/* TAB 6: Attachments & Documents */}
+          {activeTab === 'attachments' && (
+            <div className="space-y-5">
+              <div className="p-4 sm:p-5 rounded-2xl neu-inset-sm space-y-3.5">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <UploadCloud className="w-5 h-5 text-emerald-800" />
+                    <h4 className="text-xs sm:text-sm font-extrabold text-slate-800">
+                      رفع مستند للمهمة (فاتورة شراء، إشعار بنكي، محضر تسليم)
+                    </h4>
+                  </div>
+                  <select
+                    value={attachmentDocType}
+                    onChange={(e) => setAttachmentDocType(e.target.value)}
+                    className="neu-inset px-3 py-1.5 rounded-xl text-xs text-slate-700 font-semibold"
+                  >
+                    <option value="فاتورة شراء">فاتورة شراء</option>
+                    <option value="إشعار بنكي">إشعار بنكي / إيداع</option>
+                    <option value="محضر استلام وتسليم">محضر استلام وتسليم</option>
+                    <option value="تقرير فحص ومعاينة">تقرير فحص ومعاينة</option>
+                    <option value="مستند آخر">مستند آخر</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <label className="flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-dashed border-emerald-800/30 hover:border-emerald-800/60 bg-white/60 transition cursor-pointer text-xs font-bold text-emerald-900">
+                    <UploadCloud className="w-4 h-4 text-emerald-700" />
+                    <span>اختر ملف من جهازك (صورة، فاتورة، PDF)...</span>
+                    <input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            const dataUrl = reader.result as string;
+                            const sizeKb = `${Math.round(file.size / 1024)} KB`;
+                            dataStore.addTaskAttachment(task.id, {
+                              name: `${attachmentDocType} - ${file.name}`,
+                              url: dataUrl,
+                              size: sizeKb,
+                              type: file.type.startsWith('image/') ? 'image' : 'pdf',
+                            });
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Attachments List */}
+              <div className="space-y-3">
+                <h5 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">
+                  المستندات المرفقة بهذه المهمة ({task.attachments ? task.attachments.length : 0}):
+                </h5>
+
+                {task.attachments && task.attachments.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    {task.attachments.map((att) => (
+                      <div
+                        key={att.id}
+                        className="p-3.5 rounded-2xl neu-raised flex items-start gap-3 bg-white"
+                      >
+                        {att.type === 'image' && att.url.startsWith('data:') ? (
+                          <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-200">
+                            <img src={att.url} alt={att.name} className="w-full h-full object-cover" />
+                          </div>
+                        ) : (
+                          <div className="w-11 h-11 rounded-xl neu-inset-sm text-emerald-800 flex items-center justify-center shrink-0">
+                            <FileText className="w-5 h-5" />
+                          </div>
+                        )}
+
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <strong className="text-xs font-bold text-slate-800 block truncate">
+                            {att.name}
+                          </strong>
+                          <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                            <span>{att.size}</span>
+                            <span>•</span>
+                            <span>بواسطة: {att.uploadedBy}</span>
+                          </div>
+                          <div className="flex items-center gap-2 pt-1">
+                            <a
+                              href={att.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[11px] font-bold text-emerald-800 hover:underline"
+                            >
+                              معاينة / تحميل
+                            </a>
+                            <button
+                              onClick={() => dataStore.deleteTaskAttachment(task.id, att.id)}
+                              className="text-[11px] font-bold text-rose-600 hover:text-rose-800 cursor-pointer mr-auto"
+                            >
+                              حذف
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-xs text-slate-400">
+                    لم يتم إرفاق أي مستندات أو فواتير بعد. يمكنك رفع صورة الفاتورة أو إشعار البنك من المربع أعلاه.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 7: History */}
           {activeTab === 'history' && (
             <div className="space-y-3">
               <div className="border-r-2 border-emerald-800/20 pr-4 mr-2 space-y-4">
