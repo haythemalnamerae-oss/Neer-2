@@ -78,6 +78,8 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
   const [selectedStandingAccId, setSelectedStandingAccId] = useState('');
   const [coverageMethod, setCoverageMethod] = useState<'normal' | 'cascade' | 'deficit'>('normal');
   const [secondaryFundId, setSecondaryFundId] = useState('');
+  const selectedStandingAccount = standingAccounts.find((account) => account.id === selectedStandingAccId);
+  const isSupplierCredit = Boolean(selectedStandingAccount && (selectedStandingAccount.direction === 'payable' || selectedStandingAccount.direction === 'payable_by_us'));
 
   // Sync when initial values change
   useEffect(() => {
@@ -103,7 +105,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
   const selectedFund = funds.find((f) => f.id === fundId);
   const exceedsLimit = totalWithTax > settings.singleExpenseLimit;
   const availableBal = selectedFund ? selectedFund.currentBalance : 0;
-  const exceedsBalance = totalWithTax > availableBal;
+  const exceedsBalance = !isSupplierCredit && totalWithTax > availableBal;
   const shortageAmount = Number((totalWithTax - availableBal).toFixed(2));
 
   // Available secondary funds for cascade deduction
@@ -143,12 +145,15 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
       return;
     }
 
-    if (exceedsBalance && coverageMethod === 'normal') {
+    const selectedAccount = standingAccounts.find((account) => account.id === selectedStandingAccId);
+    const supplierCredit = Boolean(selectedAccount && (selectedAccount.direction === 'payable' || selectedAccount.direction === 'payable_by_us'));
+
+    if (exceedsBalance && coverageMethod === 'normal' && !supplierCredit) {
       alert('المبلغ المطلوب يتجاوز الرصيد الحالي المتوفر في هذه العهدة! يرجى اختيار إما "السحب المتسلسل من عهدتين" أو "تسجيل عجز سالب مؤقت".');
       return;
     }
 
-    if (coverageMethod === 'cascade' && (!secondaryFundId || !secondaryCanCover)) {
+    if (!supplierCredit && coverageMethod === 'cascade' && (!secondaryFundId || !secondaryCanCover)) {
       alert('حدد عهدة بديلة برصيد كافٍ لتغطية الفرق.');
       return;
     }
@@ -170,9 +175,9 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
         expenseDate: new Date().toISOString().split('T')[0],
         taskId: taskId || undefined,
         taskTitle: task?.title,
-        cascadeDeduction: coverageMethod === 'cascade',
-        secondaryFundId: coverageMethod === 'cascade' ? secondaryFundId : undefined,
-        allowDeficit: coverageMethod === 'deficit' && canApproveExpense,
+        cascadeDeduction: !supplierCredit && coverageMethod === 'cascade',
+        secondaryFundId: !supplierCredit && coverageMethod === 'cascade' ? secondaryFundId : undefined,
+        allowDeficit: !supplierCredit && coverageMethod === 'deficit' && canApproveExpense,
         standingAccountId: standingAcc?.id,
         standingAccountName: standingAcc?.name,
         standingDirection: standingAcc?.direction,
@@ -206,7 +211,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
           <div className="flex items-center justify-between text-xs flex-wrap gap-2">
             <span className="font-extrabold text-slate-800 flex items-center gap-1.5">
               <Tag className="w-4 h-4 text-emerald-700" />
-              <span>حسابات المصروفات الاعتيادية والموردين المعتادين (بقالة، بوفيه، وقود):</span>
+              <span>حسابات الموردين والمتاجر المعتادة (بقالة، بوفيه، وقود):</span>
             </span>
             <div className="flex items-center gap-2">
               {hasPermission(currentUser.role, 'funds', 'edit') && <button
@@ -229,8 +234,8 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
             </div>
           </div>
 
-          {hasPermission(currentUser.role, 'funds', 'edit') && <div className="flex flex-wrap gap-2 pt-1">
-            {standingAccounts.map((acc) => (
+          <div className="flex flex-wrap gap-2 pt-1">
+            {standingAccounts.filter((acc) => acc.active !== false && (acc.direction === 'payable' || acc.direction === 'payable_by_us') && (acc.currency || settings.currency) === settings.currency).map((acc) => (
               <button
                 key={acc.id}
                 type="button"
@@ -242,17 +247,17 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
                 }`}
               >
                 <span>{acc.name}</span>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-extrabold ${acc.direction === 'receivable' ? 'bg-emerald-100 text-emerald-800' : 'bg-black/5 text-slate-600'}`}>
-                  {acc.direction === 'receivable' ? 'لنا' : 'علينا'}
-                </span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-md font-extrabold bg-amber-50 text-amber-800">آجل</span>
+                <span className="text-[10px] font-mono text-slate-500">{formatCurrency(acc.currentBalance || 0, acc.currency || settings.currency)}</span>
               </button>
             ))}
-          </div>}
+          </div>
+          {isSupplierCredit && <p className="text-[11px] text-emerald-800 font-semibold">سيُسجل هذا الشراء كالتزام على حساب المورد بعد الاعتماد، ولن يُخصم من رصيد العهدة إلا عند تسجيل السداد من كشف الحساب.</p>}
         </div>
 
         {/* Fund Selection via SmartSelect */}
         <SmartSelect
-          label="العهدة النقدية المصروف منها *"
+          label={isSupplierCredit ? 'العهدة المرجعية التي ستتم التسوية منها لاحقاً *' : 'العهدة النقدية المصروف منها *'}
           placeholder="اختر العهدة النقدية..."
           options={funds.map((f) => ({
             value: f.id,
@@ -311,7 +316,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
           )}
 
           {/* Blueprint: Cascade Deduction & Deficit Options when balance is insufficient */}
-          {exceedsBalance && (
+          {exceedsBalance && !isSupplierCredit && (
             <div className="p-4 neu-inset-sm rounded-2xl space-y-3.5 text-xs sm:text-sm">
               <div className="flex items-start gap-2.5 text-rose-900">
                 <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-rose-600" />
