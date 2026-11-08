@@ -23,7 +23,9 @@ export const StandingAccountDetailsModal: React.FC<StandingAccountDetailsModalPr
 
   const current = dataStore.getStandingAccounts().find((item) => item.id === account.id) || account;
   const entries = current.entries || [];
-  const balance = current.currentBalance ?? current.openingBalance ?? 0;
+  const entryDelta = entries.reduce((sum, entry) => sum + (entry.type === 'charge' ? entry.amount : -entry.amount), 0);
+  const openingBalance = current.openingBalance ?? Number(((current.currentBalance ?? 0) - entryDelta).toFixed(2));
+  const balance = current.currentBalance ?? openingBalance + entryDelta;
   const currency = current.currency || dataStore.getSettings().currency;
   const isPayable = current.direction === 'payable' || current.direction === 'payable_by_us';
   const funds = dataStore.getFunds().filter((fund) => fund.currency === currency);
@@ -61,7 +63,7 @@ export const StandingAccountDetailsModal: React.FC<StandingAccountDetailsModalPr
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="neu-inset-sm rounded-2xl p-3">
             <span className="text-xs text-slate-500 block">الرصيد الافتتاحي</span>
-            <strong className="font-mono text-lg">{formatCurrency(current.openingBalance ?? 0, currency)}</strong>
+            <strong className="font-mono text-lg">{formatCurrency(openingBalance, currency)}</strong>
           </div>
           <div className="neu-inset-sm rounded-2xl p-3">
             <span className="text-xs text-slate-500 block">{isPayable ? 'المبلغ المستحق علينا' : 'المبلغ المستحق لنا'}</span>
@@ -124,7 +126,7 @@ export const StandingAccountDetailsModal: React.FC<StandingAccountDetailsModalPr
                 <thead><tr className="border-b text-slate-500"><th className="p-2">التاريخ</th><th className="p-2">البيان</th><th className="p-2">المرجع</th><th className="p-2">إضافة</th><th className="p-2">تسوية</th><th className="p-2">الرصيد</th></tr></thead>
                 <tbody>
                   {(() => {
-                    let runningBalance = current.openingBalance ?? current.currentBalance ?? 0;
+                    let runningBalance = openingBalance;
                     const chronologicalRows = entries.slice().reverse().map((entry) => {
                       runningBalance += entry.type === 'charge' ? entry.amount : -entry.amount;
                       return { entry, balance: runningBalance };
