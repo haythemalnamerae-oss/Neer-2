@@ -37,8 +37,9 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
     ? allExpenses.filter((expense) => expense.submittedBy === currentUser.name || funds.some((fund) => fund.id === expense.fundId && fund.holderId === currentUser.id))
     : allExpenses;
 
-  const totalAmount = expenses.reduce((s, e) => s + e.totalWithTax, 0);
-  const totalTax = expenses.reduce((s, e) => s + e.taxAmount, 0);
+  const activeFinancialExpenses = expenses.filter((expense) => expense.status !== 'rejected');
+  const totalAmount = activeFinancialExpenses.reduce((sum, expense) => sum + expense.totalWithTax, 0);
+  const totalTax = activeFinancialExpenses.reduce((sum, expense) => sum + expense.taxAmount, 0);
 
   const filteredExpenses = expenses.filter((e) => {
     if (categoryFilter !== 'all' && e.category !== categoryFilter) return false;
