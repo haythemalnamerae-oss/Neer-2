@@ -36,7 +36,7 @@ interface FieldMapViewProps {
 }
 
 // Coordinates are displayed only when recorded on the task or captured from the device.
-const DEFAULT_CENTER = { lat: 15.3694, lng: 44.1910 }; // Sana'a map viewport only
+const DEFAULT_CENTER = { lat: 0, lng: 0 }; // Used only as an inert map fallback when no real location exists.
 
 export const FieldMapView: React.FC<FieldMapViewProps> = ({
   onSelectTask,
@@ -294,7 +294,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
         <div className="lg:col-span-8 space-y-4">
           <div className="inner-white-card p-3 overflow-hidden rounded-[26px]">
             <div className="relative w-full h-[540px] rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 shadow-inner">
-              {apiKey ? (
+              {apiKey && (filteredTasks.length > 0 || userLiveCoords) ? (
                 <APIProvider apiKey={apiKey} libraries={['marker']} reuseMaps>
                   <Map
                     mapId="DEMO_MAP_ID"
@@ -450,7 +450,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
                     </div>
 
                     <span className="text-slate-400 text-[10px]">
-                      انقر على أي موقع لمشاهدة التفاصيل الميدانية وأزرار التحكم
+                      هذه قائمة مهام ذات إحداثيات حقيقية وليست خريطة GPS مباشرة
                     </span>
                   </div>
                 </div>
@@ -688,7 +688,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
                 <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">
                   أحدث المهام الميدانية:
                 </span>
-                {tasks.slice(0, 4).map((t) => (
+                {visibleTasks.slice(0, 4).map((t) => (
                   <div
                     key={t.id}
                     onClick={() => setSelectedTask(t)}
