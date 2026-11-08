@@ -106,6 +106,14 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
 
   const selectedFund = funds.find((f) => f.id === fundId);
   const exceedsLimit = totalWithTax > settings.singleExpenseLimit;
+  const currentExpenseMonth = new Date().toISOString().slice(0, 7);
+  const selectedAccountMonthTotal = selectedStandingAccount ? (
+    expenses.filter((expense) => expense.standingAccountId === selectedStandingAccount.id && expense.status !== 'rejected' && (expense.expenseDate || '').startsWith(currentExpenseMonth))
+      .reduce((sum, expense) => sum + expense.totalWithTax, 0) +
+    (selectedStandingAccount.entries || []).filter((entry) => entry.type === 'charge' && !entry.expenseId && entry.date.startsWith(currentExpenseMonth))
+      .reduce((sum, entry) => sum + entry.amount, 0)
+  ) : 0;
+  const exceedsStandingMonthlyLimit = Boolean(selectedStandingAccount?.monthlyLimit && selectedAccountMonthTotal + totalWithTax > selectedStandingAccount.monthlyLimit);
   const availableBal = selectedFund ? selectedFund.currentBalance : 0;
   const exceedsBalance = !isSupplierCredit && totalWithTax > availableBal;
   const shortageAmount = Number((totalWithTax - availableBal).toFixed(2));
@@ -321,6 +329,12 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
             <div className="flex items-center gap-2 text-xs text-amber-800 neu-inset-sm p-3 rounded-2xl">
               <AlertTriangle className="w-4.5 h-4.5 shrink-0 text-amber-700" />
               <span>المصروف يتجاوز سقف الصرف الفردي المسموح به ({formatCurrency(settings.singleExpenseLimit, settings.currency)}). سيتطلب تدقيقاً خاصاً.</span>
+            </div>
+          )}
+          {exceedsStandingMonthlyLimit && selectedStandingAccount?.monthlyLimit && (
+            <div className="flex items-center gap-2 text-xs text-amber-800 neu-inset-sm p-3 rounded-2xl">
+              <AlertTriangle className="w-4.5 h-4.5 shrink-0 text-amber-700" />
+              <span>هذا الشراء سيتجاوز الحد الشهري لحساب {selectedStandingAccount.name} ({formatCurrency(selectedStandingAccount.monthlyLimit, settings.currency)}). سيتطلب ملاحظة تدقيق عند الاعتماد.</span>
             </div>
           )}
 
