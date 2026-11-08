@@ -4,7 +4,7 @@
  */
 
 import { Task, PettyCashFund, Expense, Settlement, CashReceipt, StandingAccount, AuditLog } from '../../types/domain';
-import { dataStore } from '../storage';
+import { dataStore, STORAGE_KEYS } from '../storage';
 
 export interface SyncPayload {
   version: number;
@@ -310,12 +310,12 @@ export class PeerSyncEngine {
     const mergedTasksList = Array.from(taskMap.values());
     
     // Direct store hydration through safe storage
-    localStorage.setItem('ops_platform_tasks', JSON.stringify(mergedTasksList));
-    localStorage.setItem('ops_platform_expenses', JSON.stringify(mergedExpensesList));
-    localStorage.setItem('ops_platform_funds', JSON.stringify(updatedFunds));
-    localStorage.setItem('ops_platform_cash_receipts', JSON.stringify(mergedReceiptsList));
-    localStorage.setItem('ops_platform_standing_accounts', JSON.stringify(Array.from(standingMap.values())));
-    localStorage.setItem('ops_platform_settlements', JSON.stringify(Array.from(settlementMap.values())));
+    localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(mergedTasksList));
+    localStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(mergedExpensesList));
+    localStorage.setItem(STORAGE_KEYS.FUNDS, JSON.stringify(updatedFunds));
+    localStorage.setItem(STORAGE_KEYS.CASH_RECEIPTS, JSON.stringify(mergedReceiptsList));
+    localStorage.setItem(STORAGE_KEYS.STANDING_ACCOUNTS, JSON.stringify(Array.from(standingMap.values())));
+    localStorage.setItem(STORAGE_KEYS.SETTLEMENTS, JSON.stringify(Array.from(settlementMap.values())));
 
     // Record audit log for local sync
     dataStore.logAudit(
