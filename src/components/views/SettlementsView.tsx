@@ -39,6 +39,16 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
     }, 200);
   };
 
+  const handleReject = (id: string) => {
+    const reason = window.prompt('سبب رفض التسوية وإعادة فواتيرها إلى قائمة التسوية:', 'توجد ملاحظات تحتاج إلى تصحيح');
+    if (!reason?.trim()) return;
+    try {
+      SettlementsService.reject(id, reason.trim());
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'تعذر رفض التسوية.');
+    }
+  };
+
   const handleApprove = (id: string) => {
     const notes = window.prompt('ملاحظات التدقيق والمطابقة:', `تمت مراجعة الفواتير والتحقق من الضريبة ${settings.taxRate}%`);
     try {
@@ -85,10 +95,10 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
                 {st.code}
               </span>
               <Badge
-                variant={st.status === 'approved' || st.status === 'closed' ? 'success' : 'warning'}
+                variant={st.status === 'approved' || st.status === 'closed' ? 'success' : st.status === 'rejected' ? 'danger' : 'warning'}
                 size="md"
               >
-                {st.status === 'approved' || st.status === 'closed' ? 'معتمدة ومقفلة' : st.status === 'audited' ? 'مدققة بانتظار الاعتماد' : 'قيد المراجعة التدقيقية'}
+                {st.status === 'approved' || st.status === 'closed' ? 'معتمدة ومقفلة' : st.status === 'rejected' ? 'مرفوضة — الفواتير متاحة لإعادة التسوية' : st.status === 'audited' ? 'مدققة بانتظار الاعتماد' : 'قيد المراجعة التدقيقية'}
               </Badge>
             </div>
 
@@ -144,7 +154,7 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
                 </Button>
               </div>
 
-              {canApproveSettlement && st.status !== 'approved' && st.status !== 'closed' && (
+              {canApproveSettlement && ['under_review', 'audited'].includes(st.status) && (
                 <Button
                   variant="success"
                   size="sm"
@@ -153,6 +163,16 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
                   className="text-xs sm:text-sm font-bold min-h-[40px]"
                 >
                   اعتماد التسوية
+                </Button>
+                <Button
+                  variant="outline"
+                  color="danger"
+                  size="sm"
+                  onClick={() => handleReject(st.id)}
+                  icon={<X className="w-4 h-4" />}
+                  className="text-xs sm:text-sm font-bold min-h-[40px]"
+                >
+                  رفض وإعادة الفواتير
                 </Button>
               )}
             </div>
