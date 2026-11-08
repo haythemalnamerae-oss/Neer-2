@@ -275,6 +275,8 @@ export interface StandingAccount {
   category: string;
   vendorName?: string; // اسم المورد المعتاد أو صاحب المحل
   contactPhone?: string; // رقم هاتف التواصل المباشر
+  imageUrl?: string; // صورة تعريف المنشأة أو شعارها
+  referenceImageUrl?: string; // صورة فاتورة أو سند أو طلبية مرجعية
   accountType?: 'grocery' | 'vendor' | 'transport' | 'hospitality' | 'utility' | 'maintenance' | 'other';
   direction: 'receivable' | 'payable' | 'receivable_for_us' | 'payable_by_us'; // "لنا" / "علينا"
   monthlyLimit?: number;

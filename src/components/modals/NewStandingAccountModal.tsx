@@ -26,6 +26,14 @@ export const NewStandingAccountModal: React.FC<NewStandingAccountModalProps> = (
   const [defaultAmount, setDefaultAmount] = useState('');
   const [monthlyLimit, setMonthlyLimit] = useState('');
   const [notes, setNotes] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [referenceImageUrl, setReferenceImageUrl] = useState('');
+
+  const readImage = (file: File, setter: (value: string) => void) => {
+    const reader = new FileReader();
+    reader.onload = () => setter(typeof reader.result === 'string' ? reader.result : '');
+    reader.readAsDataURL(file);
+  };
 
   const categoryOptions = [
     { value: 'materials', label: 'بقالة ومستلزمات استهلاكية', icon: '🛒' },
@@ -53,6 +61,8 @@ export const NewStandingAccountModal: React.FC<NewStandingAccountModalProps> = (
       defaultAmount: defaultAmount ? parseFloat(defaultAmount) : undefined,
       monthlyLimit: monthlyLimit ? parseFloat(monthlyLimit) : undefined,
       notes: notes.trim() || undefined,
+      imageUrl: imageUrl || undefined,
+      referenceImageUrl: referenceImageUrl || undefined,
       active: true,
     });
 
@@ -172,6 +182,18 @@ export const NewStandingAccountModal: React.FC<NewStandingAccountModalProps> = (
             value={monthlyLimit}
             onChange={(e) => setMonthlyLimit(e.target.value)}
           />
+        </div>
+
+        {/* Account and reference documents */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <label className="space-y-1.5 block">
+            <span className="block text-xs font-bold text-slate-700">صورة تعريف المنشأة أو الشعار</span>
+            <input type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && readImage(e.target.files[0], setImageUrl)} className="w-full text-xs" />
+          </label>
+          <label className="space-y-1.5 block">
+            <span className="block text-xs font-bold text-slate-700">صورة فاتورة أو سند أو طلبية مرجعية</span>
+            <input type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && readImage(e.target.files[0], setReferenceImageUrl)} className="w-full text-xs" />
+          </label>
         </div>
 
         {/* Notes */}

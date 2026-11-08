@@ -24,6 +24,8 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
   const [taskType, setTaskType] = useState('صيانة ميدانية');
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
+  const standingAccounts = dataStore.getStandingAccounts();
+  const [standingAccountId, setStandingAccountId] = useState('');
   const [priority, setPriority] = useState<TaskPriority>('medium');
   const [assigneeIds, setAssigneeIds] = useState<string[]>([users[0]?.id || '']);
   const [supervisorIds, setSupervisorIds] = useState<string[]>([]);
@@ -171,6 +173,8 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
       taskType,
       clientName: clientName || undefined,
       clientPhone: clientPhone || undefined,
+      standingAccountId: standingAccountId || undefined,
+      standingAccountName: standingAccounts.find((account) => account.id === standingAccountId)?.name,
       dueTime: dueTime || undefined,
       proofRequired: proofRequired || undefined,
       assigneeId: assignedUser.id,
@@ -221,6 +225,7 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
     setLocation('');
     setClientName('');
     setClientPhone('');
+    setStandingAccountId('');
     setProofRequired('');
     setTaskFundAmount('');
     setSecondaryFundId('');
@@ -300,6 +305,17 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
             placeholder="مثال: 0501234567"
             value={clientPhone}
             onChange={(e) => setClientPhone(e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <SmartSelect
+            label="المنشأة أو المورد المعتاد المرتبط بالمهمة"
+            placeholder="ابحث باسم المنشأة أو المورد..."
+            options={[{ value: '', label: 'بدون منشأة ثابتة' }, ...standingAccounts.map((account) => ({ value: account.id, label: account.name, sublabel: account.vendorName || account.category }))]}
+            value={standingAccountId}
+            onChange={(value) => setStandingAccountId(value)}
+            creatable={false}
           />
         </div>
 

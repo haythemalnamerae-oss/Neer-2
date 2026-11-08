@@ -236,6 +236,9 @@ export const TasksView: React.FC<TasksViewProps> = ({
                           <MapPin className="w-4 h-4 text-[#3A644D]" />
                           {task.location}
                         </span>
+                        {task.standingAccountName && (
+                          <span className="text-xs text-[#2A563B] font-bold block mt-1 truncate">حساب معتاد: {task.standingAccountName}</span>
+                        )}
                         {task.steps && task.steps.length > 0 && (
                           <span className="text-xs text-[#2A563B] font-bold block mt-1">
                             مراحل: {task.steps.filter((s) => s.status === 'completed').length}/{task.steps.length}
