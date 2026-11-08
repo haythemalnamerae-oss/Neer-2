@@ -45,15 +45,18 @@ export const NewSettlementModal: React.FC<NewSettlementModalProps> = ({ isOpen, 
       return;
     }
 
-    SettlementsService.create({
-      fundId,
-      periodStart,
-      periodEnd,
-      notes,
-      expenseIds: eligibleExpenses.map((expense) => expense.id),
-    });
-
-    onClose();
+    try {
+      SettlementsService.create({
+        fundId,
+        periodStart,
+        periodEnd,
+        notes,
+        expenseIds: eligibleExpenses.map((expense) => expense.id),
+      });
+      onClose();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'تعذر إنشاء طلب التسوية.');
+    }
   };
 
   return (
@@ -135,7 +138,7 @@ export const NewSettlementModal: React.FC<NewSettlementModalProps> = ({ isOpen, 
           <Button variant="outline" size="md" type="button" onClick={onClose}>
             إلغاء
           </Button>
-          <Button variant="primary" size="md" type="submit">
+          <Button variant="primary" size="md" type="submit" disabled={eligibleExpenses.length === 0 || periodStart > periodEnd}>
             تقديم طلب التسوية ({eligibleExpenses.length})
           </Button>
         </div>
