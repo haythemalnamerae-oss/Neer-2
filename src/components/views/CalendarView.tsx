@@ -1,12 +1,16 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Calendar as CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
   Plus,
   MapPin,
   Clock,
+  CalendarDays,
 } from 'lucide-react';
 import { Task } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
+import { hasPermission } from '../../lib/rbac/permissions';
 import { Button } from '../ui/button';
 
 interface CalendarViewProps {
@@ -14,181 +18,168 @@ interface CalendarViewProps {
   onOpenNewTask: () => void;
 }
 
+const toDateKey = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const parseDateKey = (value: string): Date | null => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value || '');
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
 export const CalendarView: React.FC<CalendarViewProps> = ({ onSelectTask, onOpenNewTask }) => {
-  const [selectedDate, setSelectedDate] = useState<string>('2026-09-21');
-  const tasks = dataStore.getTasks();
+  const today = new Date();
+  const [visibleMonth, setVisibleMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
+  const [selectedDate, setSelectedDate] = useState(() => toDateKey(today));
+  const user = dataStore.getCurrentUser();
+  const canCreate = hasPermission(user.role, 'tasks', 'create');
+  const canReschedule = hasPermission(user.role, 'tasks', 'edit');
+  const allTasks = dataStore.getTasks();
+  const tasks = user.role === 'field_officer'
+    ? allTasks.filter((task) => task.assigneeId === user.id)
+    : allTasks;
 
-  // Simple September 2026 calendar days
-  const daysInMonth = Array.from({ length: 30 }, (_, i) => {
-    const dayNum = i + 1;
-    const dateStr = `2026-09-${dayNum < 10 ? '0' + dayNum : dayNum}`;
-    const dayTasks = tasks.filter((t) => t.dueDate === dateStr);
-    return { dayNum, dateStr, tasks: dayTasks };
-  });
+  const monthLabel = new Intl.DateTimeFormat('ar', { month: 'long', year: 'numeric' }).format(visibleMonth);
+  const days = useMemo(() => {
+    const firstDay = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1);
+    const offset = firstDay.getDay();
+    const count = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 0).getDate();
+    return Array.from({ length: Math.ceil((offset + count) / 7) * 7 }, (_, index) => {
+      const date = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), index - offset + 1);
+      const key = toDateKey(date);
+      return {
+        date,
+        key,
+        dayNumber: date.getDate(),
+        inMonth: date.getMonth() === visibleMonth.getMonth(),
+        tasks: tasks.filter((task) => task.dueDate?.slice(0, 10) === key),
+      };
+    });
+  }, [visibleMonth, tasks]);
 
-  const selectedDayTasks = tasks.filter((t) => t.dueDate === selectedDate);
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
+  const selectedDayTasks = tasks.filter((task) => task.dueDate?.slice(0, 10) === selectedDate);
+  const moveMonth = (offset: number) => {
+    setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1));
   };
 
-  const handleDrop = (e: React.DragEvent, targetDate: string) => {
-    e.preventDefault();
-    const taskId = e.dataTransfer.getData('text/plain');
-    if (taskId) {
-      const task = tasks.find((t) => t.id === taskId);
-      if (task) {
-        dataStore.rescheduleTask(taskId, targetDate, 'تمت إعادة الجدولة عبر التقويم الميداني');
-      }
+  const handleDragOver = (event: React.DragEvent) => {
+    if (canReschedule) event.preventDefault();
+  };
+
+  const handleDrop = (event: React.DragEvent, targetDate: string) => {
+    if (!canReschedule) return;
+    event.preventDefault();
+    const taskId = event.dataTransfer.getData('text/plain');
+    const task = tasks.find((item) => item.id === taskId);
+    if (task && task.dueDate?.slice(0, 10) !== targetDate) {
+      dataStore.rescheduleTask(taskId, targetDate, 'تمت إعادة الجدولة عبر التقويم');
     }
   };
 
-  const handleDragStart = (e: React.DragEvent, taskId: string) => {
-    e.dataTransfer.setData('text/plain', taskId);
-  };
-
   return (
-    <div className="space-y-7 animate-in fade-in duration-200">
-      {/* Top Bar */}
-      <div className="neu-raised-lg rounded-3xl p-6 sm:p-7 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
+    <div className="space-y-6 animate-in fade-in duration-200">
+      <section className="neu-raised-lg rounded-3xl p-5 sm:p-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="flex items-center gap-2 text-[#325A41] font-bold text-xs uppercase mb-1">
-            <CalendarIcon className="w-5 h-5 stroke-[2.2]" />
-            <span>التقويم الميداني وجدولة المهام</span>
+          <div className="flex items-center gap-2 text-[#325A41] font-bold text-xs mb-1">
+            <CalendarIcon className="h-5 w-5" />
+            <span>التشغيل / الجدولة</span>
           </div>
-          <h2 className="text-xl sm:text-2xl font-black text-[#142B1D] font-serif-display">سبتمبر 2026</h2>
-          <p className="text-xs sm:text-sm text-[#4E6C5B] mt-1 font-medium">
-            يمكنك سحب وإفلات المهام لتغيير موعد الاستحقاق الميداني، أو النقر على أي يوم لاستعراض مهامه
-          </p>
+          <h1 className="text-xl sm:text-2xl font-black text-[#142B1D]">تقويم المهام والمواعيد</h1>
+          <p className="mt-1 text-xs sm:text-sm text-[#4E6C5B]">عرض المواعيد الفعلية من سجل المهام، مع إعادة الجدولة حسب صلاحيتك.</p>
         </div>
+        {canCreate && (
+          <Button variant="primary" size="md" onClick={onOpenNewTask} icon={<Plus className="h-5 w-5" />} className="min-h-11">
+            إضافة مهمة
+          </Button>
+        )}
+      </section>
 
-        <Button
-          variant="primary"
-          size="md"
-          onClick={onOpenNewTask}
-          icon={<Plus className="w-5 h-5 stroke-[2.5]" />}
-          className="text-xs sm:text-sm font-bold min-h-[44px]"
-        >
-          إضافة مهمة بالتقويم
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-7 items-start">
-        {/* Calendar Grid (8 Cols) */}
-        <div className="lg:col-span-8 neu-raised-lg rounded-3xl p-5 sm:p-7 space-y-4">
-          {/* Day Headers */}
-          <div className="grid grid-cols-7 gap-1 text-center font-bold text-xs sm:text-sm text-[#506E5D] pb-3 border-b border-[#C8D3CC]/50">
-            <div>الأحد</div>
-            <div>الإثنين</div>
-            <div>الثلاثاء</div>
-            <div>الأربعاء</div>
-            <div>الخميس</div>
-            <div>الجمعة</div>
-            <div>السبت</div>
+      <section className="grid grid-cols-1 gap-5 xl:grid-cols-12 items-start">
+        <div className="xl:col-span-8 neu-raised-lg rounded-3xl p-4 sm:p-6 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <CalendarDays className="h-5 w-5 text-emerald-800" />
+              <h2 className="font-black text-slate-900">{monthLabel}</h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => {
+                const now = new Date();
+                setVisibleMonth(new Date(now.getFullYear(), now.getMonth(), 1));
+                setSelectedDate(toDateKey(now));
+              }} className="min-h-10 rounded-xl border border-slate-200 px-3 text-xs font-bold text-slate-700 hover:bg-slate-50">اليوم</button>
+              <button type="button" aria-label="الشهر السابق" onClick={() => moveMonth(-1)} className="h-10 w-10 rounded-xl border border-slate-200 flex items-center justify-center hover:bg-slate-50"><ChevronRight className="h-4 w-4" /></button>
+              <button type="button" aria-label="الشهر التالي" onClick={() => moveMonth(1)} className="h-10 w-10 rounded-xl border border-slate-200 flex items-center justify-center hover:bg-slate-50"><ChevronLeft className="h-4 w-4" /></button>
+            </div>
           </div>
 
-          {/* Days Cells */}
-          <div className="grid grid-cols-7 gap-2">
-            {daysInMonth.map((d) => {
-              const isSelected = selectedDate === d.dateStr;
-              const hasTasks = d.tasks.length > 0;
+          <div className="grid grid-cols-7 gap-1 text-center text-[10px] sm:text-xs font-bold text-slate-500">
+            {['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'].map((label) => <div key={label} className="py-2">{label}</div>)}
+          </div>
 
+          <div className="grid grid-cols-7 gap-1 sm:gap-2">
+            {days.map((day) => {
+              const selected = selectedDate === day.key;
+              const isToday = day.key === toDateKey(today);
               return (
-                <div
-                  key={d.dateStr}
-                  onClick={() => setSelectedDate(d.dateStr)}
+                <button
+                  key={day.key}
+                  type="button"
+                  onClick={() => setSelectedDate(day.key)}
                   onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, d.dateStr)}
-                  className={`min-h-[92px] p-2.5 rounded-2xl transition cursor-pointer flex flex-col justify-between ${
-                    isSelected
-                      ? 'neu-inset text-[#142B1D] font-bold ring-2 ring-[#325A41]/30'
-                      : 'neu-raised-sm hover:neu-inset text-[#284835]'
-                  }`}
+                  onDrop={(event) => handleDrop(event, day.key)}
+                  className={`min-h-[76px] sm:min-h-[105px] min-w-0 rounded-xl sm:rounded-2xl border p-1.5 sm:p-2 text-right flex flex-col transition ${selected ? 'border-emerald-700 bg-emerald-50 ring-2 ring-emerald-700/15' : 'border-slate-100 bg-white hover:border-emerald-200'} ${day.inMonth ? '' : 'opacity-40'}`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={`text-xs sm:text-sm font-bold font-mono ${
-                        isSelected ? 'text-[#142B1D] font-black' : 'text-[#355743]'
-                      }`}
-                    >
-                      {d.dayNum}
-                    </span>
-                    {hasTasks && (
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#2E583F]" />
-                    )}
-                  </div>
-
-                  <div className="space-y-1 mt-1">
-                    {d.tasks.slice(0, 2).map((t) => (
-                      <div
-                        key={t.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, t.id)}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSelectTask(t);
-                        }}
-                        className={`text-xs font-bold p-1 rounded-xl truncate ${
-                          t.priority === 'urgent'
-                            ? 'neu-inset-sm text-[#943B2E]'
-                            : 'neu-raised-sm text-[#254A34]'
-                        }`}
-                      >
-                        {t.title}
-                      </div>
+                  <span className={`text-xs font-black ${isToday ? 'text-emerald-800' : 'text-slate-700'}`}>{day.dayNumber}</span>
+                  {day.tasks.length > 0 && (
+                    <span className="mt-1 rounded-md bg-slate-100 px-1 py-0.5 text-[9px] sm:text-[10px] font-bold text-slate-600 truncate">{day.tasks.length} مهام</span>
+                  )}
+                  <span className="mt-1 hidden sm:block space-y-1 w-full">
+                    {day.tasks.slice(0, 2).map((task) => (
+                      <span key={task.id} draggable={canReschedule} onDragStart={(event) => {
+                        if (canReschedule) event.dataTransfer.setData('text/plain', task.id);
+                      }} onClick={(event) => {
+                        event.stopPropagation();
+                        onSelectTask(task);
+                      }} className={`block truncate rounded-md px-1 py-0.5 text-[10px] font-bold ${task.priority === 'urgent' ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-800'}`}>
+                        {task.title}
+                      </span>
                     ))}
-                  </div>
-                </div>
+                  </span>
+                </button>
               );
             })}
           </div>
+          <p className="text-[11px] text-slate-500">{canReschedule ? 'يمكنك سحب المهمة إلى يوم آخر لتغيير موعدها.' : 'العرض فقط؛ لا تملك صلاحية إعادة جدولة المهام.'}</p>
         </div>
 
-        {/* Selected Day Agenda (4 Cols) */}
-        <div className="lg:col-span-4 neu-raised-lg rounded-3xl p-5 sm:p-6 space-y-4">
-          <div className="border-b border-[#C8D3CC]/50 pb-3.5">
-            <h3 className="font-black text-base text-[#142B1D] font-serif-display">
-              مهام يوم: {selectedDate}
-            </h3>
-            <p className="text-xs text-[#527060] mt-0.5">
-              إجمالي المهام المجدولة: {selectedDayTasks.length} مهمة
-            </p>
+        <aside className="xl:col-span-4 neu-raised-lg rounded-3xl p-5 sm:p-6 space-y-4">
+          <div className="border-b border-slate-200 pb-3">
+            <h2 className="font-black text-slate-900">جدول اليوم المحدد</h2>
+            <p className="mt-1 text-xs text-slate-500">{parseDateKey(selectedDate)?.toLocaleDateString('ar', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} · {selectedDayTasks.length} مهمة</p>
           </div>
-
           <div className="space-y-3">
             {selectedDayTasks.map((task) => (
-              <div
-                key={task.id}
-                onClick={() => onSelectTask(task)}
-                className="p-4 rounded-2xl neu-raised-sm hover:neu-inset transition cursor-pointer space-y-2 text-xs sm:text-sm"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-mono font-bold text-[#234D35] neu-inset-sm px-2.5 py-0.5 rounded-full text-xs">
-                    {task.code}
-                  </span>
-                  <span className="text-xs font-bold text-[#743F17]">
-                    {task.priority}
-                  </span>
+              <button key={task.id} type="button" onClick={() => onSelectTask(task)} className="w-full rounded-xl border border-slate-100 p-3 text-right hover:border-emerald-200 hover:bg-emerald-50/30">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-sm font-bold text-slate-900">{task.title}</span>
+                  <span className="shrink-0 text-[10px] font-bold text-amber-700">{task.priority}</span>
                 </div>
-                <h4 className="font-bold text-[#142B1D] leading-snug">{task.title}</h4>
-                <div className="flex items-center justify-between text-xs text-[#547363] pt-2 border-t border-[#C8D3CC]/40 font-medium">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5" />
-                    <span>{task.location}</span>
-                  </span>
-                  <span>{task.assigneeName}</span>
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
+                  <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{task.dueTime || 'وقت غير محدد'}</span>
+                  <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{task.location || 'موقع غير محدد'}</span>
                 </div>
-              </div>
+                <p className="mt-1 text-[11px] text-slate-500">{task.assigneeName}</p>
+              </button>
             ))}
-
-            {selectedDayTasks.length === 0 && (
-              <div className="p-8 text-center text-xs sm:text-sm text-[#5C7A6A] neu-inset rounded-2xl">
-                لا توجد مهام مجدولة لهذا اليوم
-              </div>
-            )}
+            {selectedDayTasks.length === 0 && <div className="rounded-xl bg-slate-50 p-7 text-center text-xs text-slate-500">لا توجد مهام مستحقة في هذا اليوم.</div>}
           </div>
-        </div>
-      </div>
+        </aside>
+      </section>
     </div>
   );
 };
