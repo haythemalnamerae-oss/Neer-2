@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { Settlement } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
+import { hasPermission } from '../../lib/rbac/permissions';
 import { SettlementsService } from '../../services/settlements.service';
 import { formatCurrency } from '../../lib/utils/format';
 import { Button } from '../ui/button';
@@ -22,7 +23,14 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
   const [selectedSettlement, setSelectedSettlement] = useState<Settlement | null>(null);
   const [previewSettlement, setPreviewSettlement] = useState<Settlement | null>(null);
 
-  const settlements = dataStore.getSettlements();
+  const currentUser = dataStore.getCurrentUser();
+  const settings = dataStore.getSettings();
+  const canCreateSettlement = hasPermission(currentUser.role, 'settlements', 'create');
+  const canApproveSettlement = hasPermission(currentUser.role, 'settlements', 'approve');
+  const allSettlements = dataStore.getSettlements();
+  const settlements = currentUser.role === 'field_officer'
+    ? allSettlements.filter((settlement) => settlement.settledBy === currentUser.name)
+    : allSettlements;
 
   const handlePrint = (st: Settlement) => {
     setSelectedSettlement(st);
@@ -32,7 +40,7 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
   };
 
   const handleApprove = (id: string) => {
-    const notes = window.prompt('ملاحظات التدقيق والمطابقة:', 'تم فحص الفواتير والتحقق من حساب الضريبة 5%');
+    const notes = window.prompt('ملاحظات التدقيق والمطابقة:', `تمت مراجعة الفواتير والتحقق من الضريبة ${settings.taxRate}%`);
     SettlementsService.approve(id, notes || undefined);
   };
 
@@ -53,7 +61,7 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
           </p>
         </div>
 
-        <Button
+        {canCreateSettlement && <Button
           variant="primary"
           size="md"
           onClick={onOpenNewSettlement}
@@ -61,7 +69,7 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
           className="text-xs sm:text-sm font-bold min-h-[44px]"
         >
           إنشاء تسوية دورية
-        </Button>
+        </Button>}
       </div>
 
       {/* Grid of Settlements */}
@@ -73,10 +81,10 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
                 {st.code}
               </span>
               <Badge
-                variant={st.status === 'approved' ? 'success' : 'warning'}
+                variant={st.status === 'approved' || st.status === 'closed' ? 'success' : 'warning'}
                 size="md"
               >
-                {st.status === 'approved' ? 'معتمدة ومقفلة' : 'قيد المراجعة التدقيقية'}
+                {st.status === 'approved' || st.status === 'closed' ? 'معتمدة ومقفلة' : st.status === 'audited' ? 'مدققة بانتظار الاعتماد' : 'قيد المراجعة التدقيقية'}
               </Badge>
             </div>
 
@@ -132,7 +140,7 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
                 </Button>
               </div>
 
-              {st.status !== 'approved' && (
+              {canApproveSettlement && st.status !== 'approved' && st.status !== 'closed' && (
                 <Button
                   variant="success"
                   size="sm"
@@ -146,6 +154,11 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
             </div>
           </div>
         ))}
+        {settlements.length === 0 && (
+          <div className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">
+            لا توجد تسويات ضمن نطاق صلاحيتك حتى الآن.
+          </div>
+        )}
       </div>
 
       {/* On-Screen Modal for Official Settlement Voucher Preview */}
@@ -192,7 +205,7 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
                 </div>
                 <div className="space-y-1.5 text-left sm:text-right">
                   <p><strong>فترة دورة التسوية:</strong> من {previewSettlement.periodStart} إلى {previewSettlement.periodEnd}</p>
-                  <p><strong>عدد الفواتير المرفقة:</strong> {previewSettlement.expenseIds?.length || 4} فواتير ضريبية</p>
+                  <p><strong>عدد الفواتير المرفقة:</strong> {previewSettlement.expenseIds?.length || 0} فواتير</p>
                 </div>
               </div>
 
@@ -202,7 +215,7 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
                   <thead>
                     <tr className="text-[#4E6C5C]">
                       <th className="p-3 text-right font-bold">البند المحاسبي</th>
-                      <th className="p-3 text-center font-bold">المبلغ (AED)</th>
+                      <th className="p-3 text-center font-bold">المبلغ ({settings.currency})</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -295,7 +308,7 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
             </div>
             <div>
               <p><strong>فترة الدورة:</strong> من {selectedSettlement.periodStart} إلى {selectedSettlement.periodEnd}</p>
-              <p><strong>حالة الاعتماد:</strong> معتمد ومصادق عليه</p>
+              <p><strong>حالة الاعتماد:</strong> {selectedSettlement.status === 'approved' || selectedSettlement.status === 'closed' ? 'معتمد ومصادق عليه' : 'قيد المراجعة — غير معتمد'}</p>
             </div>
           </div>
         </div>
