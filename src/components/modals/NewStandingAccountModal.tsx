@@ -5,7 +5,6 @@ import { Button } from '../ui/button';
 import { dataStore } from '../../lib/storage';
 import { StandingAccount } from '../../types/domain';
 import { SmartSelect } from '../ui/SmartSelect';
-import { Store, Phone, DollarSign, FileText } from 'lucide-react';
 
 interface NewStandingAccountModalProps {
   isOpen: boolean;
