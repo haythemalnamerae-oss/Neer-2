@@ -296,17 +296,17 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
           {/* Live Calculation Display */}
           <div className="flex items-center justify-between pt-3 border-t border-black/[0.04] text-xs sm:text-sm">
             <span className="text-slate-600 font-bold">
-              ضريبة القيمة المضافة ({settings.taxRate}%): <span className="font-extrabold text-slate-800 dir-ltr">{formatCurrency(taxAmount)}</span>
+              ضريبة القيمة المضافة ({settings.taxRate}%): <span className="font-extrabold text-slate-800 dir-ltr">{formatCurrency(taxAmount, settings.currency)}</span>
             </span>
             <span className="text-sm sm:text-base font-black text-emerald-800">
-              المجموع الإجمالي: <span className="dir-ltr font-mono">{formatCurrency(totalWithTax)}</span>
+              المجموع الإجمالي: <span className="dir-ltr font-mono">{formatCurrency(totalWithTax, settings.currency)}</span>
             </span>
           </div>
 
           {exceedsLimit && (
             <div className="flex items-center gap-2 text-xs text-amber-800 neu-inset-sm p-3 rounded-2xl">
               <AlertTriangle className="w-4.5 h-4.5 shrink-0 text-amber-700" />
-              <span>المصروف يتجاوز سقف الصرف الفردي المسموح به ({formatCurrency(settings.singleExpenseLimit)}). سيتطلب تدقيقاً خاصاً.</span>
+              <span>المصروف يتجاوز سقف الصرف الفردي المسموح به ({formatCurrency(settings.singleExpenseLimit, settings.currency)}). سيتطلب تدقيقاً خاصاً.</span>
             </div>
           )}
 
@@ -316,8 +316,8 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
               <div className="flex items-start gap-2.5 text-rose-900">
                 <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-rose-600" />
                 <div>
-                  <p className="font-extrabold">المبلغ المطلوب ({formatCurrency(totalWithTax)}) يتجاوز رصيد العهدة ({formatCurrency(availableBal)})!</p>
-                  <p className="text-xs text-rose-700 mt-0.5">العجز المطلوب تغطيته: <strong>{formatCurrency(shortageAmount)}</strong></p>
+                  <p className="font-extrabold">المبلغ المطلوب ({formatCurrency(totalWithTax, settings.currency)}) يتجاوز رصيد العهدة ({formatCurrency(availableBal, settings.currency)})!</p>
+                  <p className="text-xs text-rose-700 mt-0.5">العجز المطلوب تغطيته: <strong>{formatCurrency(shortageAmount, settings.currency)}</strong></p>
                 </div>
               </div>
 
@@ -337,7 +337,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
                   <div className="flex-1 min-w-0">
                     <span className="font-extrabold text-slate-900 block">السحب المتسلسل من عهدتين (Cascade Deduction)</span>
                     <span className="text-xs text-slate-600 block mt-1 leading-relaxed">
-                      استنزاف العهدة الحالية بالكامل ({formatCurrency(availableBal)}) ليصبح رصيدها صفراً، وسحب المتبقي ({formatCurrency(shortageAmount)}) تلقائياً من عهدة بديلة.
+                      استنزاف العهدة الحالية بالكامل ({formatCurrency(availableBal, settings.currency)}) ليصبح رصيدها صفراً، وسحب المتبقي ({formatCurrency(shortageAmount, settings.currency)}) تلقائياً من عهدة بديلة.
                     </span>
                     {coverageMethod === 'cascade' && (
                       <div className="mt-3 space-y-1.5">
@@ -373,7 +373,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
                   <div className="flex-1 min-w-0">
                     <span className="font-extrabold text-slate-900 block">تسجيل عجز مالي مؤقت بالسالب (Negative Balance / Deficit)</span>
                     <span className="text-xs text-slate-600 block mt-1 leading-relaxed">
-                      السماح بالصرف للمهمة الميدانية وتسجيل عجز بقيمة ({formatCurrency(shortageAmount)}) كالتزام يظهر بالسالب لتتم تغطيته فور توريد نقد للصندوق.
+                      السماح بالصرف للمهمة الميدانية وتسجيل عجز بقيمة ({formatCurrency(shortageAmount, settings.currency)}) كالتزام يظهر بالسالب لتتم تغطيته فور توريد نقد للصندوق.
                     </span>
                   </div>
                 </label>}
