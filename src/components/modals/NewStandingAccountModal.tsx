@@ -24,6 +24,8 @@ export const NewStandingAccountModal: React.FC<NewStandingAccountModalProps> = (
   const [contactPhone, setContactPhone] = useState('');
   const [direction, setDirection] = useState<'payable' | 'receivable'>('payable');
   const [defaultAmount, setDefaultAmount] = useState('');
+  const [openingBalance, setOpeningBalance] = useState('0');
+  const settings = dataStore.getSettings();
   const [monthlyLimit, setMonthlyLimit] = useState('');
   const [notes, setNotes] = useState('');
   const [imageUrl, setImageUrl] = useState('');
@@ -58,6 +60,10 @@ export const NewStandingAccountModal: React.FC<NewStandingAccountModalProps> = (
       category,
       contactPhone: contactPhone.trim() || undefined,
       direction,
+      openingBalance: openingBalance ? Number(openingBalance) : 0,
+      currentBalance: openingBalance ? Number(openingBalance) : 0,
+      currency: settings.currency,
+      accountType: category === 'materials' ? 'grocery' : category === 'hospitality' ? 'hospitality' : category === 'transport' ? 'transport' : category === 'maintenance' ? 'maintenance' : category === 'vendor' ? 'vendor' : category === 'fuel' ? 'utility' : 'other',
       defaultAmount: defaultAmount ? parseFloat(defaultAmount) : undefined,
       monthlyLimit: monthlyLimit ? parseFloat(monthlyLimit) : undefined,
       notes: notes.trim() || undefined,
@@ -74,6 +80,7 @@ export const NewStandingAccountModal: React.FC<NewStandingAccountModalProps> = (
     setVendorName('');
     setContactPhone('');
     setDefaultAmount('');
+    setOpeningBalance('0');
     setMonthlyLimit('');
     setNotes('');
   };
@@ -169,7 +176,7 @@ export const NewStandingAccountModal: React.FC<NewStandingAccountModalProps> = (
           <Input
             type="number"
             step="0.01"
-            label="المبلغ الاعتيادي المعتاد (AED)"
+            label={`المبلغ الاعتيادي المعتاد (${settings.currency})`}
             placeholder="مثال: 75.00"
             value={defaultAmount}
             onChange={(e) => setDefaultAmount(e.target.value)}
@@ -177,11 +184,25 @@ export const NewStandingAccountModal: React.FC<NewStandingAccountModalProps> = (
           <Input
             type="number"
             step="0.01"
-            label="الحد الشهري الأقصى للصرف (AED)"
+            label={`الحد الشهري الأقصى (${settings.currency})`}
             placeholder="مثال: 1500.00"
             value={monthlyLimit}
             onChange={(e) => setMonthlyLimit(e.target.value)}
           />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Input
+            type="number"
+            step="0.01"
+            label={`الرصيد الافتتاحي المستحق (${settings.currency})`}
+            placeholder="0.00"
+            value={openingBalance}
+            onChange={(e) => setOpeningBalance(e.target.value)}
+          />
+          <div className="rounded-xl neu-inset-sm p-3 text-xs text-slate-600 flex items-center">
+            العملة المعتمدة لهذا الحساب: <strong className="mx-1">{settings.currency}</strong>. يبدأ كشف الحساب من الرصيد الافتتاحي ثم تتراكم الفواتير والسدادات والتحصيلات.
+          </div>
         </div>
 
         {/* Account and reference documents */}
