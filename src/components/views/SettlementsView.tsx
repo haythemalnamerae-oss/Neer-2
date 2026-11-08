@@ -27,6 +27,7 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
   const settings = dataStore.getSettings();
   const canCreateSettlement = hasPermission(currentUser.role, 'settlements', 'create');
   const canApproveSettlement = hasPermission(currentUser.role, 'settlements', 'approve');
+  const requiresDualApproval = settings.requireDualApprovalForSettlements;
   const allSettlements = dataStore.getSettlements();
   const settlements = currentUser.role === 'field_officer'
     ? allSettlements.filter((settlement) => settlement.settledBy === currentUser.name)
@@ -125,6 +126,9 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
               </div>
             </div>
 
+            {st.auditedBy && (
+              <div className="text-xs text-slate-500">المدقق الأول: <strong>{st.auditedBy}</strong>{st.auditedAt ? ` — ${st.auditedAt}` : ''}</div>
+            )}
             {st.auditNotes && (
               <div className="p-3.5 neu-inset rounded-2xl text-xs sm:text-sm text-[#502E68]">
                 <strong>ملاحظات التدقيق:</strong> {st.auditNotes}
@@ -160,11 +164,13 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
                   variant="success"
                   size="sm"
                   onClick={() => handleApprove(st.id)}
+                  disabled={requiresDualApproval && st.status === 'audited' && st.auditedBy === currentUser.name}
                   icon={<CheckCircle2 className="w-4.5 h-4.5 stroke-[2.2]" />}
                   className="text-xs sm:text-sm font-bold min-h-[40px]"
                 >
-                  اعتماد التسوية
+                  {requiresDualApproval ? (st.status === 'audited' ? 'الاعتماد النهائي' : 'التدقيق الأولي') : 'اعتماد التسوية'}
                 </Button>
+                {requiresDualApproval && st.status === 'audited' && st.auditedBy === currentUser.name && <span className="text-xs text-amber-700">يلزم معتمد مختلف عن المدقق الأول</span>}
                 <Button
                   variant="danger"
                   size="sm"
