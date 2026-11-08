@@ -36,8 +36,6 @@ interface FieldMapViewProps {
 }
 
 // Coordinates are displayed only when recorded on the task or captured from the device.
-const DEFAULT_CENTER = { lat: 0, lng: 0 }; // Used only as an inert map fallback when no real location exists.
-
 export const FieldMapView: React.FC<FieldMapViewProps> = ({
   onSelectTask,
   onOpenNewTask,
@@ -120,7 +118,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
         };
         setUserLiveCoords(coords);
         setLocationSuccessMsg(
-          `تم رفع موقعك الميداني بدقة ±${coords.accuracy}م (${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}) في تمام ${new Date().toLocaleTimeString('ar-AE')}`
+          `تم تحديد موقعك الميداني بدقة ±${coords.accuracy}م (${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}) في تمام ${new Date().toLocaleTimeString('ar-AE')}`
         );
         setTimeout(() => setLocationSuccessMsg(''), 8000);
       },
@@ -178,7 +176,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
     if (selectedTask?.geoCoordinates) return selectedTask.geoCoordinates;
     if (userLiveCoords) return { lat: userLiveCoords.lat, lng: userLiveCoords.lng };
     if (filteredTasks[0]?.resolvedCoords) return filteredTasks[0].resolvedCoords;
-    return DEFAULT_CENTER;
+    return { lat: 0, lng: 0 };
   }, [selectedTask, userLiveCoords, filteredTasks]);
 
   return (
@@ -211,7 +209,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
             className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold font-sans-inter transition-all border border-white/20 cursor-pointer shadow-xs active:scale-95 disabled:opacity-60"
           >
             <Navigation className={`w-4 h-4 text-emerald-300 ${isLocating ? 'animate-spin' : ''}`} />
-            <span>{isLocating ? 'جاري الرصد بالـ GPS...' : 'رفع موقعي الميداني الحالي'}</span>
+            <span>{isLocating ? 'جاري الرصد بالـ GPS...' : 'تحديد موقعي الحالي'}</span>
           </button>
 
           {canCreateTask && <button
@@ -306,7 +304,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
                 <APIProvider apiKey={apiKey} libraries={['marker']} reuseMaps>
                   <Map
                     mapId="DEMO_MAP_ID"
-                    defaultCenter={DEFAULT_CENTER}
+                    defaultCenter={mapCenter}
                     center={mapCenter}
                     defaultZoom={11}
                     gestureHandling="greedy"
