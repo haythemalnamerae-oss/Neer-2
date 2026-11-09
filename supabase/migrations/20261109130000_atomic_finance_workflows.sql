@@ -54,14 +54,18 @@ alter table public.standing_account_entries enable row level security;
 revoke all on public.fund_transactions, public.standing_account_entries from public, anon;
 grant select on public.fund_transactions, public.standing_account_entries to authenticated;
 drop policy if exists fund_transactions_finance_read on public.fund_transactions;
+drop policy if exists fund_transactions_finance_read on public.fund_transactions;
 create policy fund_transactions_finance_read on public.fund_transactions
   for select to authenticated using (private.has_org_role(organization_id,array['admin','finance_officer']));
+drop policy if exists fund_transactions_finance_insert on public.fund_transactions;
 create policy fund_transactions_finance_insert on public.fund_transactions
   for insert to authenticated with check (private.has_org_role(organization_id,array['admin','finance_officer']) and created_by=auth.uid());
 grant insert on public.fund_transactions to authenticated;
 drop policy if exists standing_entries_finance_read on public.standing_account_entries;
+drop policy if exists standing_entries_finance_read on public.standing_account_entries;
 create policy standing_entries_finance_read on public.standing_account_entries
   for select to authenticated using (private.has_org_role(organization_id,array['admin','finance_officer']));
+drop policy if exists standing_entries_finance_insert on public.standing_account_entries;
 create policy standing_entries_finance_insert on public.standing_account_entries
   for insert to authenticated with check (private.has_org_role(organization_id,array['admin','finance_officer']) and created_by=auth.uid());
 grant insert on public.standing_account_entries to authenticated;
