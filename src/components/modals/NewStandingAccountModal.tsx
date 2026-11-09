@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Modal } from '../ui/modal';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
-import { dataStore } from '../../lib/storage';\nimport { FinanceApiService } from '../../services/finance-api.service';
+import { dataStore } from '../../lib/storage';
+import { FinanceApiService } from '../../services/finance-api.service';
 import { StandingAccount } from '../../types/domain';
 import { SmartSelect } from '../ui/SmartSelect';
 
