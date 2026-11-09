@@ -18,7 +18,7 @@ import {
 import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
 import { Task, TaskStatus } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
-import { captureRequiredLocation, recordFieldLifecycleEvent, startFieldLocationTracking, stopFieldLocationTracking } from '../../lib/operations/fieldEvents';
+import { captureRequiredLocation, ensureFieldVisitCanStart, recordFieldLifecycleEvent, startFieldLocationTracking, stopFieldLocationTracking } from '../../lib/operations/fieldEvents';
 import { hasPermission } from '../../lib/rbac/permissions';
 import { formatCurrency, TASK_STATUS_CONFIG } from '../../lib/utils/format';
 import { Button } from '../ui/button';
@@ -139,6 +139,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
     }
     setIsLocating(true);
     try {
+      await ensureFieldVisitCanStart();
       const location = await captureRequiredLocation();
       await recordFieldLifecycleEvent({
         taskId: task.id,
@@ -192,6 +193,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
     }
     setIsLocating(true);
     try {
+      await ensureFieldVisitCanStart();
       const location = await captureRequiredLocation();
       await recordFieldLifecycleEvent({
         taskId: task.id,
