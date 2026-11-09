@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { dataStore } from './lib/storage';
+import { startFieldLocationTracking, stopFieldLocationTracking } from './lib/operations/fieldEvents';
 import { Task } from './types/domain';
 
 // Layout
@@ -38,7 +39,7 @@ import { TaskOutcomeModal } from './components/modals/TaskOutcomeModal';
 import { TaskChainModal } from './components/modals/TaskChainModal';
 
 export default function App() {
-  const [, setStoreVersion] = useState(0);
+  const [storeVersion, setStoreVersion] = useState(0);
   const [currentView, setCurrentView] = useState<string>('daily');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
@@ -60,6 +61,18 @@ export default function App() {
       setStoreVersion((v) => v + 1);
     });
   }, []);
+
+  // Keep active field GPS tracking alive independently of whether a task modal is open.
+  useEffect(() => {
+    dataStore.getTasks().forEach((task) => {
+      const isFieldTask = task.taskTypeCategory === 'field' || task.taskTypeCategory === 'visit';
+      if (isFieldTask && task.status === 'in_progress' && !task.isPaused) {
+        startFieldLocationTracking(task.id);
+      } else {
+        stopFieldLocationTracking(task.id);
+      }
+    });
+  }, [storeVersion]);
 
   const currentUser = dataStore.getCurrentUser();
 
