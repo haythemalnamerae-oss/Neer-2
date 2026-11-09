@@ -1,4 +1,4 @@
-import type { Role } from '../../types/domain';
+import type { Role, PettyCashFund, Expense, Settlement, CashReceipt, StandingAccount, StandingAccountEntry } from '../../types/domain';\nimport { dataStore } from '../storage';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -182,7 +182,7 @@ const fromSnake = (row: Record<string, any>) => {
 /** Loads the initial server snapshot before importing the legacy synchronous UI store. */
 export async function loadUiSnapshot(session: ApiSession): Promise<void> {
   const common = ['tasks','task-checklist','task-steps','task-subtasks','task-updates','task-history','task-attachments','task-comments','task-events','follow-ups','notifications'];
-  const finance = ['funds','expenses','settlements','cash-receipts','standing-accounts'];
+  const finance = ['funds','expenses','settlements','settlement-expenses','cash-receipts','standing-accounts','fund-transactions','standing-account-entries'];
   const canReadUserDirectory = session.role === 'admin' || session.role === 'ops_manager';
   const canReadFinance = session.role === 'admin' || session.role === 'finance_officer';
   const collections = [...common, ...(canReadFinance ? finance : []), ...(canReadUserDirectory ? ['users'] : [])];
