@@ -136,6 +136,11 @@ export function startFieldLocationTracking(taskId: string): void {
   let failureRecorded = false;
   const watchId = navigator.geolocation.watchPosition(
     ({ coords }) => {
+      if (failureRecorded) {
+        failureRecorded = false;
+        lastRecordedAt = 0;
+        if (typeof window !== 'undefined') window.alert('تم استعادة إشارة الموقع؛ استؤنف توثيق مسار الزيارة تلقائياً.');
+      }
       if (Date.now() - lastRecordedAt < LOCATION_SAMPLE_INTERVAL_MS) return;
       lastRecordedAt = Date.now();
       void recordTaskEvent({
@@ -158,7 +163,7 @@ export function startFieldLocationTracking(taskId: string): void {
       void recordLocationUnavailable(taskId, reason).catch((saveError) => {
         console.error('Could not save location-unavailable event:', saveError);
       });
-      stopFieldLocationTracking(taskId);
+      if (typeof window !== 'undefined') window.alert('فُقد اتصال الموقع أثناء الزيارة. تأكد من تشغيل GPS والسماح بالموقع؛ سيواصل النظام محاولة استعادته تلقائياً.');
     },
     { enableHighAccuracy: true, maximumAge: 0, timeout: 20_000 },
   );
