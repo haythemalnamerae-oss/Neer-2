@@ -148,7 +148,7 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
   const response = await supabaseFetch(`/rest/v1/${resource.table}?${query}`, auth.token, {
     method: req.method,
     headers: req.method === 'POST' || req.method === 'PATCH' ? { Prefer: 'return=representation' } : {},
-    ...(req.method === 'POST' || req.method === 'PATCH' ? { body: JSON.stringify({ ...body, organization_id: auth.organizationId, ...(req.params.resource === 'task-events' ? { actor_auth_user_id: auth.userId } : {}) }) } : {}),
+    ...(req.method === 'POST' || req.method === 'PATCH' ? { body: JSON.stringify({ ...body, organization_id: auth.organizationId, ...(req.params.resource === 'task-events' ? { actor_auth_user_id: auth.userId, occurred_at: new Date().toISOString() } : {}) }) } : {}),
   });
   if (!response.ok) return sendDbError(res, response.status, await response.text());
   if (response.status === 204) return res.status(204).end();
