@@ -75,7 +75,7 @@ begin
   insert into public.cash_receipts(id,organization_id,code,amount,source,type,received_by,receipt_date,notes,fund_id)
   values(v_receipt_id,p_org,'REC-'||to_char(current_date,'YYYY')||'-'||upper(substr(replace(gen_random_uuid()::text,'-',''),1,8)),
    p_amount,'تحصيل من حساب '||v_account.name,'cash_box',
-   coalesce((select name from public.app_users where organization_id=p_org and auth_user_id=auth.uid() limit 1),'',
+   coalesce((select name from public.app_users where organization_id=p_org and auth_user_id=auth.uid() limit 1),''),
    coalesce(p_entry_date,current_date),p_reference,p_fund_id);
  end if;
  insert into public.standing_account_entries(organization_id,standing_account_id,fund_id,entry_type,amount,balance_effect,currency,entry_date,description,reference,idempotency_key)
