@@ -51,8 +51,6 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   onViewChain,
   onAddExpense,
 }) => {
-  if (!isOpen || !task) return null;
-
   const [activeTab, setActiveTab] = useState<'details' | 'steps' | 'subtasks' | 'daily_updates' | 'checklist' | 'attachments' | 'history'>('details');
   const [isPausePromptOpen, setIsPausePromptOpen] = useState(false);
   const [pauseReasonInput, setPauseReasonInput] = useState('');
@@ -67,6 +65,8 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   // Attachment states
   const [attachmentDocType, setAttachmentDocType] = useState('فاتورة شراء');
   const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+
+  if (!isOpen || !task) return null;
 
   const currentUser = dataStore.getCurrentUser();
   const requiresFieldLocation = task.taskTypeCategory === 'field' || task.taskTypeCategory === 'visit';
