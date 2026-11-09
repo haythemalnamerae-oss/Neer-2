@@ -61,7 +61,7 @@ create policy standing_entries_finance_read on public.standing_account_entries
   for select to authenticated using (private.has_org_role(organization_id,array['admin','finance_officer']));
 
 create or replace function public.finance_create_expense(p_org uuid,p_payload jsonb,p_idempotency uuid)
-returns jsonb language plpgsql security invoker set search_path = '' as $
+returns jsonb language plpgsql security invoker set search_path = '' as $finance$
 declare v_fund public.funds%rowtype; v_expense public.expenses%rowtype; v_id text; v_code text;
 begin
   if not private.has_org_role(p_org,array['admin','finance_officer']) then raise exception 'FORBIDDEN' using errcode='42501'; end if;
@@ -94,7 +94,7 @@ create unique index if not exists expenses_org_idempotency_uidx
   on public.expenses(organization_id,idempotency_key) where idempotency_key is not null;
 
 create or replace function public.finance_review_expense(p_org uuid,p_expense_id text,p_approve boolean,p_reason text default null)
-returns jsonb language plpgsql security invoker set search_path = '' as $
+returns jsonb language plpgsql security invoker set search_path = '' as $finance$
 declare v_exp public.expenses%rowtype; v_fund public.funds%rowtype; v_name text;
 begin
   if not private.has_org_role(p_org,array['admin','finance_officer']) then raise exception 'FORBIDDEN' using errcode='42501'; end if;
@@ -125,7 +125,7 @@ begin
 end $$;
 
 create or replace function public.finance_replenish_fund(p_org uuid,p_fund_id text,p_amount numeric,p_notes text,p_idempotency uuid)
-returns jsonb language plpgsql security invoker set search_path = '' as $
+returns jsonb language plpgsql security invoker set search_path = '' as $finance$
 declare v_fund public.funds%rowtype; v_tx public.fund_transactions%rowtype;
 begin
   if not private.has_org_role(p_org,array['admin','finance_officer']) then raise exception 'FORBIDDEN' using errcode='42501'; end if;
@@ -143,7 +143,7 @@ begin
 end $$;
 
 create or replace function public.finance_create_standing_entry(p_org uuid,p_payload jsonb,p_idempotency uuid)
-returns jsonb language plpgsql security invoker set search_path = '' as $
+returns jsonb language plpgsql security invoker set search_path = '' as $finance$
 declare v_account public.standing_accounts%rowtype; v_entry public.standing_account_entries%rowtype; v_effect numeric;
 begin
   if not private.has_org_role(p_org,array['admin','finance_officer']) then raise exception 'FORBIDDEN' using errcode='42501'; end if;
@@ -163,7 +163,7 @@ begin
 end $$;
 
 create or replace function public.finance_create_settlement(p_org uuid,p_fund_id text,p_period_start date,p_period_end date,p_expense_ids text[],p_idempotency uuid)
-returns jsonb language plpgsql security invoker set search_path = '' as $
+returns jsonb language plpgsql security invoker set search_path = '' as $finance$
 declare v_fund public.funds%rowtype; v_settlement public.settlements%rowtype; v_ids text[]; v_total numeric; v_count integer; v_id text;
 begin
   if not private.has_org_role(p_org,array['admin','finance_officer']) then raise exception 'FORBIDDEN' using errcode='42501'; end if;
@@ -191,7 +191,7 @@ begin
 end $$;
 
 create or replace function public.finance_close_settlement(p_org uuid,p_settlement_id text,p_approve boolean,p_notes text default null)
-returns jsonb language plpgsql security invoker set search_path = '' as $
+returns jsonb language plpgsql security invoker set search_path = '' as $finance$
 declare v_settlement public.settlements%rowtype; v_name text;
 begin
   if not private.has_org_role(p_org,array['admin','finance_officer']) then raise exception 'FORBIDDEN' using errcode='42501'; end if;
