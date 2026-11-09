@@ -57,7 +57,7 @@ export const NewStandingAccountModal: React.FC<NewStandingAccountModalProps> = (
 
     let created: StandingAccount;
     try {
-      created = dataStore.addStandingAccount({
+      const saved = await FinanceApiService.createStandingAccount({
       name: name.trim(),
       vendorName: vendorName.trim() || undefined,
       category,
@@ -73,8 +73,9 @@ export const NewStandingAccountModal: React.FC<NewStandingAccountModalProps> = (
       notes: notes.trim() || undefined,
       imageUrl: imageUrl || undefined,
       referenceImageUrl: referenceImageUrl || undefined,
-      active: true,
       });
+      created = dataStore.getStandingAccounts().find((account) => account.id === (saved as any).id)!;
+      if (!created) throw new Error('تم إنشاء الحساب لكن تعذر تحميله من الخادم؛ أعد تحديث البيانات.');
     } catch (error) {
       alert(error instanceof Error ? error.message : 'تعذر إنشاء الحساب. تحقق من البيانات والصلاحيات.');
       return;
