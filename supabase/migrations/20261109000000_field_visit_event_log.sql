@@ -66,7 +66,7 @@ create table if not exists public.task_events (
   latitude double precision,
   longitude double precision,
   accuracy_meters double precision,
-  location_status text not null check (
+  location_status text not null check (location_status in (
     'captured','permission_denied','services_disabled','unavailable','timeout','not_requested'
   )),
   client_event_id uuid not null,
