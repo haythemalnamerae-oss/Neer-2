@@ -81,6 +81,31 @@ export async function recordTaskEvent(input: {
   });
 }
 
+
+export async function recordFieldLifecycleEvent(input: {
+  taskId: string;
+  eventType: Extract<FieldEventType, 'visit_started' | 'visit_paused' | 'visit_resumed' | 'visit_completed' | 'task_started' | 'task_paused' | 'task_resumed' | 'task_completed'>;
+  eventLabel: string;
+  location: CapturedLocation;
+  details?: Record<string, unknown>;
+}): Promise<void> {
+  const session = getSession();
+  if (!session) throw new Error('انتهت جلسة الدخول. سجّل الدخول مجدداً قبل توثيق الحدث الميداني.');
+  await apiRequest(session, '/task-events/lifecycle', {
+    method: 'POST',
+    body: JSON.stringify({
+      task_id: input.taskId,
+      event_type: input.eventType,
+      event_label: input.eventLabel,
+      latitude: input.location.latitude,
+      longitude: input.location.longitude,
+      accuracy_meters: input.location.accuracyMeters,
+      client_event_id: crypto.randomUUID(),
+      details: input.details || {},
+    }),
+  });
+}
+
 const activeLocationWatches = new Map<string, number>();
 const LOCATION_SAMPLE_INTERVAL_MS = 60_000;
 
