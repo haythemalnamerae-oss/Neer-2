@@ -39,7 +39,10 @@ export const FinanceApiService = {
   reviewExpense(id: string, approve: boolean, reason?: string) {
     return workflow<Expense>('review-expense', { expenseId: id, approve, reason });
   },
-  coverDeficit(expenseId: string) {\n    return workflow<Expense>('cover-deficit', { expenseId, idempotencyKey: idempotencyKey() });\n  },\n  createSettlement(fundId: string, periodStart: string, periodEnd: string, expenseIds: string[]) {
+  coverDeficit(expenseId: string) {
+    return workflow<Expense>('cover-deficit', { expenseId, idempotencyKey: idempotencyKey() });
+  },
+  createSettlement(fundId: string, periodStart: string, periodEnd: string, expenseIds: string[]) {
     return workflow<Settlement>('create-settlement', { fundId, periodStart, periodEnd, expenseIds, idempotencyKey: idempotencyKey() });
   },
   reviewSettlement(id: string, action: 'audit' | 'approve' | 'reject', notes?: string) {
