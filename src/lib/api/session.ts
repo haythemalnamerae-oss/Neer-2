@@ -186,7 +186,9 @@ export async function loadUiSnapshot(session: ApiSession): Promise<void> {
   const finance = ['funds','expenses','settlements','settlement-expenses','cash-receipts','standing-accounts','fund-transactions','standing-account-entries'];
   const canReadUserDirectory = session.role === 'admin' || session.role === 'ops_manager';
   const canReadFinance = session.role === 'admin' || session.role === 'finance_officer';
-  const collections = [...common, ...(canReadFinance ? finance : []), ...(canReadUserDirectory ? ['users'] : [])];
+  const canReadFieldFinance = session.role === 'field_officer';
+  const financeCollections = canReadFinance ? finance : canReadFieldFinance ? ['funds','expenses','standing-accounts'] : [];
+  const collections = [...common, ...financeCollections, ...(canReadUserDirectory ? ['users'] : [])];
   const values = await Promise.all(collections.map(async (name) => [name, await apiRequest<Record<string, any>[]>(session, `/${name}?limit=500`)] as const));
   const data = Object.fromEntries(values);
 
@@ -229,18 +231,42 @@ export async function loadUiSnapshot(session: ApiSession): Promise<void> {
     return task;
   });
 
-  const funds = (data.funds || []).map(fromSnake);
-  const expenses = (data.expenses || []).map(fromSnake);
-  const settlements = (data.settlements || []).map((row) => ({ ...fromSnake(row), expenseIds: [], expensesCount: row.expenses_count || 0 }));
+  const funds = (data.funds || []).map((row: Record<string, any>) => fromSnake(row)) as PettyCashFund[];
+  const fundById = new Map(funds.map((fund) => [fund.id, fund]));
+  const expenses = (data.expenses || []).map((row: Record<string, any>) => ({
+    ...fromSnake(row), fundName: fundById.get(row.fund_id)?.name || '', submittedBy: row.submitted_by || '',
+  })) as Expense[];
+  const settlementLinks = data['settlement-expenses'] || [];
+  const settlements = (data.settlements || []).map((row: Record<string, any>) => ({
+    ...fromSnake(row), fundName: fundById.get(row.fund_id)?.name || '',
+    expenseIds: settlementLinks.filter((item: Record<string, any>) => item.settlement_id === row.id).map((item: Record<string, any>) => item.expense_id),
+    expensesCount: row.expenses_count || 0, voucherNumber: row.settlement_voucher_number || row.code,
+  })) as Settlement[];
+  const cashReceipts = (data['cash-receipts'] || []).map((row: Record<string, any>) => ({
+    ...fromSnake(row), date: row.receipt_date, fundName: fundById.get(row.fund_id)?.name,
+  })) as CashReceipt[];
+  const entryRows = (data['standing-account-entries'] || []) as Record<string, any>[];
+  const standingAccounts = (data['standing-accounts'] || []).map((row: Record<string, any>) => {
+    const entries = entryRows.filter((entry) => entry.standing_account_id === row.id).map((entry) => ({
+      id: entry.id, type: entry.entry_type === 'charge' ? 'charge' : 'settlement',
+      entryType: entry.entry_type, balanceEffect: Number(entry.balance_effect), amount: Number(entry.amount),
+      date: entry.entry_date, description: entry.description || '', reference: entry.reference || undefined,
+      fundId: entry.fund_id || undefined, fundName: fundById.get(entry.fund_id)?.name,
+      expenseId: entry.expense_id || undefined, createdBy: entry.created_by || '', createdAt: entry.created_at,
+    })) as StandingAccountEntry[];
+    const currentBalance = Number((Number(row.opening_balance || 0) + entries.reduce((sum, entry) => sum + (entry.balanceEffect || 0), 0)).toFixed(2));
+    return { ...fromSnake(row), entries, currentBalance };
+  }) as StandingAccount[];
   const followUps = (data['follow-ups'] || []).map((row) => ({ ...fromSnake(row), assignedTo: row.assigned_to, scheduledDate: row.scheduled_date, lastContactDate: row.last_contact_date }));
   const notifications = (data.notifications || []).map(fromSnake);
 
   const storeData: Record<string, unknown> = {
     ops_users_v3: users, ops_tasks_v3: tasks, ops_funds_v3: funds, ops_expenses_v3: expenses,
     ops_settlements_v3: settlements, ops_follow_ups_v3: followUps, ops_notifications_v3: notifications,
-    ops_audit_logs_v3: [], ops_cash_receipts_v3: (data['cash-receipts'] || []).map(fromSnake),
-    ops_standing_accounts_v3: (data['standing-accounts'] || []).map(fromSnake),
+    ops_audit_logs_v3: [], ops_cash_receipts_v3: cashReceipts,
+    ops_standing_accounts_v3: standingAccounts,
   };
   for (const [key, value] of Object.entries(storeData)) localStorage.setItem(key, JSON.stringify(value));
+  if (canReadFinance || canReadFieldFinance) dataStore.hydrateFinanceData({ funds, expenses, settlements, cashReceipts, standingAccounts });
   if (session.appUserId) localStorage.setItem('ops_current_user_id_v3', JSON.stringify(session.appUserId));
 }
