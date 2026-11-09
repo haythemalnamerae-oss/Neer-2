@@ -69,6 +69,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   const [isUploadingDoc, setIsUploadingDoc] = useState(false);
 
   const currentUser = dataStore.getCurrentUser();
+  const requiresFieldLocation = task.taskTypeCategory === 'field' || task.taskTypeCategory === 'visit';
   const users = dataStore.getUsers();
   const allExpenses = dataStore.getExpenses();
   const taskExpenses = allExpenses.filter((e) => e.taskId === task.id);
@@ -94,6 +95,10 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   };
 
   const handleStartTask = async () => {
+    if (!requiresFieldLocation) {
+      dataStore.startTask(task.id);
+      return;
+    }
     setIsLocating(true);
     try {
       const location = await captureRequiredLocation();
@@ -117,6 +122,12 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   const handleConfirmPause = () => {
     if (!pauseReasonInput.trim()) {
       alert('يرجى تدوين سبب إيقاف المهمة مؤقتاً');
+      return;
+    }
+    if (!requiresFieldLocation) {
+      dataStore.pauseTask(task.id, pauseReasonInput.trim());
+      setIsPausePromptOpen(false);
+      setPauseReasonInput('');
       return;
     }
     setIsLocating(true);
@@ -144,6 +155,10 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   };
 
   const handleResumeTask = async () => {
+    if (!requiresFieldLocation) {
+      dataStore.resumeTask(task.id);
+      return;
+    }
     setIsLocating(true);
     try {
       const location = await captureRequiredLocation();
@@ -190,6 +205,11 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     e.preventDefault();
     if (!newSubTaskTitle.trim()) return;
     const assignee = users.find((u) => u.id === newSubTaskAssignee) || currentUser;
+    if (!requiresFieldLocation) {
+      dataStore.addSubTask(task.id, { title: newSubTaskTitle.trim(), assigneeId: assignee.id, assigneeName: assignee.name, status: 'scheduled', requiresApproval: true, isApproved: false });
+      setNewSubTaskTitle('');
+      return;
+    }
     try {
       const location = await captureRequiredLocation();
       await recordTaskEvent({
