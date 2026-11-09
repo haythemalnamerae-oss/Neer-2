@@ -147,9 +147,9 @@ export const FundsView: React.FC<FundsViewProps> = ({
     setReceiptFundId('');
   };
 
-  const handleCoverDeficit = (expenseId: string) => {
+  const handleCoverDeficit = async (expenseId: string) => {
     try {
-      dataStore.coverDeficitExpenseFromCash(expenseId, currentUser.name);
+      await FinanceApiService.coverDeficit(expenseId);
     } catch (error) {
       alert(error instanceof Error ? error.message : 'تعذر تغطية العجز من الصندوق.');
     }
