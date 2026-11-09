@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { Task, TaskStatus, TaskStepStatus } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
+import { captureRequiredLocation, recordTaskEvent, type FieldEventType } from '../../lib/operations/fieldEvents';
 import { formatCurrency, TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG } from '../../lib/utils/format';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -85,26 +86,30 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
 
   const catCfg = categoryLabels[task.taskTypeCategory || 'field'] || categoryLabels.field;
 
-  const handleStartTask = () => {
-    if (typeof navigator !== 'undefined' && navigator.geolocation) {
-      setIsLocating(true);
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setIsLocating(false);
-          dataStore.startTask(task.id, {
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-          });
-        },
-        (err) => {
-          setIsLocating(false);
-          console.warn('Geolocation not acquired:', err);
-          dataStore.startTask(task.id);
-        },
-        { timeout: 6000, enableHighAccuracy: true }
-      );
-    } else {
-      dataStore.startTask(task.id);
+  const getFieldEventType = (action: 'started' | 'paused' | 'resumed' | 'completed'): FieldEventType => {
+    const visit = task.taskTypeCategory === 'visit';
+    return visit
+      ? ({ started: 'visit_started', paused: 'visit_paused', resumed: 'visit_resumed', completed: 'visit_completed' } as const)[action]
+      : ({ started: 'task_started', paused: 'task_paused', resumed: 'task_resumed', completed: 'task_completed' } as const)[action];
+  };
+
+  const handleStartTask = async () => {
+    setIsLocating(true);
+    try {
+      const location = await captureRequiredLocation();
+      await recordTaskEvent({
+        taskId: task.id,
+        standingAccountId: task.standingAccountId,
+        eventType: getFieldEventType('started'),
+        eventLabel: task.taskTypeCategory === 'visit' ? 'بدء الزيارة' : 'بدء المهمة الميدانية',
+        location,
+        details: { taskTitle: task.title },
+      });
+      dataStore.startTask(task.id, { lat: location.latitude, lng: location.longitude });
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'تعذر توثيق الموقع والبدء.');
+    } finally {
+      setIsLocating(false);
     }
   };
 
@@ -113,13 +118,46 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
       alert('يرجى تدوين سبب إيقاف المهمة مؤقتاً');
       return;
     }
-    dataStore.pauseTask(task.id, pauseReasonInput.trim());
-    setIsPausePromptOpen(false);
-    setPauseReasonInput('');
+    setIsLocating(true);
+    void (async () => {
+      try {
+        const location = await captureRequiredLocation();
+        await recordTaskEvent({
+          taskId: task.id,
+          standingAccountId: task.standingAccountId,
+          eventType: getFieldEventType('paused'),
+          eventLabel: 'إيقاف مؤقت',
+          location,
+          details: { reason: pauseReasonInput.trim() },
+        });
+        dataStore.pauseTask(task.id, pauseReasonInput.trim());
+        setIsPausePromptOpen(false);
+        setPauseReasonInput('');
+      } catch (error) {
+        window.alert(error instanceof Error ? error.message : 'تعذر توثيق الإيقاف المؤقت.');
+      } finally {
+        setIsLocating(false);
+      }
+    })();
   };
 
-  const handleResumeTask = () => {
-    dataStore.resumeTask(task.id);
+  const handleResumeTask = async () => {
+    setIsLocating(true);
+    try {
+      const location = await captureRequiredLocation();
+      await recordTaskEvent({
+        taskId: task.id,
+        standingAccountId: task.standingAccountId,
+        eventType: getFieldEventType('resumed'),
+        eventLabel: 'استئناف العمل الميداني',
+        location,
+      });
+      dataStore.resumeTask(task.id);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'تعذر توثيق الاستئناف.');
+    } finally {
+      setIsLocating(false);
+    }
   };
 
   const handleAddDailyUpdate = (e: React.FormEvent) => {
