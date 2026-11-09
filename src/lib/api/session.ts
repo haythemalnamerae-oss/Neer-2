@@ -216,7 +216,7 @@ export async function loadUiSnapshot(session: ApiSession): Promise<void> {
     const eventHistory = fieldEvents.filter((event: Record<string, any>) => event.task_id === task.id).map((event: Record<string, any>) => ({
       id: event.id,
       action: event.event_label || event.event_type,
-      performedBy: authUserNames.get(event.actor_auth_user_id) || 'مستخدم النظام',
+      performedBy: event.actor_name || authUserNames.get(event.actor_auth_user_id) || 'مستخدم النظام',
       timestamp: event.occurred_at,
       notes: event.location_status === 'captured'
         ? `GPS: ${event.latitude}, ${event.longitude} • الدقة ${event.accuracy_meters ?? 'غير محددة'}م`
