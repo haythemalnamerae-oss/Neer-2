@@ -1,4 +1,5 @@
-import type { Role, PettyCashFund, Expense, Settlement, CashReceipt, StandingAccount, StandingAccountEntry } from '../../types/domain';\nimport { dataStore } from '../storage';
+import type { Role, PettyCashFund, Expense, Settlement, CashReceipt, StandingAccount, StandingAccountEntry } from '../../types/domain';
+import { dataStore } from '../storage';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
