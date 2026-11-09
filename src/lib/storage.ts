@@ -1861,7 +1861,11 @@ export class OpsDataStore {
     settlements: Settlement[];
     cashReceipts: CashReceipt[];
     standingAccounts: StandingAccount[];
+    users?: User[];
+    currentUserId?: string;
   }): void {
+    if (data.users) { this.users = data.users; safeSet(STORAGE_KEYS.USERS, this.users); }
+    if (data.currentUserId) { this.currentUserId = data.currentUserId; safeSet(STORAGE_KEYS.CURRENT_USER_ID, this.currentUserId); }
     this.funds = data.funds;
     this.expenses = data.expenses;
     this.settlements = data.settlements;
