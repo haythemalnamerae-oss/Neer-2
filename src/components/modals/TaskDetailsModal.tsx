@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { Task, TaskStatus, TaskStepStatus } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
-import { captureRequiredLocation, recordFieldLifecycleEvent, recordTaskEvent, startFieldLocationTracking, stopFieldLocationTracking, type FieldEventType } from '../../lib/operations/fieldEvents';
+import { captureRequiredLocation, ensureFieldVisitCanStart, recordFieldLifecycleEvent, recordTaskEvent, startFieldLocationTracking, stopFieldLocationTracking, type FieldEventType } from '../../lib/operations/fieldEvents';
 import { formatCurrency, TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG } from '../../lib/utils/format';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -101,6 +101,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     }
     setIsLocating(true);
     try {
+      await ensureFieldVisitCanStart();
       const location = await captureRequiredLocation();
       await recordFieldLifecycleEvent({
         taskId: task.id,
@@ -159,6 +160,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     }
     setIsLocating(true);
     try {
+      await ensureFieldVisitCanStart();
       const location = await captureRequiredLocation();
       await recordFieldLifecycleEvent({
         taskId: task.id,
