@@ -53,7 +53,8 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
   const handleApprove = async (id: string) => {
     const notes = window.prompt('ملاحظات التدقيق والمطابقة:', `تمت مراجعة الفواتير والتحقق من الضريبة ${settings.taxRate}%`);
     try {
-      const settlement = settlements.find((item) => item.id === id);\n      await FinanceApiService.reviewSettlement(id, settlement?.status === 'under_review' && requiresDualApproval ? 'audit' : 'approve', notes || undefined);
+      const settlement = settlements.find((item) => item.id === id);
+      await FinanceApiService.reviewSettlement(id, settlement?.status === 'under_review' && requiresDualApproval ? 'audit' : 'approve', notes || undefined);
     } catch (error) {
       alert(error instanceof Error ? error.message : 'تعذر اعتماد التسوية.');
     }
