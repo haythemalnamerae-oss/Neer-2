@@ -166,6 +166,42 @@ app.post('/api/v1/task-events/lifecycle', async (req, res) => {
   }
 });
 
+
+app.post('/api/v1/finance/:workflow', async (req, res) => {
+  const auth = (req as AuthenticatedRequest).auth;
+  if (!['admin','finance_officer'].includes(auth.role)) {
+    return res.status(403).json({ error: { code: 'FINANCE_ROLE_REQUIRED', message: 'Finance officer or administrator role required.' } });
+  }
+  const body = req.body as Record<string, any> | undefined;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return res.status(400).json({ error: { code: 'INVALID_BODY', message: 'JSON object required.' } });
+  }
+  const workflows: Record<string, { rpc: string; args: (value: Record<string, any>) => Record<string, unknown> }> = {
+    'create-expense': { rpc: 'finance_create_expense', args: (v) => ({ p_org: auth.organizationId, p_payload: v.payload, p_idempotency: v.idempotencyKey }) },
+    'review-expense': { rpc: 'finance_review_expense', args: (v) => ({ p_org: auth.organizationId, p_expense_id: v.expenseId, p_approve: v.approve, p_reason: v.reason ?? null }) },
+    'replenish-fund': { rpc: 'finance_replenish_fund', args: (v) => ({ p_org: auth.organizationId, p_fund_id: v.fundId, p_amount: v.amount, p_notes: v.notes ?? null, p_idempotency: v.idempotencyKey }) },
+    'standing-entry': { rpc: 'finance_create_standing_entry', args: (v) => ({ p_org: auth.organizationId, p_payload: v.payload, p_idempotency: v.idempotencyKey }) },
+    'create-settlement': { rpc: 'finance_create_settlement', args: (v) => ({ p_org: auth.organizationId, p_fund_id: v.fundId, p_period_start: v.periodStart, p_period_end: v.periodEnd, p_expense_ids: v.expenseIds ?? null, p_idempotency: v.idempotencyKey }) },
+    'close-settlement': { rpc: 'finance_close_settlement', args: (v) => ({ p_org: auth.organizationId, p_settlement_id: v.settlementId, p_approve: v.approve, p_notes: v.notes ?? null }) },
+  };
+  const workflow = workflows[req.params.workflow];
+  if (!workflow) return res.status(404).json({ error: { code: 'FINANCE_WORKFLOW_NOT_FOUND' } });
+  if (['create-expense','replenish-fund','standing-entry','create-settlement'].includes(req.params.workflow) &&
+      (typeof body.idempotencyKey !== 'string' || !uuidPattern.test(body.idempotencyKey))) {
+    return res.status(400).json({ error: { code: 'IDEMPOTENCY_KEY_REQUIRED', message: 'Provide a UUID idempotencyKey.' } });
+  }
+  if (req.params.workflow === 'review-expense' && (typeof body.expenseId !== 'string' || typeof body.approve !== 'boolean')) return res.status(400).json({ error: { code: 'INVALID_REVIEW' } });
+  if (req.params.workflow === 'close-settlement' && (typeof body.settlementId !== 'string' || typeof body.approve !== 'boolean')) return res.status(400).json({ error: { code: 'INVALID_SETTLEMENT_REVIEW' } });
+  try {
+    const response = await supabaseFetch('/rest/v1/rpc/' + workflow.rpc, auth.token, { method: 'POST', body: JSON.stringify(workflow.args(body)) });
+    if (!response.ok) return sendDbError(res, response.status, await response.text());
+    return res.status(200).json(await response.json());
+  } catch (error) {
+    console.error('Finance workflow failed:', error);
+    return res.status(503).json({ error: { code: 'FINANCE_WORKFLOW_FAILED', message: 'The financial transaction could not be completed.' } });
+  }
+});
+
 app.all('/api/v1/:resource/:id?', async (req, res) => {
   const auth = (req as unknown as AuthenticatedRequest).auth;
   const resource = resources[req.params.resource as keyof typeof resources];
