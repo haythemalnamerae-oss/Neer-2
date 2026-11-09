@@ -87,7 +87,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
 
   const catCfg = categoryLabels[task.taskTypeCategory || 'field'] || categoryLabels.field;
 
-  const getFieldEventType = (action: 'started' | 'paused' | 'resumed' | 'completed'): FieldEventType => {
+  const getFieldEventType = (action: 'started' | 'paused' | 'resumed' | 'completed'): Extract<FieldEventType, 'visit_started' | 'visit_paused' | 'visit_resumed' | 'visit_completed' | 'task_started' | 'task_paused' | 'task_resumed' | 'task_completed'> => {
     const visit = task.taskTypeCategory === 'visit';
     return visit
       ? ({ started: 'visit_started', paused: 'visit_paused', resumed: 'visit_resumed', completed: 'visit_completed' } as const)[action]
