@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { Task, TaskStatus, TaskStepStatus } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
-import { captureRequiredLocation, recordTaskEvent, type FieldEventType } from '../../lib/operations/fieldEvents';
+import { captureRequiredLocation, recordTaskEvent, startFieldLocationTracking, stopFieldLocationTracking, type FieldEventType } from '../../lib/operations/fieldEvents';
 import { formatCurrency, TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG } from '../../lib/utils/format';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -106,6 +106,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
         details: { taskTitle: task.title },
       });
       dataStore.startTask(task.id, { lat: location.latitude, lng: location.longitude });
+      startFieldLocationTracking(task.id);
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'تعذر توثيق الموقع والبدء.');
     } finally {
@@ -131,6 +132,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
           details: { reason: pauseReasonInput.trim() },
         });
         dataStore.pauseTask(task.id, pauseReasonInput.trim());
+        stopFieldLocationTracking(task.id);
         setIsPausePromptOpen(false);
         setPauseReasonInput('');
       } catch (error) {
@@ -153,6 +155,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
         location,
       });
       dataStore.resumeTask(task.id);
+      startFieldLocationTracking(task.id);
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'تعذر توثيق الاستئناف.');
     } finally {
