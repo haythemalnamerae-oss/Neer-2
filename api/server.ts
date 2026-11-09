@@ -16,7 +16,7 @@ const resources = {
   'task-attachments': { table: 'task_attachments', module: 'tasks' }, 'task-comments': { table: 'task_comments', module: 'tasks' },
   funds: { table: 'funds', module: 'funds' }, expenses: { table: 'expenses', module: 'expenses' },
   settlements: { table: 'settlements', module: 'settlements' }, 'settlement-expenses': { table: 'settlement_expenses', module: 'settlements' },
-  'cash-receipts': { table: 'cash_receipts', module: 'funds' }, 'standing-accounts': { table: 'standing_accounts', module: 'expenses' },
+  'cash-receipts': { table: 'cash_receipts', module: 'funds' }, 'standing-accounts': { table: 'standing_accounts', module: 'expenses' },\n  'fund-transactions': { table: 'fund_transactions', module: 'funds' }, 'standing-account-entries': { table: 'standing_account_entries', module: 'expenses' },
   'follow-ups': { table: 'follow_ups', module: 'followUps' }, notifications: { table: 'notifications', module: 'dashboard' },
   'audit-logs': { table: 'audit_logs', module: 'audit' }, users: { table: 'app_users', module: 'users' },
   roles: { table: 'roles', module: 'roles' }, settings: { table: 'system_settings', module: 'settings' },
@@ -27,10 +27,10 @@ type AuthContext = { token: string; userId: string; organizationId: string; role
 type AuthenticatedRequest = Request & { auth: AuthContext };
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const idPattern = /^[a-zA-Z0-9_-]{1,120}$/;
-const allowedFilters = new Set(['id','status','priority','assignee_id','fund_id','task_id','user_id','is_read','category','urgency','active','holder_id','scheduled_date','due_date','created_at']);
+const allowedFilters = new Set(['id','status','priority','assignee_id','fund_id','task_id','user_id','is_read','category','urgency','active','holder_id','scheduled_date','due_date','created_at','settlement_id','expense_id','standing_account_id']);
 const permissionActions = new Set(['view','create','edit','delete','approve']);
 // Financial balances and approvals must only change through atomic, audited database workflows.
-const transactionOnlyResources = new Set(['funds','expenses','settlements','settlement-expenses','cash-receipts','standing-accounts']);
+const transactionOnlyResources = new Set(['funds','expenses','settlements','settlement-expenses','cash-receipts','standing-accounts','fund-transactions','standing-account-entries']);
 
 async function supabaseFetch(path: string, token: string, init: RequestInit = {}) {
   return fetch(`${supabaseUrl}${path}`, { ...init, headers: { apikey: supabaseAnonKey!, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...init.headers } });
@@ -177,7 +177,7 @@ app.post('/api/v1/finance/:workflow', async (req, res) => {
     return res.status(400).json({ error: { code: 'INVALID_BODY', message: 'JSON object required.' } });
   }
   const workflows: Record<string, { rpc: string; args: (value: Record<string, any>) => Record<string, unknown> }> = {
-    'create-expense': { rpc: 'finance_create_expense', args: (v) => ({ p_org: auth.organizationId, p_payload: v.payload, p_idempotency: v.idempotencyKey }) },
+    'create-fund': { rpc: 'finance_create_fund', args: (v) => ({ p_org: auth.organizationId, p_payload: v.payload, p_idempotency: v.idempotencyKey }) },\n    'create-standing-account': { rpc: 'finance_create_standing_account', args: (v) => ({ p_org: auth.organizationId, p_payload: v.payload, p_idempotency: v.idempotencyKey }) },\n    'create-cash-receipt': { rpc: 'finance_create_cash_receipt', args: (v) => ({ p_org: auth.organizationId, p_payload: v.payload, p_idempotency: v.idempotencyKey }) },\n    'settle-standing-account': { rpc: 'finance_settle_standing_account', args: (v) => ({ p_org: auth.organizationId, p_account_id: v.accountId, p_amount: v.amount, p_fund_id: v.fundId, p_entry_date: v.entryDate, p_reference: v.reference, p_idempotency: v.idempotencyKey }) },\n    'review-settlement': { rpc: 'finance_review_settlement', args: (v) => ({ p_org: auth.organizationId, p_settlement_id: v.settlementId, p_action: v.action, p_notes: v.notes ?? null }) },\n    'create-expense': { rpc: 'finance_create_expense', args: (v) => ({ p_org: auth.organizationId, p_payload: v.payload, p_idempotency: v.idempotencyKey }) },
     'review-expense': { rpc: 'finance_review_expense', args: (v) => ({ p_org: auth.organizationId, p_expense_id: v.expenseId, p_approve: v.approve, p_reason: v.reason ?? null }) },
     'replenish-fund': { rpc: 'finance_replenish_fund', args: (v) => ({ p_org: auth.organizationId, p_fund_id: v.fundId, p_amount: v.amount, p_notes: v.notes ?? null, p_idempotency: v.idempotencyKey }) },
     'standing-entry': { rpc: 'finance_create_standing_entry', args: (v) => ({ p_org: auth.organizationId, p_payload: v.payload, p_idempotency: v.idempotencyKey }) },
@@ -186,11 +186,11 @@ app.post('/api/v1/finance/:workflow', async (req, res) => {
   };
   const workflow = workflows[req.params.workflow];
   if (!workflow) return res.status(404).json({ error: { code: 'FINANCE_WORKFLOW_NOT_FOUND' } });
-  if (['create-expense','replenish-fund','standing-entry','create-settlement'].includes(req.params.workflow) &&
+  if (['create-fund','create-standing-account','create-cash-receipt','settle-standing-account','create-expense','replenish-fund','standing-entry','create-settlement'].includes(req.params.workflow) &&
       (typeof body.idempotencyKey !== 'string' || !uuidPattern.test(body.idempotencyKey))) {
     return res.status(400).json({ error: { code: 'IDEMPOTENCY_KEY_REQUIRED', message: 'Provide a UUID idempotencyKey.' } });
   }
-  if (req.params.workflow === 'review-expense' && (typeof body.expenseId !== 'string' || typeof body.approve !== 'boolean')) return res.status(400).json({ error: { code: 'INVALID_REVIEW' } });
+  if (req.params.workflow === 'review-settlement' && (typeof body.settlementId !== 'string' || !['audit','approve','reject'].includes(body.action))) return res.status(400).json({ error: { code: 'INVALID_SETTLEMENT_ACTION' } });\n  if (req.params.workflow === 'settle-standing-account' && (typeof body.accountId !== 'string' || typeof body.fundId !== 'string' || typeof body.amount !== 'number' || typeof body.reference !== 'string')) return res.status(400).json({ error: { code: 'INVALID_ACCOUNT_SETTLEMENT' } });\n  if (req.params.workflow === 'review-expense' && (typeof body.expenseId !== 'string' || typeof body.approve !== 'boolean')) return res.status(400).json({ error: { code: 'INVALID_REVIEW' } });
   if (req.params.workflow === 'close-settlement' && (typeof body.settlementId !== 'string' || typeof body.approve !== 'boolean')) return res.status(400).json({ error: { code: 'INVALID_SETTLEMENT_REVIEW' } });
   try {
     const response = await supabaseFetch('/rest/v1/rpc/' + workflow.rpc, auth.token, { method: 'POST', body: JSON.stringify(workflow.args(body)) });
