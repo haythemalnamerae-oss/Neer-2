@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { Task, TaskOutcome, TaskOutcomeReason } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
-import { captureRequiredLocation, recordTaskEvent, stopFieldLocationTracking } from '../../lib/operations/fieldEvents';
+import { captureRequiredLocation, recordFieldLifecycleEvent, stopFieldLocationTracking } from '../../lib/operations/fieldEvents';
 import { Button } from '../ui/button';
 
 interface TaskOutcomeModalProps {
@@ -174,9 +174,8 @@ export const TaskOutcomeModal: React.FC<TaskOutcomeModalProps> = ({
     if (task.taskTypeCategory === 'field' || task.taskTypeCategory === 'visit') {
       try {
         const location = await captureRequiredLocation();
-        await recordTaskEvent({
+        await recordFieldLifecycleEvent({
           taskId: task.id,
-          standingAccountId: task.standingAccountId,
           eventType: task.taskTypeCategory === 'visit' ? 'visit_completed' : 'task_completed',
           eventLabel: task.taskTypeCategory === 'visit' ? 'إنهاء الزيارة' : 'إنهاء المهمة الميدانية',
           location,
