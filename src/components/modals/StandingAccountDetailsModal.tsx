@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Modal } from '../ui/modal';
 import { Button } from '../ui/button';
 import { StandingAccount } from '../../types/domain';
-import { dataStore } from '../../lib/storage';
+import { dataStore } from '../../lib/storage';\nimport { FinanceApiService } from '../../services/finance-api.service';
 import { formatCurrency } from '../../lib/utils/format';
 
 interface StandingAccountDetailsModalProps {
@@ -33,7 +33,7 @@ export const StandingAccountDetailsModal: React.FC<StandingAccountDetailsModalPr
   const linkedExpenses = dataStore.getExpenses();
   const linkedTasks = dataStore.getTasks().filter((task) => task.standingAccountId === current.id);
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     const value = Number(amount);
     if (!Number.isFinite(value) || value <= 0) {
@@ -42,13 +42,13 @@ export const StandingAccountDetailsModal: React.FC<StandingAccountDetailsModalPr
     }
     try {
       if (mode === 'charge') {
-        dataStore.addStandingAccountCharge(current.id, value, date, description, reference);
+        await FinanceApiService.createStandingCharge(current.id, value, date, description, reference);
       } else {
         if (!fundId) {
           window.alert('حدد العهدة أو الصندوق الذي تمت منه التسوية.');
           return;
         }
-        dataStore.settleStandingAccount(current.id, value, fundId, date, reference);
+        await FinanceApiService.settleStandingAccount(current.id, value, fundId, date, reference);
       }
       setAmount('');
       setDescription('');
