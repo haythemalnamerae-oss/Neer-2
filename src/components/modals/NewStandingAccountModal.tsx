@@ -65,7 +65,6 @@ export const NewStandingAccountModal: React.FC<NewStandingAccountModalProps> = (
       address: address.trim() || undefined,
       direction,
       openingBalance: openingBalance ? Number(openingBalance) : 0,
-      currentBalance: openingBalance ? Number(openingBalance) : 0,
       currency: settings.currency,
       accountType: category === 'materials' ? 'grocery' : category === 'hospitality' ? 'hospitality' : category === 'transport' ? 'transport' : category === 'maintenance' ? 'maintenance' : category === 'vendor' ? 'vendor' : category === 'fuel' ? 'utility' : 'other',
       defaultAmount: defaultAmount ? parseFloat(defaultAmount) : undefined,
