@@ -267,6 +267,6 @@ export async function loadUiSnapshot(session: ApiSession): Promise<void> {
     ops_standing_accounts_v3: standingAccounts,
   };
   for (const [key, value] of Object.entries(storeData)) localStorage.setItem(key, JSON.stringify(value));
-  if (canReadFinance || canReadFieldFinance) dataStore.hydrateFinanceData({ funds, expenses, settlements, cashReceipts, standingAccounts });
+  if (canReadFinance || canReadFieldFinance) dataStore.hydrateFinanceData({ funds, expenses, settlements, cashReceipts, standingAccounts, users, currentUserId: session.appUserId });
   if (session.appUserId) localStorage.setItem('ops_current_user_id_v3', JSON.stringify(session.appUserId));
 }
