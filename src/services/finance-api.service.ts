@@ -24,12 +24,12 @@ export const FinanceApiService = {
     return workflow('replenish-fund', { fundId, amount, notes, idempotencyKey: idempotencyKey() });
   },
   createExpense(payload: {
-    fundId: string; amount: number; category: string; description: string; invoiceNumber?: string; vendorName: string;
+    fundId: string; amount: number; taxAmount: number; category: string; description: string; invoiceNumber?: string; vendorName: string;
     merchantName?: string; hasReceipt: boolean; receiptUrl?: string; expenseDate?: string; taskId?: string; notes?: string;
     standingAccountId?: string;
   }) {
     return workflow<Expense>('create-expense', { idempotencyKey: idempotencyKey(), payload: {
-      fund_id: payload.fundId, amount: payload.amount, tax_amount: 0, category: payload.category,
+      fund_id: payload.fundId, amount: payload.amount, tax_amount: payload.taxAmount, category: payload.category,
       description: payload.description, invoice_number: payload.invoiceNumber || '', vendor_name: payload.vendorName,
       merchant_name: payload.merchantName || null, has_receipt: payload.hasReceipt, receipt_url: payload.receiptUrl || null,
       expense_date: payload.expenseDate || new Date().toISOString().slice(0,10), task_id: payload.taskId || null,
