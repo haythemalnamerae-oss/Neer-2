@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { Task, TaskStatus, TaskStepStatus } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
-import { captureRequiredLocation, recordTaskEvent, startFieldLocationTracking, stopFieldLocationTracking, type FieldEventType } from '../../lib/operations/fieldEvents';
+import { captureRequiredLocation, recordFieldLifecycleEvent, recordTaskEvent, startFieldLocationTracking, stopFieldLocationTracking, type FieldEventType } from '../../lib/operations/fieldEvents';
 import { formatCurrency, TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG } from '../../lib/utils/format';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -102,9 +102,8 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     setIsLocating(true);
     try {
       const location = await captureRequiredLocation();
-      await recordTaskEvent({
+      await recordFieldLifecycleEvent({
         taskId: task.id,
-        standingAccountId: task.standingAccountId,
         eventType: getFieldEventType('started'),
         eventLabel: task.taskTypeCategory === 'visit' ? 'بدء الزيارة' : 'بدء المهمة الميدانية',
         location,
@@ -134,9 +133,8 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     void (async () => {
       try {
         const location = await captureRequiredLocation();
-        await recordTaskEvent({
+        await recordFieldLifecycleEvent({
           taskId: task.id,
-          standingAccountId: task.standingAccountId,
           eventType: getFieldEventType('paused'),
           eventLabel: 'إيقاف مؤقت',
           location,
@@ -162,9 +160,8 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     setIsLocating(true);
     try {
       const location = await captureRequiredLocation();
-      await recordTaskEvent({
+      await recordFieldLifecycleEvent({
         taskId: task.id,
-        standingAccountId: task.standingAccountId,
         eventType: getFieldEventType('resumed'),
         eventLabel: 'استئناف العمل الميداني',
         location,
