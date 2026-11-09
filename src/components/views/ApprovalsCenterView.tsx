@@ -8,7 +8,8 @@ import {
 } from 'lucide-react';
 import { dataStore } from '../../lib/storage';
 import { hasPermission } from '../../lib/rbac/permissions';
-import { formatCurrency } from '../../lib/utils/format';\nimport { FinanceApiService } from '../../services/finance-api.service';
+import { formatCurrency } from '../../lib/utils/format';
+import { FinanceApiService } from '../../services/finance-api.service';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 
@@ -63,7 +64,8 @@ export const ApprovalsCenterView: React.FC<ApprovalsCenterViewProps> = ({ onSele
 
   const handleApproveSettlement = async (id: string) => {
     const notes = window.prompt('ملاحظات التدقيق والمصادقة على التسوية:', `تم تدقيق الفواتير ومطابقة الرصيد والتحقق من الضريبة ${settings.taxRate}%`);
-    const settlement = settlements.find((item) => item.id === id);\n    try { await FinanceApiService.reviewSettlement(id, settlement?.status === 'under_review' && settings.requireDualApprovalForSettlements ? 'audit' : 'approve', notes || undefined); }
+    const settlement = settlements.find((item) => item.id === id);
+    try { await FinanceApiService.reviewSettlement(id, settlement?.status === 'under_review' && settings.requireDualApprovalForSettlements ? 'audit' : 'approve', notes || undefined); }
     catch (error) { alert(error instanceof Error ? error.message : 'تعذر اعتماد التسوية.'); }
   };
 
