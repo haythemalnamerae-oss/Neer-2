@@ -192,7 +192,6 @@ app.post('/api/v1/finance/:workflow', async (req, res) => {
     'replenish-fund': { rpc: 'finance_replenish_fund', args: (v) => ({ p_org: auth.organizationId, p_fund_id: v.fundId, p_amount: v.amount, p_notes: v.notes ?? null, p_idempotency: v.idempotencyKey }) },
     'standing-entry': { rpc: 'finance_create_standing_entry', args: (v) => ({ p_org: auth.organizationId, p_payload: v.payload, p_idempotency: v.idempotencyKey }) },
     'create-settlement': { rpc: 'finance_create_settlement', args: (v) => ({ p_org: auth.organizationId, p_fund_id: v.fundId, p_period_start: v.periodStart, p_period_end: v.periodEnd, p_expense_ids: v.expenseIds ?? null, p_idempotency: v.idempotencyKey }) },
-    'close-settlement': { rpc: 'finance_close_settlement', args: (v) => ({ p_org: auth.organizationId, p_settlement_id: v.settlementId, p_approve: v.approve, p_notes: v.notes ?? null }) },
   };
   const workflow = workflows[req.params.workflow];
   if (!workflow) return res.status(404).json({ error: { code: 'FINANCE_WORKFLOW_NOT_FOUND' } });
@@ -204,7 +203,6 @@ app.post('/api/v1/finance/:workflow', async (req, res) => {
   if (req.params.workflow === 'review-settlement' && (typeof body.settlementId !== 'string' || !['audit','approve','reject'].includes(body.action))) return res.status(400).json({ error: { code: 'INVALID_SETTLEMENT_ACTION' } });
   if (req.params.workflow === 'settle-standing-account' && (typeof body.accountId !== 'string' || typeof body.fundId !== 'string' || typeof body.amount !== 'number' || typeof body.reference !== 'string')) return res.status(400).json({ error: { code: 'INVALID_ACCOUNT_SETTLEMENT' } });
   if (req.params.workflow === 'review-expense' && (typeof body.expenseId !== 'string' || typeof body.approve !== 'boolean')) return res.status(400).json({ error: { code: 'INVALID_REVIEW' } });
-  if (req.params.workflow === 'close-settlement' && (typeof body.settlementId !== 'string' || typeof body.approve !== 'boolean')) return res.status(400).json({ error: { code: 'INVALID_SETTLEMENT_REVIEW' } });
   try {
     const response = await supabaseFetch('/rest/v1/rpc/' + workflow.rpc, auth.token, { method: 'POST', body: JSON.stringify(workflow.args(body)) });
     if (!response.ok) return sendDbError(res, response.status, await response.text());
