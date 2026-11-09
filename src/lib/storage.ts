@@ -1853,6 +1853,28 @@ export class OpsDataStore {
     this.notify();
   }
 
+
+  /** Replace only finance collections after an authenticated server refresh. */
+  public hydrateFinanceData(data: {
+    funds: PettyCashFund[];
+    expenses: Expense[];
+    settlements: Settlement[];
+    cashReceipts: CashReceipt[];
+    standingAccounts: StandingAccount[];
+  }): void {
+    this.funds = data.funds;
+    this.expenses = data.expenses;
+    this.settlements = data.settlements;
+    this.cashReceipts = data.cashReceipts;
+    this.standingAccounts = data.standingAccounts;
+    safeSet(STORAGE_KEYS.FUNDS, this.funds);
+    safeSet(STORAGE_KEYS.EXPENSES, this.expenses);
+    safeSet(STORAGE_KEYS.SETTLEMENTS, this.settlements);
+    safeSet(STORAGE_KEYS.CASH_RECEIPTS, this.cashReceipts);
+    safeSet(STORAGE_KEYS.STANDING_ACCOUNTS, this.standingAccounts);
+    this.notify();
+  }
+
   // --- Follow Ups ---
   public getFollowUps(): FollowUp[] {
     return [...this.followUps];
