@@ -183,19 +183,32 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     setDeferredDateInput('');
   };
 
-  const handleAddSubTask = (e: React.FormEvent) => {
+  const handleAddSubTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSubTaskTitle.trim()) return;
     const assignee = users.find((u) => u.id === newSubTaskAssignee) || currentUser;
-    dataStore.addSubTask(task.id, {
-      title: newSubTaskTitle.trim(),
-      assigneeId: assignee.id,
-      assigneeName: assignee.name,
-      status: 'scheduled',
-      requiresApproval: true,
-      isApproved: false,
-    });
-    setNewSubTaskTitle('');
+    try {
+      const location = await captureRequiredLocation();
+      await recordTaskEvent({
+        taskId: task.id,
+        standingAccountId: task.standingAccountId,
+        eventType: 'subtask_created',
+        eventLabel: 'إضافة مهمة فرعية أثناء التنفيذ',
+        location,
+        details: { title: newSubTaskTitle.trim(), assigneeId: assignee.id, assigneeName: assignee.name },
+      });
+      dataStore.addSubTask(task.id, {
+        title: newSubTaskTitle.trim(),
+        assigneeId: assignee.id,
+        assigneeName: assignee.name,
+        status: 'scheduled',
+        requiresApproval: true,
+        isApproved: false,
+      });
+      setNewSubTaskTitle('');
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'تعذر توثيق المهمة الفرعية.');
+    }
   };
 
   const handleToggleChecklist = (itemId: string) => {
