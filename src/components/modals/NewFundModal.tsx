@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { dataStore } from '../../lib/storage';\nimport { FinanceApiService } from '../../services/finance-api.service';
+import { dataStore } from '../../lib/storage';
+import { FinanceApiService } from '../../services/finance-api.service';
 import { Modal } from '../ui/modal';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
