@@ -18,6 +18,7 @@ import {
 import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
 import { Task, TaskStatus } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
+import { captureRequiredLocation, recordFieldLifecycleEvent, startFieldLocationTracking, stopFieldLocationTracking } from '../../lib/operations/fieldEvents';
 import { hasPermission } from '../../lib/rbac/permissions';
 import { formatCurrency, TASK_STATUS_CONFIG } from '../../lib/utils/format';
 import { Button } from '../ui/button';
@@ -55,7 +56,6 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
 
   // Map API Key retrieval
   const apiKey = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || '';
-  const systemSettings = dataStore.getSettings();
 
   // Calculate task coordinates
   const tasksWithCoords = useMemo(() => visibleTasks.filter((task) => {
@@ -126,43 +126,87 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
     );
   };
 
-  const handleStartTaskWithLocation = (task: Task) => {
-    if (userLiveCoords) {
-      dataStore.startTask(task.id, { lat: userLiveCoords.lat, lng: userLiveCoords.lng });
-      alert(`تم بدء المهمة وتوثيق موقع التنفيذ الفعلي ووقته بالثانية والدقيقة بنجاح!`);
-      return;
-    }
+  const getFieldEventType = (task: Task, action: 'started' | 'paused' | 'resumed') => {
+    const visit = task.taskTypeCategory === 'visit';
+    if (visit) return ({ started: 'visit_started', paused: 'visit_paused', resumed: 'visit_resumed' } as const)[action];
+    return ({ started: 'task_started', paused: 'task_paused', resumed: 'task_resumed' } as const)[action];
+  };
 
-    if (!systemSettings.autoCaptureLocationWithoutApproval || !navigator.geolocation) {
+  const handleStartTaskWithLocation = async (task: Task) => {
+    if (task.taskTypeCategory !== 'field' && task.taskTypeCategory !== 'visit') {
       dataStore.startTask(task.id);
-      alert('تم بدء المهمة وتوثيق وقت البدء. حفظ الموقع التلقائي غير مفعّل في سياسة المنشأة.');
       return;
     }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const coords = { lat: position.coords.latitude, lng: position.coords.longitude };
-        dataStore.startTask(task.id, coords);
-        setUserLiveCoords({ ...coords, accuracy: Math.round(position.coords.accuracy) });
-        alert('تم بدء المهمة وحفظ موقع التنفيذ تلقائياً وفق سياسة المنشأة، دون طلب موافقة إضافية.');
-      },
-      () => {
-        dataStore.startTask(task.id);
-        alert('تم بدء المهمة، وتعذر تحديد الموقع حالياً.');
-      },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
-    );
-  };
-
-  const handlePauseTask = (task: Task) => {
-    const reason = window.prompt('يرجى كتابة سبب الإيقاف المؤقت للمهمة:', 'انتظار توريد المواد / موافقة المشرف');
-    if (reason) {
-      dataStore.pauseTask(task.id, reason);
+    setIsLocating(true);
+    try {
+      const location = await captureRequiredLocation();
+      await recordFieldLifecycleEvent({
+        taskId: task.id,
+        eventType: getFieldEventType(task, 'started'),
+        eventLabel: task.taskTypeCategory === 'visit' ? 'بدء الزيارة' : 'بدء المهمة الميدانية',
+        location,
+        details: { taskTitle: task.title, source: 'field_map' },
+      });
+      const coords = { lat: location.latitude, lng: location.longitude };
+      dataStore.startTask(task.id, coords);
+      setUserLiveCoords({ ...coords, accuracy: Math.round(location.accuracyMeters) });
+      startFieldLocationTracking(task.id);
+      setLocationSuccessMsg('تم بدء التنفيذ وتوثيق الحدث والموقع على الخادم بنجاح.');
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'تعذر بدء المهمة دون موقع GPS موثق.');
+    } finally {
+      setIsLocating(false);
     }
   };
 
-  const handleResumeTask = (task: Task) => {
-    dataStore.resumeTask(task.id);
+  const handlePauseTask = async (task: Task) => {
+    const reason = window.prompt('يرجى كتابة سبب الإيقاف المؤقت للمهمة:', 'انتظار توريد المواد / موافقة المشرف');
+    if (!reason?.trim()) return;
+    if (task.taskTypeCategory !== 'field' && task.taskTypeCategory !== 'visit') {
+      dataStore.pauseTask(task.id, reason.trim());
+      return;
+    }
+    setIsLocating(true);
+    try {
+      const location = await captureRequiredLocation();
+      await recordFieldLifecycleEvent({
+        taskId: task.id,
+        eventType: getFieldEventType(task, 'paused'),
+        eventLabel: 'إيقاف مؤقت من الخريطة الميدانية',
+        location,
+        details: { reason: reason.trim(), source: 'field_map' },
+      });
+      dataStore.pauseTask(task.id, reason.trim());
+      stopFieldLocationTracking(task.id);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'تعذر توثيق الإيقاف المؤقت.');
+    } finally {
+      setIsLocating(false);
+    }
+  };
+
+  const handleResumeTask = async (task: Task) => {
+    if (task.taskTypeCategory !== 'field' && task.taskTypeCategory !== 'visit') {
+      dataStore.resumeTask(task.id);
+      return;
+    }
+    setIsLocating(true);
+    try {
+      const location = await captureRequiredLocation();
+      await recordFieldLifecycleEvent({
+        taskId: task.id,
+        eventType: getFieldEventType(task, 'resumed'),
+        eventLabel: 'استئناف العمل من الخريطة الميدانية',
+        location,
+        details: { source: 'field_map' },
+      });
+      dataStore.resumeTask(task.id);
+      startFieldLocationTracking(task.id);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'تعذر توثيق استئناف المهمة.');
+    } finally {
+      setIsLocating(false);
+    }
   };
 
   const mapCenter = useMemo(() => {
