@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { dataStore } from '../../lib/storage';
-import { SettlementsService } from '../../services/settlements.service';
+import { FinanceApiService } from '../../services/finance-api.service';
 import { Modal } from '../ui/modal';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
@@ -37,7 +37,7 @@ export const NewSettlementModal: React.FC<NewSettlementModalProps> = ({ isOpen, 
   ), [expenses, fundId, periodStart, periodEnd, alreadyIncludedIds]);
   const totalExpensesAmount = eligibleExpenses.reduce((sum, expense) => sum + expense.totalWithTax, 0);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fundId || !periodStart || !periodEnd || periodStart > periodEnd || eligibleExpenses.length === 0) {
       alert('تحقق من العهدة والفترة، وتأكد من وجود فواتير معتمدة غير مسواة ضمنها.');
