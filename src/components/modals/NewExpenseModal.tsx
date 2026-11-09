@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { dataStore } from '../../lib/storage';
+import { dataStore } from '../../lib/storage';\nimport { FinanceApiService } from '../../services/finance-api.service';
 import { hasPermission } from '../../lib/rbac/permissions';
 import { ExpenseCategory, StandingAccount } from '../../types/domain';
 import { formatCurrency, EXPENSE_CATEGORY_CONFIG } from '../../lib/utils/format';
@@ -161,7 +161,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
     setVendorName(newAcc.vendorName || newAcc.name);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canCreateExpense) { alert('لا تملك صلاحية تسجيل المصروفات.'); return; }
     if (!fundId || numAmount <= 0 || !description.trim() || !vendorName.trim() || (settings.requireInvoiceNumber && !invoiceNumber.trim())) {
