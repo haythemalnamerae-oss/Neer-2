@@ -126,16 +126,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
     }
 
     try {
-      dataStore.addCashReceipt({
-      amount: amt,
-      source: receiptSource.trim(),
-      type: receiptType,
-      receivedBy: currentUser.name,
-      date: new Date().toISOString().split('T')[0],
-      notes: receiptNotes || undefined,
-      fundId: receiptType === 'cash_box' ? receiptFundId : undefined,
-      fundName: receiptType === 'cash_box' ? funds.find((fund) => fund.id === receiptFundId)?.name : undefined,
-      });
+      await FinanceApiService.createCashReceipt({ amount: amt, source: receiptSource.trim(), type: receiptType, receiptDate: new Date().toISOString().slice(0,10), notes: receiptNotes || undefined, fundId: receiptType === 'cash_box' ? receiptFundId : undefined });
     } catch (error) {
       alert(error instanceof Error ? error.message : 'تعذر تسجيل المقبوض.');
       return;
