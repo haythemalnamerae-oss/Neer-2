@@ -453,3 +453,20 @@ export interface PermissionRule {
     approve: boolean;
   };
 }
+
+export interface TaskEvent {
+  id: string;
+  taskId: string;
+  standingAccountId?: string;
+  actorAuthUserId: string;
+  eventType: string;
+  eventLabel: string;
+  occurredAt: string;
+  receivedAt: string;
+  latitude?: number;
+  longitude?: number;
+  accuracyMeters?: number;
+  locationStatus: 'captured' | 'permission_denied' | 'services_disabled' | 'unavailable' | 'timeout' | 'not_requested';
+  clientEventId: string;
+  details: Record<string, unknown>;
+}
