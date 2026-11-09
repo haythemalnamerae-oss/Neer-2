@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Modal } from '../ui/modal';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
-import { dataStore } from '../../lib/storage';
+import { dataStore } from '../../lib/storage';\nimport { FinanceApiService } from '../../services/finance-api.service';
 import { StandingAccount } from '../../types/domain';
 import { SmartSelect } from '../ui/SmartSelect';
 
@@ -47,7 +47,7 @@ export const NewStandingAccountModal: React.FC<NewStandingAccountModalProps> = (
     { value: 'other', label: 'مصروفات أخرى معتادة', icon: '📑' },
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       alert('يرجى كتابة اسم الحساب أو المورد المعتاد');
