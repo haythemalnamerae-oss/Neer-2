@@ -183,8 +183,9 @@ const fromSnake = (row: Record<string, any>) => {
 export async function loadUiSnapshot(session: ApiSession): Promise<void> {
   const common = ['tasks','task-checklist','task-steps','task-subtasks','task-updates','task-history','task-attachments','task-comments','task-events','follow-ups','notifications'];
   const finance = ['funds','expenses','settlements','cash-receipts','standing-accounts'];
-  const canReadUserDirectory = ['admin', 'finance_officer', 'ops_manager'].includes(session.role);
-  const collections = session.role === 'admin' || session.role === 'finance_officer' ? [...common, ...finance, 'users'] : canReadUserDirectory ? [...common, 'users'] : common;
+  const canReadUserDirectory = session.role === 'admin' || session.role === 'ops_manager';
+  const canReadFinance = session.role === 'admin' || session.role === 'finance_officer';
+  const collections = [...common, ...(canReadFinance ? finance : []), ...(canReadUserDirectory ? ['users'] : [])];
   const values = await Promise.all(collections.map(async (name) => [name, await apiRequest<Record<string, any>[]>(session, `/${name}?limit=500`)] as const));
   const data = Object.fromEntries(values);
 
