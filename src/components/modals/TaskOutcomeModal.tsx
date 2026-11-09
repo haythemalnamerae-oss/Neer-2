@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { Task, TaskOutcome, TaskOutcomeReason } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
-import { captureRequiredLocation, recordTaskEvent } from '../../lib/operations/fieldEvents';
+import { captureRequiredLocation, recordTaskEvent, stopFieldLocationTracking } from '../../lib/operations/fieldEvents';
 import { Button } from '../ui/button';
 
 interface TaskOutcomeModalProps {
@@ -188,6 +188,7 @@ export const TaskOutcomeModal: React.FC<TaskOutcomeModalProps> = ({
       }
     }
 
+    stopFieldLocationTracking(task.id);
     const res = dataStore.recordTaskOutcome(task.id, {
       outcome: selectedOutcome,
       reason: finalReason,
