@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { dataStore } from '../../lib/storage';
 import { hasPermission } from '../../lib/rbac/permissions';
-import { ReportsService } from '../../services/reports.service';
+import { ReportsService } from '../../services/reports.service';\nimport { FinanceApiService } from '../../services/finance-api.service';
 import { formatCurrency, EXPENSE_CATEGORY_CONFIG } from '../../lib/utils/format';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -68,22 +68,22 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
     document.body.removeChild(link);
   };
 
-  const handleApprove = (id: string) => {
+  const handleApprove = async (id: string) => {
     const expense = expenses.find((item) => item.id === id);
     const notes = expense?.specialAuditRequired ? window.prompt('هذا المصروف تجاوز حد الصرف الفردي أو الشهري. أدخل ملاحظة التدقيق قبل الاعتماد:') : undefined;
     if (expense?.specialAuditRequired && !notes?.trim()) return;
     try {
-      dataStore.updateExpenseStatus(id, 'approved', notes?.trim());
+      await FinanceApiService.reviewExpense(id, true, notes?.trim());
     } catch (error) {
       alert(error instanceof Error ? error.message : 'تعذر اعتماد الفاتورة.');
     }
   };
 
-  const handleReject = (id: string) => {
+  const handleReject = async (id: string) => {
     const reason = window.prompt('سبب رفض الفاتورة:', 'نقص في بيانات الفاتورة');
     if (reason?.trim()) {
       try {
-        dataStore.updateExpenseStatus(id, 'rejected', reason.trim());
+        await FinanceApiService.reviewExpense(id, false, reason.trim());
       } catch (error) {
         alert(error instanceof Error ? error.message : 'تعذر رفض الفاتورة.');
       }
