@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { dataStore } from '../../lib/storage';
+import { dataStore } from '../../lib/storage';\nimport { FinanceApiService } from '../../services/finance-api.service';
 import { Modal } from '../ui/modal';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
@@ -19,7 +19,7 @@ export const NewFundModal: React.FC<NewFundModalProps> = ({ isOpen, onClose }) =
   const [warningThreshold, setWarningThreshold] = useState(String(settings.fundWarningThresholdPercent));
   const [purpose, setPurpose] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !holderId || !Number.isFinite(Number(totalAllocation)) || Number(totalAllocation) <= 0 || !Number.isFinite(Number(warningThreshold)) || Number(warningThreshold) < 0 || Number(warningThreshold) > 100) {
       alert('يرجى ملء جميع الحقول المطلوبة');
