@@ -114,6 +114,43 @@ app.put('/api/v1/admin/permissions/:roleKey', async (req, res) => {
   } catch (error) { console.error(error); return res.status(502).json({ error: { code: 'RBAC_WRITE_FAILED', message: 'Unable to save permissions.' } }); }
 });
 
+app.post('/api/v1/task-events/lifecycle', async (req, res) => {
+  const auth = (req as AuthenticatedRequest).auth;
+  try {
+    if (!(await allowed(auth, 'tasks', 'edit'))) {
+      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Missing permission tasks.edit.' } });
+    }
+    const body = req.body as Record<string, unknown> | undefined;
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!body || typeof body.task_id !== 'string' || !idPattern.test(body.task_id) ||
+        typeof body.event_type !== 'string' || typeof body.event_label !== 'string' ||
+        typeof body.latitude !== 'number' || typeof body.longitude !== 'number' ||
+        typeof body.accuracy_meters !== 'number' || typeof body.client_event_id !== 'string' ||
+        !uuid.test(body.client_event_id) || !body.details || typeof body.details !== 'object' || Array.isArray(body.details)) {
+      return res.status(400).json({ error: { code: 'INVALID_FIELD_EVENT', message: 'A task, lifecycle event, valid GPS fix, idempotency key and JSON details are required.' } });
+    }
+    const response = await supabaseFetch('/rest/v1/rpc/record_field_task_event', auth.token, {
+      method: 'POST',
+      body: JSON.stringify({
+        p_organization_id: auth.organizationId,
+        p_task_id: body.task_id,
+        p_event_type: body.event_type,
+        p_event_label: body.event_label,
+        p_latitude: body.latitude,
+        p_longitude: body.longitude,
+        p_accuracy_meters: body.accuracy_meters,
+        p_details: body.details,
+        p_client_event_id: body.client_event_id,
+      }),
+    });
+    if (!response.ok) return sendDbError(res, response.status, await response.text());
+    return res.status(200).json({ eventId: await response.json() });
+  } catch (error) {
+    console.error('Field lifecycle transaction failed:', error);
+    return res.status(503).json({ error: { code: 'FIELD_EVENT_FAILED', message: 'Could not save the field event and task state atomically.' } });
+  }
+});
+
 app.all('/api/v1/:resource/:id?', async (req, res) => {
   const auth = (req as unknown as AuthenticatedRequest).auth;
   const resource = resources[req.params.resource as keyof typeof resources];
