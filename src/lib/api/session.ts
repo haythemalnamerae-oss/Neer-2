@@ -193,9 +193,11 @@ export async function loadUiSnapshot(session: ApiSession): Promise<void> {
   const data = Object.fromEntries(values);
 
   const users = (data.users || []).map(asDomainUser);
-  if (users.length === 0) {
+  let currentProfileId: string | undefined;
+  if (!session.appUserId || users.length === 0) {
     const currentProfile = await apiRequest<Record<string, any>>(session, '/me');
-    users.push(asDomainUser(currentProfile));
+    currentProfileId = typeof currentProfile.id === 'string' ? currentProfile.id : undefined;
+    if (users.length === 0) users.push(asDomainUser(currentProfile));
   }
   const byId = (rows: Record<string, any>[] = []) => new Map(rows.map((row) => [row.id, fromSnake(row)]));
   const checklist = byId(data['task-checklist']);
@@ -267,6 +269,6 @@ export async function loadUiSnapshot(session: ApiSession): Promise<void> {
     ops_standing_accounts_v3: standingAccounts,
   };
   for (const [key, value] of Object.entries(storeData)) localStorage.setItem(key, JSON.stringify(value));
-  dataStore.hydrateFinanceData({ funds: canReadFinance || canReadFieldFinance ? funds : [], expenses: canReadFinance || canReadFieldFinance ? expenses : [], settlements: canReadFinance ? settlements : [], cashReceipts: canReadFinance ? cashReceipts : [], standingAccounts: canReadFinance || canReadFieldFinance ? standingAccounts : [], users, currentUserId: session.appUserId || users[0]?.id });
+  dataStore.hydrateFinanceData({ funds: canReadFinance || canReadFieldFinance ? funds : [], expenses: canReadFinance || canReadFieldFinance ? expenses : [], settlements: canReadFinance ? settlements : [], cashReceipts: canReadFinance ? cashReceipts : [], standingAccounts: canReadFinance || canReadFieldFinance ? standingAccounts : [], users, currentUserId: session.appUserId || currentProfileId });
   if (session.appUserId) localStorage.setItem('ops_current_user_id_v3', JSON.stringify(session.appUserId));
 }
