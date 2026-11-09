@@ -171,6 +171,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
     }
 
     const selectedAccount = standingAccounts.find((account) => account.id === selectedStandingAccId);
+    const standingAcc = selectedAccount;
     const supplierCredit = Boolean(selectedAccount && (selectedAccount.direction === 'payable' || selectedAccount.direction === 'payable_by_us'));
 
     if (!supplierCredit && coverageMethod !== 'normal') {
