@@ -87,7 +87,7 @@ begin
     coalesce((select name from public.app_users where organization_id=p_org and auth_user_id=auth.uid() limit 1),''),'finance_officer',
     'تسجيل مصروف','create','expense',v_id,'تم تسجيل المصروف بانتظار الاعتماد؛ لم يُخصم من العهدة بعد.');
   return to_jsonb(v_expense);
-end $$;
+end $finance$;
 
 alter table public.expenses add column if not exists idempotency_key uuid;
 create unique index if not exists expenses_org_idempotency_uidx
@@ -122,7 +122,7 @@ begin
   values(p_org,coalesce(v_name,''),'finance_officer',case when p_approve then 'اعتماد مصروف' else 'رفض مصروف' end,
     case when p_approve then 'approve' else 'reject' end,'expense',v_exp.id,coalesce(p_reason,''));
   return to_jsonb(v_exp);
-end $$;
+end $finance$;
 
 create or replace function public.finance_replenish_fund(p_org uuid,p_fund_id text,p_amount numeric,p_notes text,p_idempotency uuid)
 returns jsonb language plpgsql security invoker set search_path = '' as $finance$
@@ -140,7 +140,7 @@ begin
   insert into public.fund_transactions(organization_id,fund_id,transaction_type,amount,balance_delta,description,idempotency_key)
   values(p_org,p_fund_id,'replenishment',p_amount,p_amount,coalesce(p_notes,'تغذية عهدة'),p_idempotency) returning * into v_tx;
   return jsonb_build_object('fund',to_jsonb(v_fund),'transaction',to_jsonb(v_tx));
-end $$;
+end $finance$;
 
 create or replace function public.finance_create_standing_entry(p_org uuid,p_payload jsonb,p_idempotency uuid)
 returns jsonb language plpgsql security invoker set search_path = '' as $finance$
@@ -160,7 +160,7 @@ begin
     coalesce(nullif(p_payload->>'entry_date','')::date,current_date),coalesce(p_payload->>'description',''),p_payload->>'reference',
     p_payload->>'invoice_image_url',p_payload->'ocr_data',p_idempotency) returning * into v_entry;
   return to_jsonb(v_entry);
-end $$;
+end $finance$;
 
 create or replace function public.finance_create_settlement(p_org uuid,p_fund_id text,p_period_start date,p_period_end date,p_expense_ids text[],p_idempotency uuid)
 returns jsonb language plpgsql security invoker set search_path = '' as $finance$
@@ -188,7 +188,7 @@ begin
   insert into public.settlement_expenses(organization_id,settlement_id,expense_id)
     select p_org,v_id,unnest(v_ids);
   return to_jsonb(v_settlement);
-end $$;
+end $finance$;
 
 create or replace function public.finance_close_settlement(p_org uuid,p_settlement_id text,p_approve boolean,p_notes text default null)
 returns jsonb language plpgsql security invoker set search_path = '' as $finance$
@@ -210,7 +210,7 @@ begin
       where organization_id=p_org and id=p_settlement_id returning * into v_settlement;
   end if;
   return to_jsonb(v_settlement);
-end $$;
+end $finance$;
 
 revoke all on function public.finance_create_expense(uuid,jsonb,uuid) from public,anon;
 revoke all on function public.finance_review_expense(uuid,text,boolean,text) from public,anon;
