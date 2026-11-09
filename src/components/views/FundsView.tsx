@@ -17,7 +17,8 @@ import {
 import { PettyCashFund, StandingAccount } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
 import { hasPermission } from '../../lib/rbac/permissions';
-import { formatCurrency } from '../../lib/utils/format';\nimport { FinanceApiService } from '../../services/finance-api.service';
+import { formatCurrency } from '../../lib/utils/format';
+import { FinanceApiService } from '../../services/finance-api.service';
 import { Button } from '../ui/button';
 import { NewStandingAccountModal } from '../modals/NewStandingAccountModal';
 import { StandingAccountDetailsModal } from '../modals/StandingAccountDetailsModal';
