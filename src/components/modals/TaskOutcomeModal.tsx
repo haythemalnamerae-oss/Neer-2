@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Task, TaskOutcome, TaskOutcomeReason } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
+import { captureRequiredLocation, recordTaskEvent } from '../../lib/operations/fieldEvents';
 import { Button } from '../ui/button';
 
 interface TaskOutcomeModalProps {
@@ -151,7 +152,7 @@ export const TaskOutcomeModal: React.FC<TaskOutcomeModalProps> = ({
     if (onSuccess) onSuccess();
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const isNonCompleted = selectedOutcome !== 'completed';
     const finalReason = isNonCompleted
@@ -169,6 +170,23 @@ export const TaskOutcomeModal: React.FC<TaskOutcomeModalProps> = ({
       assigneeId: followUpAssigneeId,
       assigneeName: users.find((u) => u.id === followUpAssigneeId)?.name || task.assigneeName,
     } : undefined;
+
+    if (task.taskTypeCategory === 'field' || task.taskTypeCategory === 'visit') {
+      try {
+        const location = await captureRequiredLocation();
+        await recordTaskEvent({
+          taskId: task.id,
+          standingAccountId: task.standingAccountId,
+          eventType: task.taskTypeCategory === 'visit' ? 'visit_completed' : 'task_completed',
+          eventLabel: task.taskTypeCategory === 'visit' ? 'إنهاء الزيارة' : 'إنهاء المهمة الميدانية',
+          location,
+          details: { outcome: selectedOutcome, reason: finalReason, notes },
+        });
+      } catch (error) {
+        window.alert(error instanceof Error ? error.message : 'تعذر توثيق موقع إنهاء المهمة.');
+        return;
+      }
+    }
 
     const res = dataStore.recordTaskOutcome(task.id, {
       outcome: selectedOutcome,
