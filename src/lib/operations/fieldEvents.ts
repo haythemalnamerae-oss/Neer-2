@@ -7,6 +7,7 @@ export type CapturedLocation = {
 };
 
 export type FieldEventType =
+  | 'location_sample'
   | 'visit_started' | 'visit_paused' | 'visit_resumed' | 'visit_completed'
   | 'task_started' | 'task_paused' | 'task_resumed' | 'task_completed'
   | 'subtask_created' | 'expense_recorded' | 'invoice_attached'
@@ -78,4 +79,70 @@ export async function recordTaskEvent(input: {
       details: input.details || {},
     }),
   });
+}
+
+const activeLocationWatches = new Map<string, number>();
+const LOCATION_SAMPLE_INTERVAL_MS = 60_000;
+
+async function recordLocationUnavailable(taskId: string, reason: FieldLocationError['reason']) {
+  const session = getSession();
+  if (!session) return;
+  const status = reason === 'permission_denied' ? 'permission_denied'
+    : reason === 'services_disabled' ? 'services_disabled'
+    : reason === 'timeout' ? 'timeout' : 'unavailable';
+  await apiRequest(session, '/task-events', {
+    method: 'POST',
+    body: JSON.stringify({
+      task_id: taskId,
+      event_type: 'location_unavailable',
+      event_label: 'فقدان إشارة الموقع أثناء التنفيذ',
+      occurred_at: new Date().toISOString(),
+      location_status: status,
+      client_event_id: crypto.randomUUID(),
+      details: { reason },
+    }),
+  });
+}
+
+/** Samples the foreground browser location once per minute while a visit is active. */
+export function startFieldLocationTracking(taskId: string): void {
+  if (typeof navigator === 'undefined' || !navigator.geolocation || activeLocationWatches.has(taskId)) return;
+  let lastRecordedAt = Date.now();
+  let failureRecorded = false;
+  const watchId = navigator.geolocation.watchPosition(
+    ({ coords }) => {
+      if (Date.now() - lastRecordedAt < LOCATION_SAMPLE_INTERVAL_MS) return;
+      lastRecordedAt = Date.now();
+      void recordTaskEvent({
+        taskId,
+        eventType: 'location_sample',
+        eventLabel: 'تحديث موقع الزيارة تلقائياً',
+        location: {
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          accuracyMeters: coords.accuracy,
+        },
+        details: { source: 'foreground_watch' },
+      }).catch((error) => console.error('Field location sample was not saved:', error));
+    },
+    (error) => {
+      if (failureRecorded) return;
+      failureRecorded = true;
+      const reason = error.code === error.PERMISSION_DENIED ? 'permission_denied'
+        : error.code === error.POSITION_UNAVAILABLE ? 'services_disabled' : 'timeout';
+      void recordLocationUnavailable(taskId, reason).catch((saveError) => {
+        console.error('Could not save location-unavailable event:', saveError);
+      });
+      stopFieldLocationTracking(taskId);
+    },
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 20_000 },
+  );
+  activeLocationWatches.set(taskId, watchId);
+}
+
+export function stopFieldLocationTracking(taskId: string): void {
+  const watchId = activeLocationWatches.get(taskId);
+  if (watchId === undefined) return;
+  navigator.geolocation.clearWatch(watchId);
+  activeLocationWatches.delete(taskId);
 }
