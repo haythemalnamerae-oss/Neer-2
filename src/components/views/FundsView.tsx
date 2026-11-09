@@ -17,7 +17,7 @@ import {
 import { PettyCashFund, StandingAccount } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
 import { hasPermission } from '../../lib/rbac/permissions';
-import { formatCurrency } from '../../lib/utils/format';
+import { formatCurrency } from '../../lib/utils/format';\nimport { FinanceApiService } from '../../services/finance-api.service';
 import { Button } from '../ui/button';
 import { NewStandingAccountModal } from '../modals/NewStandingAccountModal';
 import { StandingAccountDetailsModal } from '../modals/StandingAccountDetailsModal';
@@ -96,12 +96,12 @@ export const FundsView: React.FC<FundsViewProps> = ({
   const totalPendingDeficit = pendingDeficitExpenses.reduce((s, e) => s + (e.deficitAmount || e.totalWithTax), 0);
   const fundCurrencyForExpense = (fundId: string) => funds.find((fund) => fund.id === fundId)?.currency || settings.currency;
 
-  const handleConfirmReplenish = (e: React.FormEvent) => {
+  const handleConfirmReplenish = async (e: React.FormEvent) => {
     e.preventDefault();
     const amount = Number(replenishAmount);
     if (!replenishModalFund || !Number.isFinite(amount) || amount <= 0) return;
     try {
-      dataStore.replenishFund(replenishModalFund.id, amount, replenishNotes || 'تغذية رصيد تعويضية للعهدة النقدية');
+      await FinanceApiService.replenishFund(replenishModalFund.id, amount, replenishNotes || 'تغذية رصيد تعويضية للعهدة النقدية');
     } catch (error) {
       alert(error instanceof Error ? error.message : 'تعذر تغذية العهدة.');
       return;
@@ -111,7 +111,7 @@ export const FundsView: React.FC<FundsViewProps> = ({
     setReplenishNotes('');
   };
 
-  const handleCreateCashReceipt = (e: React.FormEvent) => {
+  const handleCreateCashReceipt = async (e: React.FormEvent) => {
     e.preventDefault();
     const amt = parseFloat(receiptAmount);
     if (!amt || amt <= 0 || !receiptSource.trim()) {
