@@ -11,7 +11,8 @@ import {
 } from 'lucide-react';
 import { dataStore } from '../../lib/storage';
 import { hasPermission } from '../../lib/rbac/permissions';
-import { ReportsService } from '../../services/reports.service';\nimport { FinanceApiService } from '../../services/finance-api.service';
+import { ReportsService } from '../../services/reports.service';
+import { FinanceApiService } from '../../services/finance-api.service';
 import { formatCurrency, EXPENSE_CATEGORY_CONFIG } from '../../lib/utils/format';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
