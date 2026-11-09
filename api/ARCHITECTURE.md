@@ -44,6 +44,7 @@ Database migrations:
 - `20261109030000_field_event_actor_mapping.sql`
 - `20261109040000_atomic_field_lifecycle.sql`
 - `20261109050000_field_lifecycle_timer.sql`
+- `20261109060000_field_event_actor_name.sql`
 
 **Platform boundary:** a browser cannot switch Android GPS on, guarantee background location collection after the browser is suspended, or reliably identify/disable an active VPN application. The current browser workflow blocks field actions when it cannot obtain a fresh GPS fix. Enforced GPS settings, background tracking, and VPN detection require a trusted native Android wrapper/device-management integration; they must not be simulated in browser code.
 
