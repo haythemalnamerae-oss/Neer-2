@@ -10,7 +10,7 @@ import {
 import { Settlement } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
 import { hasPermission } from '../../lib/rbac/permissions';
-import { SettlementsService } from '../../services/settlements.service';
+import { FinanceApiService } from '../../services/finance-api.service';
 import { formatCurrency } from '../../lib/utils/format';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -40,20 +40,20 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
     }, 200);
   };
 
-  const handleReject = (id: string) => {
+  const handleReject = async (id: string) => {
     const reason = window.prompt('سبب رفض التسوية وإعادة فواتيرها إلى قائمة التسوية:', 'توجد ملاحظات تحتاج إلى تصحيح');
     if (!reason?.trim()) return;
     try {
-      SettlementsService.reject(id, reason.trim());
+      await FinanceApiService.reviewSettlement(id, 'reject', reason.trim());
     } catch (error) {
       alert(error instanceof Error ? error.message : 'تعذر رفض التسوية.');
     }
   };
 
-  const handleApprove = (id: string) => {
+  const handleApprove = async (id: string) => {
     const notes = window.prompt('ملاحظات التدقيق والمطابقة:', `تمت مراجعة الفواتير والتحقق من الضريبة ${settings.taxRate}%`);
     try {
-      SettlementsService.approve(id, notes || undefined);
+      const settlement = settlements.find((item) => item.id === id);\n      await FinanceApiService.reviewSettlement(id, settlement?.status === 'under_review' ? 'audit' : 'approve', notes || undefined);
     } catch (error) {
       alert(error instanceof Error ? error.message : 'تعذر اعتماد التسوية.');
     }
