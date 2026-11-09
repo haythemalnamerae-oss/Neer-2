@@ -267,6 +267,6 @@ export async function loadUiSnapshot(session: ApiSession): Promise<void> {
     ops_standing_accounts_v3: standingAccounts,
   };
   for (const [key, value] of Object.entries(storeData)) localStorage.setItem(key, JSON.stringify(value));
-  dataStore.hydrateFinanceData({ funds: canReadFinance || canReadFieldFinance ? funds : [], expenses: canReadFinance || canReadFieldFinance ? expenses : [], settlements: canReadFinance ? settlements : [], cashReceipts: canReadFinance ? cashReceipts : [], standingAccounts: canReadFinance || canReadFieldFinance ? standingAccounts : [], users, currentUserId: session.appUserId });
+  dataStore.hydrateFinanceData({ funds: canReadFinance || canReadFieldFinance ? funds : [], expenses: canReadFinance || canReadFieldFinance ? expenses : [], settlements: canReadFinance ? settlements : [], cashReceipts: canReadFinance ? cashReceipts : [], standingAccounts: canReadFinance || canReadFieldFinance ? standingAccounts : [], users, currentUserId: session.appUserId || users[0]?.id });
   if (session.appUserId) localStorage.setItem('ops_current_user_id_v3', JSON.stringify(session.appUserId));
 }
