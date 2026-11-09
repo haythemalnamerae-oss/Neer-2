@@ -56,9 +56,19 @@ grant select on public.fund_transactions, public.standing_account_entries to aut
 drop policy if exists fund_transactions_finance_read on public.fund_transactions;
 create policy fund_transactions_finance_read on public.fund_transactions
   for select to authenticated using (private.has_org_role(organization_id,array['admin','finance_officer']));
+create policy fund_transactions_finance_insert on public.fund_transactions
+  for insert to authenticated with check (private.has_org_role(organization_id,array['admin','finance_officer']) and created_by=auth.uid());
+grant insert on public.fund_transactions to authenticated;
 drop policy if exists standing_entries_finance_read on public.standing_account_entries;
 create policy standing_entries_finance_read on public.standing_account_entries
   for select to authenticated using (private.has_org_role(organization_id,array['admin','finance_officer']));
+create policy standing_entries_finance_insert on public.standing_account_entries
+  for insert to authenticated with check (private.has_org_role(organization_id,array['admin','finance_officer']) and created_by=auth.uid());
+grant insert on public.standing_account_entries to authenticated;
+
+alter table public.expenses add column if not exists idempotency_key uuid;
+create unique index if not exists expenses_org_idempotency_uidx
+  on public.expenses(organization_id,idempotency_key) where idempotency_key is not null;
 
 create or replace function public.finance_create_expense(p_org uuid,p_payload jsonb,p_idempotency uuid)
 returns jsonb language plpgsql security invoker set search_path = '' as $finance$
@@ -88,10 +98,6 @@ begin
     'تسجيل مصروف','create','expense',v_id,'تم تسجيل المصروف بانتظار الاعتماد؛ لم يُخصم من العهدة بعد.');
   return to_jsonb(v_expense);
 end $finance$;
-
-alter table public.expenses add column if not exists idempotency_key uuid;
-create unique index if not exists expenses_org_idempotency_uidx
-  on public.expenses(organization_id,idempotency_key) where idempotency_key is not null;
 
 create or replace function public.finance_review_expense(p_org uuid,p_expense_id text,p_approve boolean,p_reason text default null)
 returns jsonb language plpgsql security invoker set search_path = '' as $finance$
