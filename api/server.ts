@@ -80,6 +80,21 @@ app.get('/health', (_req, res) => res.json({ status: 'ok', api: 'neer-v1' }));
 app.use('/api/v1', authenticate);
 app.get('/api/v1', (_req, res) => res.json({ version: 'v1', resources: Object.keys(resources).map((key) => `/api/v1/${key}`), admin: ['/api/v1/admin/permissions'] }));
 
+app.get('/api/v1/me', async (req, res) => {
+  const auth = (req as AuthenticatedRequest).auth;
+  const query = new URLSearchParams({
+    select: 'id,name,email,role,role_title_ar,phone,department,avatar,active,auth_user_id',
+    organization_id: `eq.${auth.organizationId}`,
+    auth_user_id: `eq.${auth.userId}`,
+    limit: '1',
+  });
+  const response = await supabaseFetch(`/rest/v1/app_users?${query}`, auth.token);
+  if (!response.ok) return sendDbError(res, response.status, await response.text());
+  const rows = await response.json() as Array<Record<string, unknown>>;
+  if (!rows[0]) return res.status(404).json({ error: { code: 'PROFILE_NOT_FOUND', message: 'No operational user profile is linked to this account.' } });
+  return res.json(rows[0]);
+});
+
 app.get('/api/v1/admin/permissions', async (req, res) => {
   const auth = (req as AuthenticatedRequest).auth;
   if (auth.role !== 'admin') return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Admin role required.' } });
