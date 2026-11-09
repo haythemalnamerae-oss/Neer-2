@@ -1,50 +1,33 @@
 import { dataStore } from '../lib/storage';
-import { Expense, ExpenseStatus, ExpenseCategory } from '../types/domain';
+import { Expense } from '../types/domain';
+import { FinanceApiService } from './finance-api.service';
 
 export class ExpensesService {
-  public static getAll(): Expense[] {
-    return dataStore.getExpenses();
-  }
+  public static getAll(): Expense[] { return dataStore.getExpenses(); }
+  public static getByFundId(fundId: string): Expense[] { return dataStore.getExpenses().filter((expense) => expense.fundId === fundId); }
 
-  public static getByFundId(fundId: string): Expense[] {
-    return dataStore.getExpenses().filter((e) => e.fundId === fundId);
+  public static create(data: Omit<Expense, 'id' | 'code' | 'taxAmount' | 'totalWithTax' | 'status' | 'submittedAt' | 'submittedBy'>): Promise<Expense> {
+    const taxAmount = Number((data.amount * (dataStore.getSettings().taxRate / 100)).toFixed(2));
+    return FinanceApiService.createExpense({
+      fundId: data.fundId, amount: data.amount, taxAmount, category: data.category, description: data.description,
+      invoiceNumber: data.invoiceNumber, vendorName: data.vendorName, hasReceipt: data.hasReceipt,
+      receiptUrl: data.receiptUrl, expenseDate: data.expenseDate, taskId: data.taskId,
+      notes: data.notes, standingAccountId: data.standingAccountId,
+    });
   }
-
-  public static create(data: Omit<Expense, 'id' | 'code' | 'taxAmount' | 'totalWithTax' | 'status' | 'submittedAt' | 'submittedBy'>): Expense {
-    return dataStore.addExpense(data);
-  }
-
-  public static approve(id: string): void {
-    dataStore.updateExpenseStatus(id, 'approved');
-  }
-
-  public static reject(id: string, reason: string): void {
-    dataStore.updateExpenseStatus(id, 'rejected', reason);
-  }
+  public static approve(id: string, notes?: string): Promise<Expense> { return FinanceApiService.reviewExpense(id, true, notes); }
+  public static reject(id: string, reason: string): Promise<Expense> { return FinanceApiService.reviewExpense(id, false, reason); }
 
   public static getSummary() {
     const expenses = dataStore.getExpenses();
-    const totalCount = expenses.length;
-    const totalAmount = expenses.reduce((sum, e) => sum + e.totalWithTax, 0);
-    const pendingCount = expenses.filter((e) => e.status === 'pending_approval').length;
-    const pendingAmount = expenses
-      .filter((e) => e.status === 'pending_approval')
-      .reduce((sum, e) => sum + e.totalWithTax, 0);
-    const approvedAmount = expenses
-      .filter((e) => e.status === 'approved' || e.status === 'settled')
-      .reduce((sum, e) => sum + e.totalWithTax, 0);
-
     const byCategory: Record<string, number> = {};
-    expenses.forEach((e) => {
-      byCategory[e.category] = (byCategory[e.category] || 0) + e.totalWithTax;
-    });
-
+    expenses.forEach((expense) => { byCategory[expense.category] = (byCategory[expense.category] || 0) + expense.totalWithTax; });
     return {
-      totalCount,
-      totalAmount,
-      pendingCount,
-      pendingAmount,
-      approvedAmount,
+      totalCount: expenses.length,
+      totalAmount: expenses.reduce((sum, expense) => sum + expense.totalWithTax, 0),
+      pendingCount: expenses.filter((expense) => expense.status === 'pending_approval').length,
+      pendingAmount: expenses.filter((expense) => expense.status === 'pending_approval').reduce((sum, expense) => sum + expense.totalWithTax, 0),
+      approvedAmount: expenses.filter((expense) => expense.status === 'approved' || expense.status === 'settled').reduce((sum, expense) => sum + expense.totalWithTax, 0),
       byCategory,
     };
   }
