@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { dataStore } from '../../lib/storage';\nimport { FinanceApiService } from '../../services/finance-api.service';
+import { dataStore } from '../../lib/storage';
+import { FinanceApiService } from '../../services/finance-api.service';
 import { hasPermission } from '../../lib/rbac/permissions';
 import { ExpenseCategory, StandingAccount } from '../../types/domain';
 import { formatCurrency, EXPENSE_CATEGORY_CONFIG } from '../../lib/utils/format';
