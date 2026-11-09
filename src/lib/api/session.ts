@@ -183,11 +183,16 @@ const fromSnake = (row: Record<string, any>) => {
 export async function loadUiSnapshot(session: ApiSession): Promise<void> {
   const common = ['tasks','task-checklist','task-steps','task-subtasks','task-updates','task-history','task-attachments','task-comments','task-events','follow-ups','notifications'];
   const finance = ['funds','expenses','settlements','cash-receipts','standing-accounts'];
-  const collections = session.role === 'admin' || session.role === 'finance_officer' ? [...common, ...finance, 'users'] : [...common, 'users'];
+  const canReadUserDirectory = ['admin', 'finance_officer', 'ops_manager'].includes(session.role);
+  const collections = session.role === 'admin' || session.role === 'finance_officer' ? [...common, ...finance, 'users'] : canReadUserDirectory ? [...common, 'users'] : common;
   const values = await Promise.all(collections.map(async (name) => [name, await apiRequest<Record<string, any>[]>(session, `/${name}?limit=500`)] as const));
   const data = Object.fromEntries(values);
 
   const users = (data.users || []).map(asDomainUser);
+  if (users.length === 0) {
+    const currentProfile = await apiRequest<Record<string, any>>(session, '/me');
+    users.push(asDomainUser(currentProfile));
+  }
   const byId = (rows: Record<string, any>[] = []) => new Map(rows.map((row) => [row.id, fromSnake(row)]));
   const checklist = byId(data['task-checklist']);
   const steps = byId(data['task-steps']);
