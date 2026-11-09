@@ -66,7 +66,7 @@ create table if not exists public.task_events (
   latitude double precision,
   longitude double precision,
   accuracy_meters double precision,
-  location_status text not null check (location_status in (
+  location_status text not null check (
     'captured','permission_denied','services_disabled','unavailable','timeout','not_requested'
   )),
   client_event_id uuid not null,
@@ -79,7 +79,7 @@ create table if not exists public.task_events (
     check (longitude is null or longitude between -180 and 180),
   constraint task_events_accuracy_check
     check (accuracy_meters is null or accuracy_meters >= 0),
-  constraint task_events_location_status_check
+  constraint task_events_location_consistency_check
     check (
       (location_status = 'captured' and latitude is not null and longitude is not null)
       or (location_status <> 'captured' and latitude is null and longitude is null)
@@ -134,9 +134,18 @@ create policy task_events_actor_insert
     actor_auth_user_id = (select auth.uid())
     and private.is_org_member(organization_id)
     and exists (
-      select 1 from public.tasks t
-      where t.organization_id = task_events.organization_id
-        and t.id = task_events.task_id
+      select 1
+      from public.organization_members m
+      join public.tasks t
+        on t.organization_id = m.organization_id
+       and t.id = task_events.task_id
+      where m.organization_id = task_events.organization_id
+        and m.auth_user_id = (select auth.uid())
+        and m.active
+        and (
+          m.role in ('admin','ops_manager','finance_officer')
+          or (m.role = 'field_officer' and t.assignee_id = m.app_user_id)
+        )
     )
   );
 
