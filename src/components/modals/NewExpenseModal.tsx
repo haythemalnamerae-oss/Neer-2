@@ -172,39 +172,20 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
     const selectedAccount = standingAccounts.find((account) => account.id === selectedStandingAccId);
     const supplierCredit = Boolean(selectedAccount && (selectedAccount.direction === 'payable' || selectedAccount.direction === 'payable_by_us'));
 
-    if (exceedsBalance && coverageMethod === 'normal' && !supplierCredit) {
-      alert('المبلغ المطلوب يتجاوز الرصيد الحالي المتوفر في هذه العهدة! يرجى اختيار إما "السحب المتسلسل من عهدتين" أو "تسجيل عجز سالب مؤقت".');
+    if (!supplierCredit && coverageMethod !== 'normal') {
+      alert('معالجة السحب المتسلسل والعجز لم تُنقل بعد إلى المعاملات الخادمية؛ أوقف هذا الخيار مؤقتاً لتجنب اختلاف الأرصدة.');
       return;
     }
-
-    if (!supplierCredit && coverageMethod === 'cascade' && (!secondaryFundId || !secondaryCanCover)) {
-      alert('حدد عهدة بديلة برصيد كافٍ لتغطية الفرق.');
+    if (!supplierCredit && totalWithTax > availableBal) {
+      alert('رصيد العهدة غير كافٍ. لا يمكن تسجيل المصروف قبل توفير الرصيد أو اختيار معالجة مدعومة خادمياً.');
       return;
     }
-
-    const task = tasks.find((t) => t.id === taskId);
-    const standingAcc = standingAccounts.find((a) => a.id === selectedStandingAccId);
 
     try {
-      dataStore.addExpense({
-        fundId,
-        fundName: selectedFund?.name || 'العهدة النقدية',
-        amount: numAmount,
-        category,
-        description,
-        invoiceNumber,
-        vendorName,
-        hasReceipt,
-        receiptUrl: undefined,
-        expenseDate: new Date().toISOString().split('T')[0],
-        taskId: taskId || undefined,
-        taskTitle: task?.title,
-        cascadeDeduction: !supplierCredit && coverageMethod === 'cascade',
-        secondaryFundId: !supplierCredit && coverageMethod === 'cascade' ? secondaryFundId : undefined,
-        allowDeficit: !supplierCredit && coverageMethod === 'deficit' && canApproveExpense,
-        standingAccountId: standingAcc?.id,
-        standingAccountName: standingAcc?.name,
-        standingDirection: standingAcc?.direction,
+      await FinanceApiService.createExpense({
+        fundId, amount: numAmount, taxAmount, category, description: description.trim(), invoiceNumber,
+        vendorName: vendorName.trim(), hasReceipt, expenseDate: new Date().toISOString().slice(0, 10),
+        taskId: taskId || undefined, standingAccountId: standingAcc?.id,
       });
     } catch (error) {
       alert(error instanceof Error ? error.message : 'تعذر تسجيل المصروف. تحقق من البيانات والرصيد.');
