@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { dataStore } from '../../lib/storage';
 import { hasPermission } from '../../lib/rbac/permissions';
-import { formatCurrency } from '../../lib/utils/format';
+import { formatCurrency } from '../../lib/utils/format';\nimport { FinanceApiService } from '../../services/finance-api.service';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 
@@ -34,18 +34,18 @@ export const ApprovalsCenterView: React.FC<ApprovalsCenterViewProps> = ({ onSele
 
   const totalPending = pendingExpenses.length + pendingTasks.length + pendingSettlements.length;
 
-  const handleApproveExpense = (id: string) => {
+  const handleApproveExpense = async (id: string) => {
     const expense = expenses.find((item) => item.id === id);
     const notes = expense?.specialAuditRequired ? window.prompt('هذا المصروف تجاوز حد الصرف الفردي أو الشهري. أدخل ملاحظة التدقيق قبل الاعتماد:') : undefined;
     if (expense?.specialAuditRequired && !notes?.trim()) return;
-    try { dataStore.updateExpenseStatus(id, 'approved', notes?.trim()); }
+    try { await FinanceApiService.reviewExpense(id, true, notes?.trim()); }
     catch (error) { alert(error instanceof Error ? error.message : 'تعذر اعتماد الفاتورة.'); }
   };
 
-  const handleRejectExpense = (id: string) => {
+  const handleRejectExpense = async (id: string) => {
     const reason = window.prompt('سبب رفض الفاتورة أو المستند:', 'نقص في بيانات الفاتورة الضريبية أو عدم مطابقة البنود');
     if (reason?.trim()) {
-      try { dataStore.updateExpenseStatus(id, 'rejected', reason.trim()); }
+      try { await FinanceApiService.reviewExpense(id, false, reason.trim()); }
       catch (error) { alert(error instanceof Error ? error.message : 'تعذر رفض الفاتورة.'); }
     }
   };
@@ -61,16 +61,16 @@ export const ApprovalsCenterView: React.FC<ApprovalsCenterViewProps> = ({ onSele
     }
   };
 
-  const handleApproveSettlement = (id: string) => {
+  const handleApproveSettlement = async (id: string) => {
     const notes = window.prompt('ملاحظات التدقيق والمصادقة على التسوية:', `تم تدقيق الفواتير ومطابقة الرصيد والتحقق من الضريبة ${settings.taxRate}%`);
-    try { dataStore.approveSettlement(id, notes || undefined); }
+    const settlement = settlements.find((item) => item.id === id);\n    try { await FinanceApiService.reviewSettlement(id, settlement?.status === 'under_review' && settings.requireDualApprovalForSettlements ? 'audit' : 'approve', notes || undefined); }
     catch (error) { alert(error instanceof Error ? error.message : 'تعذر اعتماد التسوية.'); }
   };
 
-  const handleRejectSettlement = (id: string) => {
+  const handleRejectSettlement = async (id: string) => {
     const reason = window.prompt('سبب رفض التسوية وإعادة الفواتير إلى قائمة التسوية:', 'توجد ملاحظات تحتاج إلى تصحيح');
     if (!reason?.trim()) return;
-    try { dataStore.rejectSettlement(id, reason.trim()); }
+    try { await FinanceApiService.reviewSettlement(id, 'reject', reason.trim()); }
     catch (error) { alert(error instanceof Error ? error.message : 'تعذر رفض التسوية.'); }
   };
 
