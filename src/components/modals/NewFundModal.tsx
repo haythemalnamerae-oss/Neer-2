@@ -31,16 +31,7 @@ export const NewFundModal: React.FC<NewFundModalProps> = ({ isOpen, onClose }) =
     if (!holder) return;
 
     try {
-      dataStore.addFund({
-        name,
-        holderId: holder.id,
-        holderName: holder.name,
-        holderDepartment: holder.department,
-        totalAllocation: Number(totalAllocation),
-        currency: settings.currency,
-        warningThreshold: Number(warningThreshold),
-        purpose,
-      });
+      await FinanceApiService.createFund({ name, holderId: holder.id, totalAllocation: Number(totalAllocation), currency: settings.currency, warningThreshold: Number(warningThreshold), purpose });
     } catch (error) {
       alert(error instanceof Error ? error.message : 'تعذر إنشاء العهدة.');
       return;
