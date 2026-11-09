@@ -64,7 +64,7 @@ export class NeerApiClient {
 }
 
 export const apiResources = {
-  tasks: 'tasks', checklist: 'task-checklist', steps: 'task-steps', subtasks: 'task-subtasks',
+  tasks: 'tasks', taskEvents: 'task-events', checklist: 'task-checklist', steps: 'task-steps', subtasks: 'task-subtasks',
   updates: 'task-updates', history: 'task-history', attachments: 'task-attachments', comments: 'task-comments',
   funds: 'funds', expenses: 'expenses', settlements: 'settlements', settlementExpenses: 'settlement-expenses',
   cashReceipts: 'cash-receipts', standingAccounts: 'standing-accounts', followUps: 'follow-ups',
