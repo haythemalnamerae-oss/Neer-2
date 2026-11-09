@@ -10,7 +10,7 @@ app.disable('x-powered-by');
 app.use(express.json({ limit: '1mb' }));
 
 const resources = {
-  tasks: { table: 'tasks', module: 'tasks' }, 'task-checklist': { table: 'task_checklist_items', module: 'tasks' },
+  tasks: { table: 'tasks', module: 'tasks' }, 'task-events': { table: 'task_events', module: 'tasks' }, 'task-checklist': { table: 'task_checklist_items', module: 'tasks' },
   'task-steps': { table: 'task_steps', module: 'tasks' }, 'task-subtasks': { table: 'task_subtasks', module: 'tasks' },
   'task-updates': { table: 'task_daily_updates', module: 'tasks' }, 'task-history': { table: 'task_history', module: 'tasks' },
   'task-attachments': { table: 'task_attachments', module: 'tasks' }, 'task-comments': { table: 'task_comments', module: 'tasks' },
@@ -127,6 +127,8 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
   try {
     if (!(await allowed(auth, resource.module, action))) return res.status(403).json({ error: { code: 'FORBIDDEN', message: `Missing permission ${resource.module}.${action}.` } });
   } catch (error) { console.error(error); return res.status(503).json({ error: { code: 'PERMISSIONS_UNAVAILABLE', message: 'Permission service is unavailable. Apply the RBAC migration.' } }); }
+  if (req.params.resource === 'task-events' && req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: { code: 'APPEND_ONLY', message: 'Field events can only be read or appended.' } });
+  if (req.params.id && req.params.resource === 'task-events' && req.method !== 'GET') return res.status(405).json({ error: { code: 'APPEND_ONLY', message: 'Field events cannot be changed or deleted.' } });
   if (req.method === 'POST' && req.params.id) return res.status(405).json({ error: { code: 'METHOD_NOT_ALLOWED', message: 'Create records on the collection path.' } });
   if ((req.method === 'PATCH' || req.method === 'DELETE') && !req.params.id) return res.status(400).json({ error: { code: 'ID_REQUIRED', message: 'Update/delete requires a record id.' } });
 
@@ -146,7 +148,7 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
   const response = await supabaseFetch(`/rest/v1/${resource.table}?${query}`, auth.token, {
     method: req.method,
     headers: req.method === 'POST' || req.method === 'PATCH' ? { Prefer: 'return=representation' } : {},
-    ...(req.method === 'POST' || req.method === 'PATCH' ? { body: JSON.stringify({ ...body, organization_id: auth.organizationId }) } : {}),
+    ...(req.method === 'POST' || req.method === 'PATCH' ? { body: JSON.stringify({ ...body, organization_id: auth.organizationId, ...(req.params.resource === 'task-events' ? { actor_auth_user_id: auth.userId } : {}) }) } : {}),
   });
   if (!response.ok) return sendDbError(res, response.status, await response.text());
   if (response.status === 204) return res.status(204).end();
