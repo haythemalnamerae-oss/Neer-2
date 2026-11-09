@@ -271,7 +271,7 @@ export interface StandingAccountInvoice {
 
 export interface StandingAccountEntry {
   id: string;
-  type: 'charge' | 'settlement';
+  type: 'charge' | 'settlement' | 'payment' | 'advance' | 'collection';\n  entryType?: 'charge' | 'payment' | 'advance' | 'collection';\n  balanceEffect?: number;
   amount: number;
   date: string;
   description: string;
