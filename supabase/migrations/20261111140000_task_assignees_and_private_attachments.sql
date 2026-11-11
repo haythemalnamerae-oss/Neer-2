@@ -127,6 +127,26 @@ create policy task_assignees_scoped_delete on public.task_assignees
 for delete to authenticated
 using (private.can_manage_task_assignee(organization_id, task_id, app_user_id));
 
+drop policy if exists taskComments_scoped_select on public.task_comments;
+create policy taskComments_scoped_select on public.task_comments
+for select to authenticated
+using (
+  private.can_access_task(organization_id, task_id, 'view')
+  and (not is_internal or private.has_org_role(organization_id, array['admin','ops_manager']))
+);
+drop policy if exists taskComments_scoped_insert on public.task_comments;
+create policy taskComments_scoped_insert on public.task_comments
+for insert to authenticated
+with check (
+  (private.can_access_task(organization_id, task_id, 'edit') or private.can_access_task(organization_id, task_id, 'create'))
+  and (not is_internal or private.has_org_role(organization_id, array['admin','ops_manager']))
+);
+
+drop policy if exists taskAttachments_scoped_delete on public.task_attachments;
+create policy taskAttachments_scoped_delete on public.task_attachments
+for delete to authenticated
+using (private.can_access_task(organization_id, task_id, 'edit'));
+
 create or replace function private.sync_primary_task_assignee()
 returns trigger
 language plpgsql
@@ -203,7 +223,7 @@ using (
     when bucket_id = 'task-attachments'
       and (storage.foldername(name))[1] ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
       and coalesce((storage.foldername(name))[2], '') <> ''
-    then private.can_access_task(((storage.foldername(name))[1])::uuid, (storage.foldername(name))[2], 'delete')
+    then private.can_access_task(((storage.foldername(name))[1])::uuid, (storage.foldername(name))[2], 'edit')
     else false
   end
 );
