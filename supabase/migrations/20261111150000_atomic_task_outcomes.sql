@@ -1546,3 +1546,78 @@ $$;
 
 revoke all on function public.cancel_task_bundle(uuid,text,text) from public, anon;
 grant execute on function public.cancel_task_bundle(uuid,text,text) to authenticated;
+
+
+create or replace function private.validate_task_event_actor()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor_name text;
+begin
+  if auth.uid() is not null then
+    if new.actor_auth_user_id is distinct from auth.uid() then
+      raise exception using errcode = '42501', message = 'Task event actor is server controlled';
+    end if;
+    if not private.can_access_task(new.organization_id,new.task_id,'edit') then
+      raise exception using errcode = '42501', message = 'Task event requires access to the assigned task';
+    end if;
+    select u.name into v_actor_name
+    from public.organization_members m
+    join public.app_users u on u.organization_id=m.organization_id and u.id=m.app_user_id
+    where m.organization_id=new.organization_id and m.auth_user_id=auth.uid()
+      and m.active and u.active
+    limit 1;
+    if v_actor_name is null then
+      raise exception using errcode = '42501', message = 'Active operational profile required';
+    end if;
+    new.actor_name := v_actor_name;
+  end if;
+
+  if new.event_type not in (
+    'location_sample','visit_started','visit_paused','visit_resumed','visit_completed',
+    'task_started','task_paused','task_resumed','task_completed','subtask_created',
+    'expense_recorded','invoice_attached','follow_up_scheduled','note_added',
+    'status_changed','location_unavailable'
+  ) then
+    raise exception using errcode = '22023', message = 'Unsupported task event type';
+  end if;
+  if new.occurred_at > now() + interval '5 minutes' then
+    raise exception using errcode = '22023', message = 'Task event timestamp is in the future';
+  end if;
+  if new.latitude is not null and new.latitude not between -90 and 90 then
+    raise exception using errcode = '22023', message = 'Invalid event latitude';
+  end if;
+  if new.longitude is not null and new.longitude not between -180 and 180 then
+    raise exception using errcode = '22023', message = 'Invalid event longitude';
+  end if;
+  if new.accuracy_meters is not null and new.accuracy_meters < 0 then
+    raise exception using errcode = '22023', message = 'Invalid event GPS accuracy';
+  end if;
+  if new.event_type in (
+    'visit_started','visit_paused','visit_resumed','visit_completed',
+    'task_started','task_paused','task_resumed','task_completed','subtask_created','location_sample'
+  ) and (new.latitude is null or new.longitude is null or new.accuracy_meters is null) then
+    raise exception using errcode = '22023', message = 'A valid GPS fix is required for this event';
+  end if;
+  if new.details is null or jsonb_typeof(new.details) <> 'object' then
+    raise exception using errcode = '22023', message = 'Task event details must be an object';
+  end if;
+  if new.standing_account_id is not null and not exists (
+    select 1 from public.standing_accounts a
+    where a.organization_id=new.organization_id and a.id=new.standing_account_id
+  ) then
+    raise exception using errcode = '23503', message = 'Standing account does not belong to this organization';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function private.validate_task_event_actor() from public, anon;
+grant execute on function private.validate_task_event_actor() to authenticated;
+drop trigger if exists task_events_validate_actor on public.task_events;
+create trigger task_events_validate_actor
+before insert on public.task_events
+for each row execute function private.validate_task_event_actor();
