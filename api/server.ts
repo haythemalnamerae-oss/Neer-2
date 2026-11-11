@@ -223,6 +223,33 @@ app.post('/api/v1/tasks/review', async (req, res) => {
   }
 });
 
+app.post('/api/v1/tasks/cancel', async (req, res) => {
+  const auth = (req as AuthenticatedRequest).auth;
+  try {
+    if (!(await allowed(auth, 'tasks', 'delete'))) {
+      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Missing permission tasks.delete.' } });
+    }
+    const body = req.body as Record<string, any> | undefined;
+    if (!body || typeof body.taskId !== 'string' || !idPattern.test(body.taskId) ||
+        (body.reason !== undefined && (typeof body.reason !== 'string' || body.reason.length > 1000))) {
+      return res.status(400).json({ error: { code: 'INVALID_TASK_CANCELLATION', message: 'Task cancellation payload is invalid.' } });
+    }
+    const response = await supabaseFetch('/rest/v1/rpc/cancel_task_bundle', auth.token, {
+      method: 'POST',
+      body: JSON.stringify({
+        p_organization_id: auth.organizationId,
+        p_task_id: body.taskId,
+        p_reason: body.reason || null,
+      }),
+    });
+    if (!response.ok) return sendDbError(res, response.status, await response.text());
+    return res.status(200).json(await response.json());
+  } catch (error) {
+    console.error('Task cancellation failed:', error);
+    return res.status(503).json({ error: { code: 'TASK_CANCELLATION_FAILED', message: 'The task could not be cancelled.' } });
+  }
+});
+
 app.post('/api/v1/tasks/attach', async (req, res) => {
   const auth = (req as AuthenticatedRequest).auth;
   try {
@@ -414,6 +441,9 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
   }
   if (req.params.resource === 'task-attachments' && req.method === 'POST') {
     return res.status(409).json({ error: { code: 'TASK_ATTACHMENT_WORKFLOW_REQUIRED', message: 'Register uploaded task files through the verified attachment workflow.' } });
+  }
+  if (req.params.resource === 'tasks' && req.method === 'DELETE') {
+    return res.status(409).json({ error: { code: 'TASK_CANCELLATION_REQUIRED', message: 'Tasks are cancelled through the audited workflow and are not physically deleted.' } });
   }
   if (req.params.resource === 'tasks' && req.method === 'POST') {
     return res.status(409).json({ error: { code: 'TASK_BUNDLE_REQUIRED', message: 'Create tasks through the atomic create-bundle workflow.' } });
