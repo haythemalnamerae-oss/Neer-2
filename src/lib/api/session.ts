@@ -235,7 +235,7 @@ export async function loadUiSnapshot(session: ApiSession): Promise<void> {
     task.assignees = children(assignees, task.id).map((item) => ({
       id: item.id,
       appUserId: item.appUserId,
-      name: item.appUserId === session.appUserId ? (users[0]?.name || task.assigneeName) : undefined,
+      name: item.appUserName || (item.appUserId === session.appUserId ? (users[0]?.name || task.assigneeName) : undefined),
       isPrimary: Boolean(item.isPrimary),
       assignedBy: item.assignedBy,
       assignedAt: item.createdAt,
