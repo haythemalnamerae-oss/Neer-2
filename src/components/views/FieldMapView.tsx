@@ -18,6 +18,7 @@ import {
 import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
 import { Task, TaskStatus } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
+import { refreshTaskSnapshot, updateTaskLifecycle } from '../../services/tasks.api';
 import { captureRequiredLocation, ensureFieldVisitCanStart, recordFieldLifecycleEvent, startFieldLocationTracking, stopFieldLocationTracking } from '../../lib/operations/fieldEvents';
 import { hasPermission } from '../../lib/rbac/permissions';
 import { formatCurrency, TASK_STATUS_CONFIG } from '../../lib/utils/format';
@@ -134,7 +135,8 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
 
   const handleStartTaskWithLocation = async (task: Task) => {
     if (task.taskTypeCategory !== 'field' && task.taskTypeCategory !== 'visit') {
-      dataStore.startTask(task.id);
+      try { await updateTaskLifecycle(task.id, 'start'); }
+      catch (error) { window.alert(error instanceof Error ? error.message : 'تعذر بدء المهمة.'); }
       return;
     }
     setIsLocating(true);
@@ -149,7 +151,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
         details: { taskTitle: task.title, source: 'field_map' },
       });
       const coords = { lat: location.latitude, lng: location.longitude };
-      dataStore.startTask(task.id, coords);
+      await refreshTaskSnapshot();
       setUserLiveCoords({ ...coords, accuracy: Math.round(location.accuracyMeters) });
       startFieldLocationTracking(task.id);
       setLocationSuccessMsg('تم بدء التنفيذ وتوثيق الحدث والموقع على الخادم بنجاح.');
@@ -164,7 +166,8 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
     const reason = window.prompt('يرجى كتابة سبب الإيقاف المؤقت للمهمة:', 'انتظار توريد المواد / موافقة المشرف');
     if (!reason?.trim()) return;
     if (task.taskTypeCategory !== 'field' && task.taskTypeCategory !== 'visit') {
-      dataStore.pauseTask(task.id, reason.trim());
+      try { await updateTaskLifecycle(task.id, 'pause', reason.trim()); }
+      catch (error) { window.alert(error instanceof Error ? error.message : 'تعذر إيقاف المهمة.'); }
       return;
     }
     setIsLocating(true);
@@ -177,7 +180,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
         location,
         details: { reason: reason.trim(), source: 'field_map' },
       });
-      dataStore.pauseTask(task.id, reason.trim());
+      await refreshTaskSnapshot();
       stopFieldLocationTracking(task.id);
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'تعذر توثيق الإيقاف المؤقت.');
@@ -188,7 +191,8 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
 
   const handleResumeTask = async (task: Task) => {
     if (task.taskTypeCategory !== 'field' && task.taskTypeCategory !== 'visit') {
-      dataStore.resumeTask(task.id);
+      try { await updateTaskLifecycle(task.id, 'resume'); }
+      catch (error) { window.alert(error instanceof Error ? error.message : 'تعذر استئناف المهمة.'); }
       return;
     }
     setIsLocating(true);
@@ -202,7 +206,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
         location,
         details: { source: 'field_map' },
       });
-      dataStore.resumeTask(task.id);
+      await refreshTaskSnapshot();
       startFieldLocationTracking(task.id);
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'تعذر توثيق استئناف المهمة.');
