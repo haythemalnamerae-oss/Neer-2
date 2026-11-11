@@ -681,3 +681,31 @@ $$;
 
 revoke all on function public.review_task_approval(uuid,text,text,text) from public, anon;
 grant execute on function public.review_task_approval(uuid,text,text,text) to authenticated;
+
+
+alter table public.task_assignees
+  add column if not exists app_user_name text not null default '';
+
+create or replace function private.fill_task_assignee_name()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  select u.name into new.app_user_name
+  from public.app_users u
+  where u.organization_id = new.organization_id
+    and u.id = new.app_user_id
+    and u.active;
+  if new.app_user_name is null or new.app_user_name = '' then
+    raise exception using errcode = '23503', message = 'Active task assignee profile not found';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists task_assignees_fill_name on public.task_assignees;
+create trigger task_assignees_fill_name
+before insert or update of app_user_id on public.task_assignees
+for each row execute function private.fill_task_assignee_name();
