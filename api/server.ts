@@ -160,7 +160,7 @@ app.post('/api/v1/tasks/record-outcome', async (req, res) => {
           typeof followUp.id !== 'string' || !idPattern.test(followUp.id) ||
           typeof followUp.title !== 'string' || !followUp.title.trim() || followUp.title.length > 240 ||
           typeof followUp.assigneeId !== 'string' || !idPattern.test(followUp.assigneeId) ||
-          typeof followUp.dueDate !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(followUp.dueDate)
+          typeof followUp.dueDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(followUp.dueDate)
         )) ||
         (event !== null && (
           typeof event !== 'object' || Array.isArray(event) ||
