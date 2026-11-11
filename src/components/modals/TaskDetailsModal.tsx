@@ -189,9 +189,9 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     }
   };
 
-  const handleStepStatusChange = async (stepId: string, status: TaskStepStatus, nextDate?: string): Promise<boolean> => {
+  const handleStepStatusChange = async (stepId: string, status: TaskStepStatus, nextDate?: string, noteOverride?: string): Promise<boolean> => {
     try {
-      const note = stepNoteInputs[stepId];
+      const note = noteOverride ?? stepNoteInputs[stepId];
       await setTaskStepStatus(task.id, stepId, status, note, nextDate);
       return true;
     } catch (error) {
@@ -205,7 +205,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
       alert('يرجى تحديد تاريخ الخطوة القادمة');
       return;
     }
-    const saved = await handleStepStatusChange(stepId, 'deferred', deferredDateInput);
+    const saved = await handleStepStatusChange(stepId, 'deferred', deferredDateInput, stepNoteInputs[stepId] || 'تم تأجيل الخطوة للموعد المحدد');
     if (!saved) return;
     setDeferringStepId(null);
     setDeferredDateInput('');
@@ -252,10 +252,13 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   };
 
   const handleOpenAttachment = async (objectPath: string) => {
+    const popup = window.open('about:blank', '_blank');
     try {
       const url = await getTaskAttachmentSignedUrl(objectPath);
-      window.open(url, '_blank', 'noopener,noreferrer');
+      if (popup) popup.location.href = url;
+      else window.location.href = url;
     } catch (error) {
+      popup?.close();
       window.alert(error instanceof Error ? error.message : 'تعذر فتح المرفق.');
     }
   };
