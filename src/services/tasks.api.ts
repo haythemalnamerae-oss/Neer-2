@@ -180,7 +180,7 @@ export async function updateTaskStatusOnServer(taskId: string, status: string, n
   await refreshAfterMutation(session);
 }
 
-export async function deleteTaskOnServer(taskId: string, reason = 'تم إلغاء المهمة من سجل المهام'): Promise<void> {
+export async function cancelTaskOnServer(taskId: string, reason = 'تم إلغاء المهمة من سجل المهام'): Promise<void> {
   const session = requireSession();
   await apiRequest(session, '/tasks/cancel', {
     method: 'POST',
