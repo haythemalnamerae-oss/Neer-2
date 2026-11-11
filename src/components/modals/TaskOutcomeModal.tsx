@@ -113,7 +113,7 @@ export const TaskOutcomeModal: React.FC<TaskOutcomeModalProps> = ({
   const [followUpTitle, setFollowUpTitle] = useState(`متابعة: ${task.title}`);
   const [followUpDate, setFollowUpDate] = useState(tomorrowDate);
   const [followUpTime, setFollowUpTime] = useState('10:00');
-  const [followUpAssigneeId, setFollowUpAssigneeId] = useState(task.assigneeId);
+  const [followUpAssigneeId, setFollowUpAssigneeId] = useState(dataStore.getCurrentUser().role === 'field_officer' ? dataStore.getCurrentUser().id : task.assigneeId);
   const [followUpNotes, setFollowUpNotes] = useState('');
 
   // Auto-enable follow up suggestion when outcome is incomplete
