@@ -247,7 +247,7 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
         select: 'id',
         organization_id: `eq.${auth.organizationId}`,
         assignee_id: `eq.${auth.appUserId}`,
-        limit: '5000',
+        limit: '500',
       });
       const assignedResponse = await supabaseFetch(`/rest/v1/tasks?${assignedQuery}`, auth.token);
       if (!assignedResponse.ok) return sendDbError(res, assignedResponse.status, await assignedResponse.text());
@@ -267,7 +267,14 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
       const n = Number(value);
       if (!Number.isInteger(n) || n < 0 || n > 5000) return res.status(400).json({ error: { code: 'INVALID_PAGINATION', message: 'limit/offset must be 0–5000.' } });
       query.set(key, String(n));
-    } else if (allowedFilters.has(key) && typeof value === 'string') query.set(key, `eq.${value}`);
+    } else if (allowedFilters.has(key) && typeof value === 'string') {
+      const serverScopedFilter =
+        auth.role === 'field_officer' &&
+        ((req.params.resource === 'tasks' && key === 'assignee_id') ||
+          (taskChildResources.has(req.params.resource) && key === 'task_id') ||
+          (req.params.resource === 'funds' && key === 'holder_id'));
+      if (!serverScopedFilter) query.set(key, `eq.${value}`);
+    }
     else return res.status(400).json({ error: { code: 'INVALID_FILTER', message: `Filter '${key}' is not supported.` } });
   }
   const body = req.body as Record<string, unknown> | undefined;
