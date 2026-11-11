@@ -468,7 +468,7 @@ begin
     end if;
     insert into public.task_assignees(id,organization_id,task_id,app_user_id,assigned_by,is_primary)
     values(
-      'asg-' || v_task_id || '-' || (v_item #>> '{}'),
+      'asg-' || p_organization_id::text || '-' || v_task_id || '-' || (v_item #>> '{}'),
       p_organization_id,v_task_id,v_item #>> '{}',v_app_user_id,
       (v_item #>> '{}') = p_task->>'assigneeId'
     )
@@ -829,7 +829,7 @@ for each row execute function private.fill_task_assignee_name();
 -- Rollback is isolated: delete these derived links or drop task_assignees; source tasks remain unchanged.
 insert into public.task_assignees(id,organization_id,task_id,app_user_id,assigned_by,is_primary)
 select
-  'asg-' || t.id || '-' || t.assignee_id,
+  'asg-' || t.organization_id::text || '-' || t.id || '-' || t.assignee_id,
   t.organization_id,t.id,t.assignee_id,t.creator_id,true
 from public.tasks t
 join public.app_users u
