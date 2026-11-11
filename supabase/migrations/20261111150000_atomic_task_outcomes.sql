@@ -1409,3 +1409,54 @@ with check (
 );
 drop policy if exists task_history_scoped_insert on public.task_history;
 drop policy if exists taskAttachments_scoped_update on public.task_attachments;
+
+
+create or replace function private.audit_task_event_insert()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor_id text;
+  v_actor_name text;
+  v_actor_role text;
+begin
+  select m.app_user_id,u.name,m.role
+    into v_actor_id,v_actor_name,v_actor_role
+  from public.organization_members m
+  left join public.app_users u on u.organization_id=m.organization_id and u.id=m.app_user_id
+  where m.organization_id=new.organization_id
+    and m.auth_user_id=new.actor_auth_user_id
+    and m.active
+  limit 1;
+
+  insert into public.task_history(id,organization_id,task_id,action,performed_by,notes)
+  values(
+    'hist-event-'||new.id::text,
+    new.organization_id,new.task_id,
+    coalesce(nullif(new.event_label,''),new.event_type),
+    coalesce(nullif(new.actor_name,''),v_actor_name,'مستخدم النظام'),
+    jsonb_build_object('event_type',new.event_type,'event_id',new.id,'details',new.details)::text
+  );
+
+  insert into public.audit_logs(id,organization_id,user_id,user_name,user_role,action,action_type,entity,entity_id,details)
+  values(
+    'aud-event-'||new.id::text,
+    new.organization_id,v_actor_id,
+    coalesce(nullif(new.actor_name,''),v_actor_name,'مستخدم النظام'),
+    coalesce(v_actor_role,'viewer'),
+    coalesce(nullif(new.event_label,''),new.event_type),
+    'create','task_event',new.id::text,
+    jsonb_build_object('task_id',new.task_id,'event_type',new.event_type,'details',new.details)::text
+  );
+  return new;
+end;
+$$;
+
+revoke all on function private.audit_task_event_insert() from public, anon;
+grant execute on function private.audit_task_event_insert() to authenticated;
+drop trigger if exists task_events_audit_insert on public.task_events;
+create trigger task_events_audit_insert
+after insert on public.task_events
+for each row execute function private.audit_task_event_insert();
