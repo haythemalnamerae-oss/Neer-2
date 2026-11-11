@@ -105,6 +105,7 @@ export const TaskOutcomeModal: React.FC<TaskOutcomeModalProps> = ({
   const [proofUrl, setProofUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [outcomeRequestId] = useState(() => crypto.randomUUID());
+  const [isSubmittingOutcome, setIsSubmittingOutcome] = useState(false);
 
   // Follow-up chain toggle & form
   const [createFollowUp, setCreateFollowUp] = useState(false);
@@ -161,6 +162,8 @@ export const TaskOutcomeModal: React.FC<TaskOutcomeModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingOutcome || isUploading) return;
+    setIsSubmittingOutcome(true);
     const isNonCompleted = selectedOutcome !== 'completed';
     const finalReason = isNonCompleted
       ? selectedReason === 'other'
@@ -207,6 +210,8 @@ export const TaskOutcomeModal: React.FC<TaskOutcomeModalProps> = ({
       }
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'تعذر حفظ نتيجة المهمة.');
+    } finally {
+      setIsSubmittingOutcome(false);
     }
   };
 
@@ -542,10 +547,14 @@ export const TaskOutcomeModal: React.FC<TaskOutcomeModalProps> = ({
             variant="primary"
             size="md"
             type="button"
-            onClick={handleSubmit}
+            disabled={isSubmittingOutcome || isUploading}
+            onClick={(event) => {
+              event.preventDefault();
+              void handleSubmit({ preventDefault: () => undefined } as React.FormEvent);
+            }}
             icon={<CheckCircle2 className="w-4 h-4 ml-1" />}
           >
-            {selectedOutcome === 'completed'
+            {isSubmittingOutcome ? 'جارٍ حفظ النتيجة...' : selectedOutcome === 'completed'
               ? 'تأكيد الإنجاز ورفع للاعتماد'
               : createFollowUp
               ? 'حفظ النتيجة وإنشاء مهمة المتابعة'
