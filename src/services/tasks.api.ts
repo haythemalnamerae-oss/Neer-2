@@ -127,7 +127,7 @@ export async function recordTaskOutcomeOnServer(
     ...payload.followUp,
     id: newId('tsk'),
   } : null;
-  await apiRequest(session, '/tasks/record-outcome', {
+  const result = await apiRequest<{ follow_up_task_id?: string | null }>(session, '/tasks/record-outcome', {
     method: 'POST',
     body: JSON.stringify({
       taskId,
@@ -144,9 +144,10 @@ export async function recordTaskOutcomeOnServer(
   const tasks = dataStore.getTasks();
   const updatedTask = tasks.find((item) => item.id === taskId);
   if (!updatedTask) throw new TaskSavedRefreshError('تم حفظ نتيجة المهمة، لكن تعذر العثور عليها بعد تحديث البيانات. أعد تحميل الصفحة.');
+  const followUpTaskId = result.follow_up_task_id || followUp?.id;
   return {
     updatedTask,
-    followUpTask: followUp ? tasks.find((item) => item.id === followUp.id) : undefined,
+    followUpTask: followUpTaskId ? tasks.find((item) => item.id === followUpTaskId) : undefined,
   };
 }
 
