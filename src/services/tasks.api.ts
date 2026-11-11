@@ -1,7 +1,11 @@
 import type { Task } from '../types/domain';
 import { apiRequest, getSession, loadUiSnapshot, SessionError } from '../lib/api/session';
 
-export class TaskSavedRefreshError extends Error {\n  constructor(message: string) { super(message); this.name = 'TaskSavedRefreshError'; }\n}\n\ntype NewTaskData = Omit<Task, 'id' | 'spentAmount' | 'history' | 'createdAt'>;
+export class TaskSavedRefreshError extends Error {
+  constructor(message: string) { super(message); this.name = 'TaskSavedRefreshError'; }
+}
+
+type NewTaskData = Omit<Task, 'id' | 'spentAmount' | 'history' | 'createdAt'>;
 
 function newId(prefix: string): string {
   const suffix = typeof crypto !== 'undefined' && 'randomUUID' in crypto
