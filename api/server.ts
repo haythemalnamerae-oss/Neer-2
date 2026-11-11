@@ -10,7 +10,7 @@ app.disable('x-powered-by');
 app.use(express.json({ limit: '1mb' }));
 
 const resources = {
-  tasks: { table: 'tasks', module: 'tasks' }, 'task-events': { table: 'task_events', module: 'tasks' }, 'task-checklist': { table: 'task_checklist_items', module: 'tasks' },
+  tasks: { table: 'tasks', module: 'tasks' }, 'task-events': { table: 'task_events', module: 'tasks' }, 'task-assignees': { table: 'task_assignees', module: 'tasks' }, 'task-checklist': { table: 'task_checklist_items', module: 'tasks' },
   'task-steps': { table: 'task_steps', module: 'tasks' }, 'task-subtasks': { table: 'task_subtasks', module: 'tasks' },
   'task-updates': { table: 'task_daily_updates', module: 'tasks' }, 'task-history': { table: 'task_history', module: 'tasks' },
   'task-attachments': { table: 'task_attachments', module: 'tasks' }, 'task-comments': { table: 'task_comments', module: 'tasks' },
@@ -28,11 +28,11 @@ type AuthContext = { token: string; userId: string; organizationId: string; appU
 type AuthenticatedRequest = Request & { auth: AuthContext };
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const idPattern = /^[a-zA-Z0-9_-]{1,120}$/;
-const allowedFilters = new Set(['id','status','priority','assignee_id','fund_id','task_id','user_id','is_read','category','urgency','active','holder_id','scheduled_date','due_date','created_at','settlement_id','expense_id','standing_account_id']);
+const allowedFilters = new Set(['id','status','priority','assignee_id','fund_id','task_id','user_id','is_read','category','urgency','active','holder_id','scheduled_date','due_date','created_at','settlement_id','expense_id','standing_account_id','app_user_id']);
 const permissionActions = new Set(['view','create','edit','delete','approve']);
 // Financial balances and approvals must only change through atomic, audited database workflows.
 const transactionOnlyResources = new Set(['funds','expenses','settlements','settlement-expenses','cash-receipts','standing-accounts','fund-transactions','standing-account-entries']);
-const taskChildResources = new Set(['task-checklist','task-steps','task-subtasks','task-updates','task-history','task-attachments','task-comments','task-events']);
+const taskChildResources = new Set(['task-checklist','task-steps','task-subtasks','task-updates','task-history','task-attachments','task-comments','task-events','task-assignees']);
 
 async function supabaseFetch(path: string, token: string, init: RequestInit = {}) {
   return fetch(`${supabaseUrl}${path}`, { ...init, headers: { apikey: supabaseAnonKey!, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...init.headers } });
@@ -284,9 +284,7 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
   if (auth.role === 'field_officer') {
     if (!auth.appUserId) return res.status(403).json({ error: { code: 'FIELD_PROFILE_REQUIRED', message: 'A linked operational user profile is required.' } });
     if (req.params.resource === 'tasks') {
-      if (req.method === 'GET' || req.method === 'PATCH' || req.method === 'DELETE') {
-        query.set('assignee_id', `eq.${auth.appUserId}`);
-      } else if (req.method === 'POST') {
+      if (req.method === 'POST') {
         const requestedAssignee = (req.body as Record<string, unknown> | undefined)?.assignee_id;
         if (requestedAssignee !== auth.appUserId) return res.status(403).json({ error: { code: 'TASK_ASSIGNMENT_FORBIDDEN', message: 'Field officers may only create tasks assigned to themselves.' } });
       }
@@ -296,18 +294,28 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
           return res.status(403).json({ error: { code: 'TASK_REASSIGNMENT_FORBIDDEN', message: 'Field officers cannot reassign tasks.' } });
         }
       }
+      // RLS scopes primary and secondary assignments. A forced assignee_id filter would hide collaborators.
     } else if (taskChildResources.has(req.params.resource)) {
-      const assignedQuery = new URLSearchParams({
-        select: 'id',
-        organization_id: `eq.${auth.organizationId}`,
-        assignee_id: `eq.${auth.appUserId}`,
-        limit: '500',
-      });
-      const assignedResponse = await supabaseFetch(`/rest/v1/tasks?${assignedQuery}`, auth.token);
+      const [assignedResponse, collaboratorResponse] = await Promise.all([
+        supabaseFetch(`/rest/v1/tasks?${new URLSearchParams({
+          select: 'id', organization_id: `eq.${auth.organizationId}`,
+          assignee_id: `eq.${auth.appUserId}`, limit: '500',
+        })}`, auth.token),
+        supabaseFetch(`/rest/v1/task_assignees?${new URLSearchParams({
+          select: 'task_id', organization_id: `eq.${auth.organizationId}`,
+          app_user_id: `eq.${auth.appUserId}`, limit: '500',
+        })}`, auth.token),
+      ]);
       if (!assignedResponse.ok) return sendDbError(res, assignedResponse.status, await assignedResponse.text());
+      if (!collaboratorResponse.ok) return sendDbError(res, collaboratorResponse.status, await collaboratorResponse.text());
       const assignedTasks = await assignedResponse.json() as Array<{ id: string }>;
-      const assignedIds = assignedTasks.map((task) => task.id).filter((id) => idPattern.test(id));
+      const collaboratorTasks = await collaboratorResponse.json() as Array<{ task_id: string }>;
+      const assignedIds = [...new Set([
+        ...assignedTasks.map((task) => task.id),
+        ...collaboratorTasks.map((task) => task.task_id),
+      ])].filter((id) => idPattern.test(id));
       const assignedFilter = assignedIds.length ? `in.(${assignedIds.join(',')})` : 'eq.__no_assigned_task__';
+      if (req.params.resource === 'task-assignees' && req.method === 'GET') query.set('app_user_id', `eq.${auth.appUserId}`);
       if (req.method === 'GET' || req.method === 'PATCH' || req.method === 'DELETE') query.set('task_id', assignedFilter);
       if (req.method === 'POST' || req.method === 'PATCH') {
         const requestedTaskId = (req.body as Record<string, unknown> | undefined)?.task_id;
