@@ -726,3 +726,18 @@ drop trigger if exists task_assignees_fill_name on public.task_assignees;
 create trigger task_assignees_fill_name
 before insert or update of app_user_id on public.task_assignees
 for each row execute function private.fill_task_assignee_name();
+
+-- Additive backfill from the existing primary assignment column.
+-- Rollback is isolated: delete these derived links or drop task_assignees; source tasks remain unchanged.
+insert into public.task_assignees(id,organization_id,task_id,app_user_id,assigned_by,is_primary)
+select
+  'asg-' || t.id || '-' || t.assignee_id,
+  t.organization_id,t.id,t.assignee_id,t.creator_id,true
+from public.tasks t
+join public.app_users u
+  on u.organization_id=t.organization_id
+ and u.id=t.assignee_id
+ and u.active
+where t.assignee_id is not null
+on conflict (organization_id,task_id,app_user_id)
+do update set is_primary=true,assigned_by=excluded.assigned_by;
