@@ -186,6 +186,7 @@ begin
     v_elapsed := greatest(1,round(extract(epoch from (v_now-v_task.timer_started_at))/60)::integer);
   end if;
 
+  perform set_config('neer.task_transition','outcome',true);
   update public.tasks set
     status = case when p_outcome='completed' then 'pending_approval' else 'deferred' end,
     outcome=p_outcome,
@@ -664,6 +665,7 @@ begin
     if v_task.status in ('completed','approved','pending_approval','cancelled','paused') or (v_task.status='in_progress' and not v_task.is_paused) then
       raise exception using errcode = '22023', message = 'This task cannot be started from its current state';
     end if;
+    perform set_config('neer.task_transition','lifecycle',true);
     update public.tasks set status='in_progress',actual_start_time=coalesce(actual_start_time,v_now),
       is_paused=false,paused_at=null,pause_reason=null,is_timer_running=true,
       timer_started_at=v_now,updated_at=v_now
@@ -675,6 +677,7 @@ begin
     if v_task.is_timer_running and v_task.timer_started_at is not null then
       v_elapsed := greatest(1,round(extract(epoch from (v_now-v_task.timer_started_at))/60)::integer);
     end if;
+    perform set_config('neer.task_transition','lifecycle',true);
     update public.tasks set status='paused',is_paused=true,paused_at=v_now,
       pause_reason=nullif(btrim(p_reason),''),time_spent_minutes=time_spent_minutes+v_elapsed,
       is_timer_running=false,timer_started_at=null,updated_at=v_now
@@ -683,6 +686,7 @@ begin
     if not v_task.is_paused and v_task.status <> 'paused' then
       raise exception using errcode = '22023', message = 'Only a paused task can be resumed';
     end if;
+    perform set_config('neer.task_transition','lifecycle',true);
     update public.tasks set status='in_progress',is_paused=false,paused_at=null,
       pause_reason=null,is_timer_running=true,timer_started_at=v_now,updated_at=v_now
     where organization_id=p_organization_id and id=p_task_id returning status into v_status;
@@ -760,6 +764,7 @@ begin
     raise exception using errcode = '22023', message = 'Task is not awaiting approval';
   end if;
 
+  perform set_config('neer.task_transition','review',true);
   update public.tasks set
     status=v_new_status,
     approval_notes=case when p_action='approve' then nullif(btrim(p_notes),'') else approval_notes end,
@@ -835,6 +840,226 @@ where t.assignee_id is not null
 on conflict (organization_id,task_id,app_user_id)
 do update set is_primary=true,assigned_by=excluded.assigned_by;
 
+
+create or replace function private.guard_task_state_changes()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_transition text := current_setting('neer.task_transition', true);
+begin
+  if new.id is distinct from old.id
+     or new.organization_id is distinct from old.organization_id
+     or new.creator_id is distinct from old.creator_id then
+    raise exception using errcode = '42501', message = 'Task identity and creator are immutable';
+  end if;
+
+  if new.assignee_id is distinct from old.assignee_id and v_transition is distinct from 'assignment' then
+    raise exception using errcode = '42501', message = 'Primary task assignment must use the assignment workflow';
+  end if;
+
+  if (
+    new.status is distinct from old.status
+    or new.outcome is distinct from old.outcome
+    or new.outcome_reason is distinct from old.outcome_reason
+    or new.outcome_notes is distinct from old.outcome_notes
+    or new.outcome_submitted_at is distinct from old.outcome_submitted_at
+    or new.proof_attachment_url is distinct from old.proof_attachment_url
+    or new.actual_start_time is distinct from old.actual_start_time
+    or new.actual_end_time is distinct from old.actual_end_time
+    or new.time_spent_minutes is distinct from old.time_spent_minutes
+    or new.is_paused is distinct from old.is_paused
+    or new.paused_at is distinct from old.paused_at
+    or new.pause_reason is distinct from old.pause_reason
+    or new.is_timer_running is distinct from old.is_timer_running
+    or new.timer_started_at is distinct from old.timer_started_at
+    or new.rejection_reason is distinct from old.rejection_reason
+    or new.approval_notes is distinct from old.approval_notes
+  ) and v_transition not in ('lifecycle','outcome','review') then
+    raise exception using errcode = '42501', message = 'Task state changes must use an approved workflow';
+  end if;
+
+  if v_transition = 'lifecycle' and (
+    new.outcome is distinct from old.outcome
+    or new.outcome_reason is distinct from old.outcome_reason
+    or new.outcome_notes is distinct from old.outcome_notes
+    or new.outcome_submitted_at is distinct from old.outcome_submitted_at
+    or new.proof_attachment_url is distinct from old.proof_attachment_url
+    or new.rejection_reason is distinct from old.rejection_reason
+    or new.approval_notes is distinct from old.approval_notes
+  ) then
+    raise exception using errcode = '42501', message = 'Lifecycle workflow cannot alter task outcome or approval fields';
+  end if;
+
+  if v_transition = 'outcome' and (
+    new.rejection_reason is distinct from old.rejection_reason
+    or new.approval_notes is distinct from old.approval_notes
+  ) then
+    raise exception using errcode = '42501', message = 'Outcome workflow cannot alter approval fields';
+  end if;
+
+  if v_transition = 'review' and (
+    new.outcome is distinct from old.outcome
+    or new.outcome_reason is distinct from old.outcome_reason
+    or new.outcome_notes is distinct from old.outcome_notes
+    or new.outcome_submitted_at is distinct from old.outcome_submitted_at
+    or new.proof_attachment_url is distinct from old.proof_attachment_url
+    or new.actual_start_time is distinct from old.actual_start_time
+    or new.time_spent_minutes is distinct from old.time_spent_minutes
+    or new.is_paused is distinct from old.is_paused
+    or new.paused_at is distinct from old.paused_at
+    or new.pause_reason is distinct from old.pause_reason
+    or new.is_timer_running is distinct from old.is_timer_running
+    or new.timer_started_at is distinct from old.timer_started_at
+  ) then
+    raise exception using errcode = '42501', message = 'Review workflow cannot alter execution evidence';
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke all on function private.guard_task_state_changes() from public, anon;
+grant execute on function private.guard_task_state_changes() to authenticated;
+
+drop trigger if exists tasks_guard_state_changes on public.tasks;
+create trigger tasks_guard_state_changes
+before update on public.tasks
+for each row execute function private.guard_task_state_changes();
+
+create or replace function public.record_field_task_event(
+  p_organization_id uuid,
+  p_task_id text,
+  p_event_type text,
+  p_event_label text,
+  p_latitude double precision,
+  p_longitude double precision,
+  p_accuracy_meters double precision,
+  p_details jsonb,
+  p_client_event_id uuid
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = ''
+as $function$
+declare
+  v_event_id uuid;
+  v_now timestamptz := clock_timestamp();
+  v_task public.tasks%rowtype;
+  v_outcome text;
+begin
+  if auth.uid() is null then
+    raise exception using errcode = '28000', message = 'Authentication required';
+  end if;
+  if p_organization_id is null or p_task_id is null or p_client_event_id is null then
+    raise exception using errcode = '22023', message = 'Organization, task and event id are required';
+  end if;
+  if not private.can_access_task(p_organization_id,p_task_id,'edit') then
+    raise exception using errcode = '42501', message = 'Task edit permission required';
+  end if;
+  if p_latitude is null or p_longitude is null
+     or p_latitude not between -90 and 90
+     or p_longitude not between -180 and 180
+     or p_accuracy_meters is null or p_accuracy_meters < 0 then
+    raise exception using errcode = '22023', message = 'A valid fresh GPS fix is required';
+  end if;
+  if p_details is null or jsonb_typeof(p_details) <> 'object' then
+    raise exception using errcode = '22023', message = 'Event details must be a JSON object';
+  end if;
+  if p_event_type is null or p_event_type not in (
+    'visit_started','visit_paused','visit_resumed','visit_completed',
+    'task_started','task_paused','task_resumed','task_completed'
+  ) then
+    raise exception using errcode = '22023', message = 'Unsupported lifecycle event type';
+  end if;
+
+  select * into v_task
+  from public.tasks
+  where organization_id=p_organization_id and id=p_task_id
+  for update;
+  if not found then
+    raise exception using errcode = 'P0002', message = 'Task not found';
+  end if;
+
+  insert into public.task_events(
+    organization_id,task_id,standing_account_id,actor_auth_user_id,
+    event_type,event_label,occurred_at,latitude,longitude,
+    accuracy_meters,location_status,client_event_id,details
+  ) values(
+    p_organization_id,p_task_id,v_task.standing_account_id,auth.uid(),
+    p_event_type,coalesce(p_event_label,''),v_now,p_latitude,p_longitude,
+    p_accuracy_meters,'captured',p_client_event_id,p_details
+  )
+  on conflict (organization_id,client_event_id) do nothing
+  returning id into v_event_id;
+
+  if v_event_id is null then
+    select id into v_event_id from public.task_events
+    where organization_id=p_organization_id and client_event_id=p_client_event_id;
+    return v_event_id;
+  end if;
+
+  if p_event_type in ('task_started','visit_started') then
+    if v_task.status in ('completed','approved','pending_approval','cancelled','paused')
+       or (v_task.status='in_progress' and not v_task.is_paused) then
+      raise exception using errcode = '22023', message = 'Task cannot be started from its current state';
+    end if;
+    perform set_config('neer.task_transition','lifecycle',true);
+    update public.tasks set
+      status='in_progress',actual_start_time=coalesce(actual_start_time,v_now),
+      is_paused=false,paused_at=null,pause_reason=null,
+      is_timer_running=true,timer_started_at=v_now,updated_at=v_now
+    where organization_id=p_organization_id and id=p_task_id;
+  elsif p_event_type in ('task_paused','visit_paused') then
+    if v_task.status <> 'in_progress' or v_task.is_paused then
+      raise exception using errcode = '22023', message = 'Only an active task can be paused';
+    end if;
+    perform set_config('neer.task_transition','lifecycle',true);
+    update public.tasks set
+      status='paused',is_paused=true,paused_at=v_now,
+      pause_reason=nullif(btrim(p_details->>'reason'),''),
+      time_spent_minutes=time_spent_minutes+case when timer_started_at is not null then greatest(1,round(extract(epoch from (v_now-timer_started_at))/60)::integer) else 0 end,
+      is_timer_running=false,timer_started_at=null,updated_at=v_now
+    where organization_id=p_organization_id and id=p_task_id;
+  elsif p_event_type in ('task_resumed','visit_resumed') then
+    if not v_task.is_paused and v_task.status <> 'paused' then
+      raise exception using errcode = '22023', message = 'Only a paused task can be resumed';
+    end if;
+    perform set_config('neer.task_transition','lifecycle',true);
+    update public.tasks set
+      status='in_progress',is_paused=false,paused_at=null,pause_reason=null,
+      is_timer_running=true,timer_started_at=v_now,updated_at=v_now
+    where organization_id=p_organization_id and id=p_task_id;
+  else
+    v_outcome := p_details->>'outcome';
+    if v_outcome is null or v_outcome not in ('completed','partially_completed','not_completed','unable_to_execute','needs_followup') then
+      raise exception using errcode = '22023', message = 'A valid task outcome is required';
+    end if;
+    if v_outcome <> 'completed' and coalesce(nullif(btrim(p_details->>'reason'),''),'') = '' then
+      raise exception using errcode = '22023', message = 'A reason is required for an incomplete outcome';
+    end if;
+    perform set_config('neer.task_transition','outcome',true);
+    update public.tasks set
+      status=case when v_outcome='completed' then 'pending_approval' else 'deferred' end,
+      outcome=v_outcome,outcome_reason=p_details->>'reason',outcome_notes=p_details->>'notes',
+      outcome_submitted_at=v_now,
+      proof_attachment_url=coalesce(nullif(p_details->>'proofUrl',''),proof_attachment_url),
+      actual_end_time=v_now,
+      time_spent_minutes=time_spent_minutes+case when timer_started_at is not null then greatest(1,round(extract(epoch from (v_now-timer_started_at))/60)::integer) else 0 end,
+      is_paused=false,paused_at=null,pause_reason=null,
+      is_timer_running=false,timer_started_at=null,updated_at=v_now
+    where organization_id=p_organization_id and id=p_task_id;
+  end if;
+
+  return v_event_id;
+end;
+$function$;
+
+revoke all on function public.record_field_task_event(uuid,text,text,text,double precision,double precision,double precision,jsonb,uuid) from public, anon;
+grant execute on function public.record_field_task_event(uuid,text,text,text,double precision,double precision,double precision,jsonb,uuid) to authenticated;
 
 create or replace function private.audit_task_child_change()
 returns trigger
