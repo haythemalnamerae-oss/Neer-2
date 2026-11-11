@@ -17,6 +17,14 @@ import { Task, TaskOutcome, TaskOutcomeReason } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
 import { captureRequiredLocation, stopFieldLocationTracking } from '../../lib/operations/fieldEvents';
 import { recordTaskOutcomeOnServer, uploadTaskAttachment } from '../../services/tasks.api';
+
+function createUuid(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
+    const value = Math.floor(Math.random() * 16);
+    return (character === 'x' ? value : (value & 0x3) | 0x8).toString(16);
+  });
+}
 import { Button } from '../ui/button';
 
 interface TaskOutcomeModalProps {
@@ -104,7 +112,7 @@ export const TaskOutcomeModal: React.FC<TaskOutcomeModalProps> = ({
   const [notes, setNotes] = useState('');
   const [proofUrl, setProofUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
-  const [outcomeRequestId] = useState(() => crypto.randomUUID());
+  const [outcomeRequestId] = useState(() => createUuid());
   const [isSubmittingOutcome, setIsSubmittingOutcome] = useState(false);
 
   // Follow-up chain toggle & form
@@ -186,7 +194,7 @@ export const TaskOutcomeModal: React.FC<TaskOutcomeModalProps> = ({
       if (task.taskTypeCategory === 'field' || task.taskTypeCategory === 'visit') {
         const location = await captureRequiredLocation();
         eventPayload = {
-          clientEventId: crypto.randomUUID(),
+          clientEventId: createUuid(),
           latitude: location.latitude,
           longitude: location.longitude,
           accuracyMeters: location.accuracyMeters,
