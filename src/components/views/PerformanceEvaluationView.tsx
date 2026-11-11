@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { dataStore } from '../../lib/storage';
 import { formatCurrency } from '../../lib/utils/format';
+import { FinanceApiService } from '../../services/finance-api.service';
 import { User, Task, Expense, PettyCashFund, StandingAccount, CashReceipt } from '../../types/domain';
 
 export const PerformanceEvaluationView: React.FC = () => {
@@ -135,6 +136,15 @@ export const PerformanceEvaluationView: React.FC = () => {
   const totalReceivableForUs = standingAccounts
     .filter((a) => a.direction === 'receivable' || a.direction === 'receivable_for_us')
     .reduce((s, a) => s + (a.currentBalance || 0), 0);
+
+  const handleCoverDeficit = async (expenseId: string) => {
+    try {
+      await FinanceApiService.coverDeficit(expenseId);
+      window.alert('تمت تغطية العجز عبر العملية المالية المعتمدة.');
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'تعذر تغطية العجز من الصندوق.');
+    }
+  };
 
   return (
     <div className="space-y-7 animate-in fade-in duration-200">
@@ -562,10 +572,7 @@ export const PerformanceEvaluationView: React.FC = () => {
 
                       {!exp.isCoveredFromCash && (
                         <button
-                          onClick={() => {
-                            dataStore.coverDeficitExpenseFromCash(exp.id, 'مدير العمليات');
-                            alert('تمت تغطية الصرف السالب وسداد العجز من الصندوق النقدي بنجاح!');
-                          }}
+                          onClick={() => void handleCoverDeficit(exp.id)}
                           className="px-4 py-2 rounded-xl bg-[#2A443B] hover:bg-[#1f332c] text-white text-xs font-bold transition shadow-xs cursor-pointer active:scale-95"
                         >
                           تغطية المبلغ من الصندوق
