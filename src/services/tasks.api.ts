@@ -20,6 +20,14 @@ function newId(prefix: string): string {
   return `${prefix}-${suffix}`;
 }
 
+function newUuid(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
+    const value = Math.floor(Math.random() * 16);
+    return (character === 'x' ? value : (value & 0x3) | 0x8).toString(16);
+  });
+}
+
 function requireSession(): ApiSession {
   const session = getSession();
   if (!session) throw new SessionError('انتهت الجلسة. سجّل الدخول مجددًا.');
@@ -135,7 +143,7 @@ export async function recordTaskOutcomeOnServer(
     method: 'POST',
     body: JSON.stringify({
       taskId,
-      requestId: requestId || (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : newId('req')),
+      requestId: requestId || newUuid(),
       outcome: payload.outcome,
       reason: payload.reason || null,
       notes: payload.notes || null,
