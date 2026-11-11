@@ -220,17 +220,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     if (!newSubTaskTitle.trim()) return;
     const assignee = users.find((u) => u.id === newSubTaskAssignee) || currentUser;
     try {
-      if (requiresFieldLocation) {
-        const location = await captureRequiredLocation();
-        await recordTaskEvent({
-          taskId: task.id,
-          standingAccountId: task.standingAccountId,
-          eventType: 'subtask_created',
-          eventLabel: 'إضافة مهمة فرعية أثناء التنفيذ',
-          location,
-          details: { title: newSubTaskTitle.trim(), assigneeId: assignee.id, assigneeName: assignee.name },
-        });
-      }
+      const location = requiresFieldLocation ? await captureRequiredLocation() : null;
       await addTaskSubtask(task.id, {
         title: newSubTaskTitle.trim(),
         assigneeId: assignee.id,
@@ -239,7 +229,24 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
         requiresApproval: true,
         isApproved: false,
       });
+      const createdTitle = newSubTaskTitle.trim();
       setNewSubTaskTitle('');
+      if (location) {
+        try {
+          await recordTaskEvent({
+            taskId: task.id,
+            standingAccountId: task.standingAccountId,
+            eventType: 'subtask_created',
+            eventLabel: 'إضافة مهمة فرعية أثناء التنفيذ',
+            location,
+            details: { title: createdTitle, assigneeId: assignee.id, assigneeName: assignee.name },
+          });
+        } catch (eventError) {
+          window.alert(eventError instanceof Error
+            ? `تم حفظ المهمة الفرعية، لكن تعذر تسجيل حدث الموقع: ${eventError.message}`
+            : 'تم حفظ المهمة الفرعية، لكن تعذر تسجيل حدث الموقع.');
+        }
+      }
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'تعذر حفظ المهمة الفرعية.');
     }
