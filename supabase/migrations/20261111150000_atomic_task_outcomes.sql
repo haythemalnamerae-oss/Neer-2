@@ -877,7 +877,7 @@ begin
     or new.timer_started_at is distinct from old.timer_started_at
     or new.rejection_reason is distinct from old.rejection_reason
     or new.approval_notes is distinct from old.approval_notes
-  ) and v_transition not in ('lifecycle','outcome','review') then
+  ) and coalesce(v_transition,'') not in ('lifecycle','outcome','review') then
     raise exception using errcode = '42501', message = 'Task state changes must use an approved workflow';
   end if;
 
