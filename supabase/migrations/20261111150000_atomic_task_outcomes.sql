@@ -625,7 +625,7 @@ create or replace function public.update_task_lifecycle(
 )
 returns jsonb
 language plpgsql
-security invoker
+security definer
 set search_path = pg_catalog, public, private
 as $$
 declare
@@ -973,7 +973,7 @@ create or replace function public.record_field_task_event(
 )
 returns uuid
 language plpgsql
-security invoker
+security definer
 set search_path = ''
 as $function$
 declare
@@ -1407,4 +1407,5 @@ with check (
     where o.bucket_id='task-attachments' and o.name=task_attachments.url
   )
 );
+drop policy if exists task_history_scoped_insert on public.task_history;
 drop policy if exists taskAttachments_scoped_update on public.task_attachments;
