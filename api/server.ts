@@ -140,6 +140,50 @@ app.post('/api/v1/tasks/create-bundle', async (req, res) => {
   }
 });
 
+app.post('/api/v1/tasks/record-outcome', async (req, res) => {
+  const auth = (req as AuthenticatedRequest).auth;
+  try {
+    if (!(await allowed(auth, 'tasks', 'edit'))) {
+      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Missing permission tasks.edit.' } });
+    }
+    const body = req.body as Record<string, any> | undefined;
+    const taskId = body?.taskId;
+    const requestId = body?.requestId;
+    const outcome = body?.outcome;
+    const followUp = body?.followUp ?? null;
+    const event = body?.event ?? null;
+    if (!body || typeof taskId !== 'string' || !idPattern.test(taskId) ||
+        typeof requestId !== 'string' || !uuidPattern.test(requestId) ||
+        !['completed','partially_completed','not_completed','unable_to_execute','needs_followup'].includes(outcome) ||
+        (followUp !== null && (typeof followUp !== 'object' || Array.isArray(followUp))) ||
+        (event !== null && (typeof event !== 'object' || Array.isArray(event)))) {
+      return res.status(400).json({ error: { code: 'INVALID_TASK_OUTCOME', message: 'Task outcome payload is invalid.' } });
+    }
+    if (auth.role === 'field_officer' && followUp?.assigneeId && followUp.assigneeId !== auth.appUserId) {
+      return res.status(403).json({ error: { code: 'FOLLOW_UP_ASSIGNMENT_FORBIDDEN', message: 'Field officers may only assign follow-up tasks to themselves.' } });
+    }
+    const response = await supabaseFetch('/rest/v1/rpc/record_task_outcome_bundle', auth.token, {
+      method: 'POST',
+      body: JSON.stringify({
+        p_organization_id: auth.organizationId,
+        p_task_id: taskId,
+        p_request_id: requestId,
+        p_outcome: outcome,
+        p_reason: body.reason || null,
+        p_notes: body.notes || null,
+        p_proof_url: body.proofUrl || null,
+        p_follow_up: followUp,
+        p_event: event,
+      }),
+    });
+    if (!response.ok) return sendDbError(res, response.status, await response.text());
+    return res.status(200).json(await response.json());
+  } catch (error) {
+    console.error('Atomic task outcome failed:', error);
+    return res.status(503).json({ error: { code: 'TASK_OUTCOME_FAILED', message: 'The task outcome could not be saved.' } });
+  }
+});
+
 app.get('/api/v1/admin/permissions', async (req, res) => {
   const auth = (req as AuthenticatedRequest).auth;
   if (auth.role !== 'admin') return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Admin role required.' } });
