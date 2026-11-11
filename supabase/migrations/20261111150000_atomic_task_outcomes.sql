@@ -902,7 +902,7 @@ begin
     or new.task_chain is distinct from old.task_chain
     or new.chain_follow_up_task_id is distinct from old.chain_follow_up_task_id
     or new.parent_task_id is distinct from old.parent_task_id
-  ) and coalesce(v_transition,'') not in ('lifecycle','outcome','review') then
+  ) and coalesce(v_transition,'') not in ('lifecycle','outcome','review','cancel') then
     raise exception using errcode = '42501', message = 'Task state changes must use an approved workflow';
   end if;
 
@@ -1465,3 +1465,77 @@ drop trigger if exists task_events_audit_insert on public.task_events;
 create trigger task_events_audit_insert
 after insert on public.task_events
 for each row execute function private.audit_task_event_insert();
+
+
+drop policy if exists tasks_scoped_delete on public.tasks;
+
+create or replace function public.cancel_task_bundle(
+  p_organization_id uuid,
+  p_task_id text,
+  p_reason text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private
+as $$
+declare
+  v_task public.tasks%rowtype;
+  v_actor_id text;
+  v_actor_name text;
+  v_actor_role text;
+  v_now timestamptz := clock_timestamp();
+  v_elapsed integer := 0;
+begin
+  if auth.uid() is null then
+    raise exception using errcode = '28000', message = 'Authentication required';
+  end if;
+  if not private.can_access_task(p_organization_id,p_task_id,'delete') then
+    raise exception using errcode = '42501', message = 'Task cancellation permission required';
+  end if;
+  select * into v_task from public.tasks
+  where organization_id=p_organization_id and id=p_task_id
+  for update;
+  if not found then
+    raise exception using errcode = 'P0002', message = 'Task not found';
+  end if;
+  if v_task.status in ('completed','approved','pending_approval','cancelled') then
+    raise exception using errcode = '22023', message = 'This task cannot be cancelled from its current state';
+  end if;
+  if v_task.is_timer_running and v_task.timer_started_at is not null then
+    v_elapsed := greatest(1,round(extract(epoch from (v_now-v_task.timer_started_at))/60)::integer);
+  end if;
+  select m.app_user_id,u.name,m.role into v_actor_id,v_actor_name,v_actor_role
+  from public.organization_members m
+  left join public.app_users u on u.organization_id=m.organization_id and u.id=m.app_user_id
+  where m.organization_id=p_organization_id and m.auth_user_id=auth.uid() and m.active
+  limit 1;
+
+  perform set_config('neer.task_transition','cancel',true);
+  update public.tasks set status='cancelled',actual_end_time=v_now,
+    time_spent_minutes=time_spent_minutes+v_elapsed,
+    is_paused=false,paused_at=null,pause_reason=null,
+    is_timer_running=false,timer_started_at=null,updated_at=v_now
+  where organization_id=p_organization_id and id=p_task_id;
+
+  insert into public.task_history(id,organization_id,task_id,action,performed_by,notes)
+  values('hist-cancel-'||gen_random_uuid()::text,p_organization_id,p_task_id,
+    'إلغاء المهمة',coalesce(v_actor_name,'مستخدم النظام'),nullif(btrim(p_reason),''));
+
+  insert into public.audit_logs(id,organization_id,user_id,user_name,user_role,action,action_type,entity,entity_id,details)
+  values('aud-cancel-'||gen_random_uuid()::text,p_organization_id,v_actor_id,
+    coalesce(v_actor_name,'مستخدم النظام'),coalesce(v_actor_role,'viewer'),
+    'إلغاء مهمة','update','task',p_task_id,coalesce(p_reason,''));
+
+  insert into public.notifications(id,organization_id,user_id,title,message,type,is_read,target_view)
+  select 'notif-cancel-'||gen_random_uuid()::text,p_organization_id,ta.app_user_id,
+    'تم إلغاء المهمة','تم إلغاء المهمة: '||v_task.title,'warning',false,'tasks'
+  from public.task_assignees ta
+  where ta.organization_id=p_organization_id and ta.task_id=p_task_id;
+
+  return jsonb_build_object('task_id',p_task_id,'status','cancelled');
+end;
+$$;
+
+revoke all on function public.cancel_task_bundle(uuid,text,text) from public, anon;
+grant execute on function public.cancel_task_bundle(uuid,text,text) to authenticated;
