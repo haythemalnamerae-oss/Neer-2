@@ -319,16 +319,15 @@ export async function uploadTaskAttachment(
     uploadedAt: new Date().toISOString(),
   };
   try {
-    await apiRequest(session, '/task-attachments', {
+    await apiRequest(session, '/tasks/attach', {
       method: 'POST',
       body: JSON.stringify({
         id: attachment.id,
-        task_id: taskId,
+        taskId,
         name: attachment.name,
-        url: objectPath,
+        objectPath,
         size: attachment.size,
         type: attachment.type,
-        uploaded_by: uploadedBy,
       }),
     });
   } catch (error) {
