@@ -1,0 +1,59 @@
+name: Main-only branch guard
+
+on:
+  create:
+  push:
+    branches:
+      - "**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: main-only-branch-guard
+  cancel-in-progress: false
+
+jobs:
+  enforce-main-only:
+    if: github.ref != 'refs/heads/main' || github.event_name == 'create' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove every non-main branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.event.ref_type }}
+          EVENT_REF: ${{ github.event.ref }}
+        run: |
+          set -euo pipefail
+
+          delete_branch() {
+            local branch="$1"
+            [ "$branch" = "main" ] && return 0
+            echo "Removing forbidden branch: $branch"
+            gh api --method DELETE "repos/$REPOSITORY/git/refs/heads/$branch" || {
+              echo "::error::Could not delete forbidden branch: $branch"
+              return 1
+            }
+          }
+
+          if [ "$EVENT_NAME" = "create" ]; then
+            if [ "$REF_TYPE" = "branch" ]; then
+              delete_branch "$EVENT_REF"
+            fi
+            exit 0
+          fi
+
+          if [ "$EVENT_NAME" = "push" ]; then
+            delete_branch "$REF_NAME"
+            exit 0
+          fi
+
+          # Manual recovery/sweep: retain main and delete every other branch.
+          gh api --paginate "repos/$REPOSITORY/branches?per_page=100" --jq '.[].name' |
+            while IFS= read -r branch; do
+              [ -n "$branch" ] && delete_branch "$branch"
+            done
