@@ -334,7 +334,7 @@ export class OpsDataStore {
     if (expenseData.taskId) {
       const linkedTask = this.tasks.find((task) => task.id === expenseData.taskId);
       if (!linkedTask) throw new Error('المهمة المرتبطة بالمصروف غير موجودة.');
-      if (currentUser.role === 'field_officer' && linkedTask.assigneeId !== currentUser.id) throw new Error('لا يمكنك ربط المصروف بمهمة غير مسندة إليك.');
+      if (currentUser.role === 'field_officer' && linkedTask.assigneeId !== currentUser.id && !linkedTask.assignees?.some((assignee) => assignee.appUserId === currentUser.id)) throw new Error('لا يمكنك ربط المصروف بمهمة غير مسندة إليك.');
     }
     const linkedStandingAccount = expenseData.standingAccountId
       ? this.standingAccounts.find((account) => account.id === expenseData.standingAccountId)
@@ -1661,7 +1661,7 @@ export class OpsDataStore {
     });
     safeSet(STORAGE_KEYS.TASKS, this.tasks);
     this.logAudit('تعليق على مهمة', 'update', 'task', taskId, `${currentUser.name}: ${text.slice(0, 40)}...`);
-    if (targetTask && (targetTask as Task).assigneeId !== currentUser.id) {
+    if (targetTask && (targetTask as Task).assigneeId !== currentUser.id && !(targetTask as Task).assignees?.some((assignee) => assignee.appUserId === currentUser.id)) {
       this.addNotification({
         title: `تعليق جديد على المهمة "${(targetTask as Task).title}"`,
         message: `${currentUser.name}: ${text.slice(0, 60)}...`,
