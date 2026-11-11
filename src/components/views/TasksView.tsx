@@ -39,7 +39,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
   const canRecordOutcome = hasPermission(currentUser.role, 'tasks', 'edit');
   const allTasks = dataStore.getTasks();
   const tasks = currentUser.role === 'field_officer'
-    ? allTasks.filter((task) => task.assigneeId === currentUser.id)
+    ? allTasks.filter((task) => task.assigneeId === currentUser.id || task.assignees?.some((assignee) => assignee.appUserId === currentUser.id))
     : allTasks;
   const users = dataStore.getUsers();
 
