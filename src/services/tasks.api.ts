@@ -151,19 +151,6 @@ export async function recordTaskOutcomeOnServer(
   };
 }
 
-export async function updateTaskFields(taskId: string, updates: Record<string, unknown>): Promise<void> {
-  const session = requireSession();
-  const snakeCase: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(updates)) {
-    const dbKey = key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
-    if (['id', 'organization_id', 'creator_id', 'spent_amount', 'task_fund_spent', 'task_fund_remaining'].includes(dbKey)) {
-      throw new Error(`الحقل ${key} لا يمكن تعديله من واجهة المهام.`);
-    }
-    snakeCase[dbKey] = value;
-  }
-  await mutateTaskResource(session, 'tasks', 'PATCH', `id=eq.${encodeURIComponent(taskId)}`, snakeCase);
-}
-
 export async function updateTaskLifecycle(taskId: string, action: 'start' | 'pause' | 'resume', reason?: string): Promise<void> {
   const session = requireSession();
   await apiRequest(session, '/tasks/lifecycle', {
