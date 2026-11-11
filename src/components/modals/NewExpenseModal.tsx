@@ -31,7 +31,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
   const allFunds = dataStore.getFunds();
   const funds = currentUser.role === 'field_officer' ? allFunds.filter((fund) => fund.holderId === currentUser.id) : allFunds;
   const allTasks = dataStore.getTasks();
-  const tasks = currentUser.role === 'field_officer' ? allTasks.filter((task) => task.assigneeId === currentUser.id) : allTasks;
+  const tasks = currentUser.role === 'field_officer' ? allTasks.filter((task) => task.assigneeId === currentUser.id || task.assignees?.some((assignee) => assignee.appUserId === currentUser.id)) : allTasks;
   const canCreateExpense = hasPermission(currentUser.role, 'expenses', 'create');
   const canApproveExpense = hasPermission(currentUser.role, 'expenses', 'approve');
   const settings = dataStore.getSettings();
