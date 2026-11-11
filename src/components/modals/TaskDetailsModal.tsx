@@ -62,6 +62,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   const [pauseReasonInput, setPauseReasonInput] = useState('');
   const [dailyNoteInput, setDailyNoteInput] = useState('');
   const [commentInput, setCommentInput] = useState('');
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [isInternalComment, setIsInternalComment] = useState(false);
   const [newSubTaskTitle, setNewSubTaskTitle] = useState('');
   const [newSubTaskAssignee, setNewSubTaskAssignee] = useState('');
@@ -264,7 +265,8 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
 
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!commentInput.trim()) return;
+    if (!commentInput.trim() || isSubmittingComment) return;
+    setIsSubmittingComment(true);
     try {
       await addTaskComment(task.id, commentInput.trim(), {
         id: currentUser.id,
@@ -276,6 +278,8 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
       setIsInternalComment(false);
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'تعذر حفظ التعليق.');
+    } finally {
+      setIsSubmittingComment(false);
     }
   };
 
@@ -1196,7 +1200,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                   </label>
                 )}
                 <div className="flex justify-end">
-                  <Button type="submit" variant="primary" size="sm" disabled={!commentInput.trim()}>إرسال التعليق</Button>
+                  <Button type="submit" variant="primary" size="sm" disabled={!commentInput.trim() || isSubmittingComment}>{isSubmittingComment ? "جارٍ الإرسال..." : "إرسال التعليق"}</Button>
                 </div>
               </form>
             </div>
