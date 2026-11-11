@@ -184,6 +184,35 @@ app.post('/api/v1/tasks/record-outcome', async (req, res) => {
   }
 });
 
+app.post('/api/v1/tasks/review', async (req, res) => {
+  const auth = (req as AuthenticatedRequest).auth;
+  try {
+    if (!(await allowed(auth, 'tasks', 'approve'))) {
+      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Missing permission tasks.approve.' } });
+    }
+    const body = req.body as Record<string, any> | undefined;
+    if (!body || typeof body.taskId !== 'string' || !idPattern.test(body.taskId) ||
+        !['approve','reject'].includes(body.action) ||
+        (body.action === 'reject' && (typeof body.reason !== 'string' || !body.reason.trim()))) {
+      return res.status(400).json({ error: { code: 'INVALID_TASK_REVIEW', message: 'Task review payload is invalid.' } });
+    }
+    const response = await supabaseFetch('/rest/v1/rpc/review_task_approval', auth.token, {
+      method: 'POST',
+      body: JSON.stringify({
+        p_organization_id: auth.organizationId,
+        p_task_id: body.taskId,
+        p_action: body.action,
+        p_notes: body.reason || body.notes || null,
+      }),
+    });
+    if (!response.ok) return sendDbError(res, response.status, await response.text());
+    return res.status(200).json(await response.json());
+  } catch (error) {
+    console.error('Task review failed:', error);
+    return res.status(503).json({ error: { code: 'TASK_REVIEW_FAILED', message: 'The task review could not be saved.' } });
+  }
+});
+
 app.post('/api/v1/tasks/lifecycle', async (req, res) => {
   const auth = (req as AuthenticatedRequest).auth;
   try {
