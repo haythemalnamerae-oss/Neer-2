@@ -247,6 +247,12 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
         const requestedAssignee = (req.body as Record<string, unknown> | undefined)?.assignee_id;
         if (requestedAssignee !== auth.appUserId) return res.status(403).json({ error: { code: 'TASK_ASSIGNMENT_FORBIDDEN', message: 'Field officers may only create tasks assigned to themselves.' } });
       }
+      if (req.method === 'PATCH') {
+        const requestedAssignee = (req.body as Record<string, unknown> | undefined)?.assignee_id;
+        if (requestedAssignee !== undefined && requestedAssignee !== auth.appUserId) {
+          return res.status(403).json({ error: { code: 'TASK_REASSIGNMENT_FORBIDDEN', message: 'Field officers cannot reassign tasks.' } });
+        }
+      }
     } else if (taskChildResources.has(req.params.resource)) {
       const assignedQuery = new URLSearchParams({
         select: 'id',
@@ -260,16 +266,23 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
       const assignedIds = assignedTasks.map((task) => task.id).filter((id) => idPattern.test(id));
       const assignedFilter = assignedIds.length ? `in.(${assignedIds.join(',')})` : 'eq.__no_assigned_task__';
       if (req.method === 'GET' || req.method === 'PATCH' || req.method === 'DELETE') query.set('task_id', assignedFilter);
-      if (req.method === 'POST') {
+      if (req.method === 'POST' || req.method === 'PATCH') {
         const requestedTaskId = (req.body as Record<string, unknown> | undefined)?.task_id;
-        if (typeof requestedTaskId !== 'string' || !assignedIds.includes(requestedTaskId)) {
+        if (req.method === 'POST' && (typeof requestedTaskId !== 'string' || !assignedIds.includes(requestedTaskId))) {
+          return res.status(403).json({ error: { code: 'TASK_ACCESS_FORBIDDEN', message: 'The related task is not assigned to this field officer.' } });
+        }
+        if (req.method === 'PATCH' && requestedTaskId !== undefined && (typeof requestedTaskId !== 'string' || !assignedIds.includes(requestedTaskId))) {
           return res.status(403).json({ error: { code: 'TASK_ACCESS_FORBIDDEN', message: 'The related task is not assigned to this field officer.' } });
         }
       }
     } else if (req.params.resource === 'follow-ups') {
       if (req.method === 'GET' || req.method === 'PATCH' || req.method === 'DELETE') query.set('assigned_to', `eq.${auth.appUserId}`);
-      if (req.method === 'POST' && (req.body as Record<string, unknown> | undefined)?.assigned_to !== auth.appUserId) {
+      const requestedAssignee = (req.body as Record<string, unknown> | undefined)?.assigned_to;
+      if (req.method === 'POST' && requestedAssignee !== auth.appUserId) {
         return res.status(403).json({ error: { code: 'FOLLOW_UP_ASSIGNMENT_FORBIDDEN', message: 'Field officers may only create follow-ups assigned to themselves.' } });
+      }
+      if (req.method === 'PATCH' && requestedAssignee !== undefined && requestedAssignee !== auth.appUserId) {
+        return res.status(403).json({ error: { code: 'FOLLOW_UP_REASSIGNMENT_FORBIDDEN', message: 'Field officers cannot reassign follow-ups.' } });
       }
     } else if (req.method === 'GET' && req.params.resource === 'funds') {
       query.set('holder_id', `eq.${auth.appUserId}`);
