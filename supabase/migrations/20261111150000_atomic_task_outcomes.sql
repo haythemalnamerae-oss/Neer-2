@@ -854,6 +854,14 @@ begin
   v_task_id := v_payload->>'task_id';
   v_record_id := v_payload->>'id';
 
+  -- Ignore child cascades caused by deleting the parent task.
+  if not exists (
+    select 1 from public.tasks t
+    where t.organization_id=v_org and t.id=v_task_id
+  ) then
+    if tg_op='DELETE' then return old; else return new; end if;
+  end if;
+
   select m.app_user_id,coalesce(u.name,''),coalesce(m.role,'viewer')
     into v_actor_id,v_actor_name,v_actor_role
   from public.organization_members m
