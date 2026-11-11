@@ -177,10 +177,14 @@ export async function refreshTaskSnapshot(): Promise<void> {
 }
 
 export async function updateTaskStatusOnServer(taskId: string, status: string, notes?: string): Promise<void> {
-  const updates: Record<string, unknown> = { status };
-  if (status === 'rejected') updates.rejection_reason = notes || null;
-  if (status === 'completed' || status === 'approved') updates.actual_end_time = new Date().toISOString();
-  await updateTaskFields(taskId, updates);
+  const session = requireSession();
+  const action = status === 'rejected' ? 'reject' : status === 'completed' || status === 'approved' ? 'approve' : null;
+  if (!action) throw new Error('حالة مراجعة المهمة غير مدعومة.');
+  await apiRequest(session, '/tasks/review', {
+    method: 'POST',
+    body: JSON.stringify({ taskId, action, reason: notes || null }),
+  });
+  await refreshAfterMutation(session);
 }
 
 export async function deleteTaskOnServer(taskId: string): Promise<void> {
