@@ -52,7 +52,7 @@ async function mutateTaskResource<T = unknown>(
 
 export async function createTaskBundle(
   data: NewTaskData,
-  options: { requiresApproval?: boolean; subtaskNotes?: string } = {},
+  options: { requiresApproval?: boolean; subtaskNotes?: string; assigneeIds?: string[] } = {},
 ): Promise<Task> {
   const session = requireSession();
   const taskId = newId('tsk');
@@ -73,6 +73,7 @@ export async function createTaskBundle(
   const task = {
     ...data,
     id: taskId,
+    assigneeIds: [...new Set([data.assigneeId, ...(options.assigneeIds || [])].filter(Boolean))],
     spentAmount: 0,
     createdAt: new Date().toISOString(),
     history: [],
