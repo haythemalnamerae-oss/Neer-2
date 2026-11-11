@@ -220,7 +220,12 @@ export async function loadUiSnapshot(session: ApiSession): Promise<void> {
     task.subTasks = children(subtasks, task.id).map((item) => ({ id: item.id, title: item.title, assigneeId: item.assigneeId || '', assigneeName: item.assigneeName, status: item.status, requiresApproval: item.requiresApproval, isApproved: item.isApproved, approvedByManager: item.approvedByManager, dueDate: item.dueDate, notes: item.notes }));
     task.dailyUpdates = children(updates, task.id).map((item) => ({ id: item.id, authorId: item.authorId || '', authorName: item.authorName, date: item.updateDate, text: item.text, createdAt: item.createdAt }));
     const storedHistory = children(histories, task.id).map((item) => ({ id: item.id, action: item.action, performedBy: item.performedBy, timestamp: item.createdAt, notes: item.notes }));
-    const eventHistory = fieldEvents.filter((event: Record<string, any>) => event.task_id === task.id).map((event: Record<string, any>) => ({
+    const auditedEventIds = new Set(storedHistory
+      .filter((item) => item.id.startsWith('hist-event-'))
+      .map((item) => item.id.slice('hist-event-'.length)));
+    const eventHistory = fieldEvents.filter((event: Record<string, any>) =>
+      event.task_id === task.id && !auditedEventIds.has(event.id)
+    ).map((event: Record<string, any>) => ({
       id: event.id,
       action: event.event_label || event.event_type,
       performedBy: event.actor_name || authUserNames.get(event.actor_auth_user_id) || 'مستخدم النظام',
