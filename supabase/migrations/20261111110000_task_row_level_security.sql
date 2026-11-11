@@ -83,7 +83,7 @@ drop policy if exists tasks_scoped_delete on public.tasks;
 
 create policy tasks_scoped_select on public.tasks
 for select to authenticated
-using (private.can_assign_task(organization_id, assignee_id, 'view'));
+using (private.can_access_task(organization_id, id, 'view'));
 
 create policy tasks_scoped_insert on public.tasks
 for insert to authenticated
@@ -92,7 +92,7 @@ with check (private.can_assign_task(organization_id, assignee_id, 'create'));
 create policy tasks_scoped_update on public.tasks
 for update to authenticated
 using (private.can_access_task(organization_id, id, 'edit'))
-with check (private.can_assign_task(organization_id, assignee_id, 'edit'));
+with check (private.can_access_task(organization_id, id, 'edit'));
 
 create policy tasks_scoped_delete on public.tasks
 for delete to authenticated
