@@ -626,7 +626,9 @@ set search_path = pg_catalog, public, private
 as $$
 declare
   v_task public.tasks%rowtype;
+  v_actor_id text;
   v_actor_name text;
+  v_actor_role text;
   v_now timestamptz := clock_timestamp();
   v_elapsed integer := 0;
   v_status text;
@@ -651,7 +653,7 @@ begin
     raise exception using errcode = 'P0002', message = 'Task not found';
   end if;
 
-  select u.name into v_actor_name
+  select m.app_user_id,u.name,m.role into v_actor_id,v_actor_name,v_actor_role
   from public.organization_members m
   left join public.app_users u on u.organization_id=m.organization_id and u.id=m.app_user_id
   where m.organization_id=p_organization_id and m.auth_user_id=auth.uid() and m.active
@@ -689,6 +691,12 @@ begin
   values('hist-life-'||gen_random_uuid()::text,p_organization_id,p_task_id,
     case p_action when 'start' then 'بدء تنفيذ المهمة' when 'pause' then 'إيقاف المهمة مؤقتاً' else 'استئناف تنفيذ المهمة' end,
     coalesce(v_actor_name,'مستخدم النظام'),nullif(btrim(p_reason),''));
+
+  insert into public.audit_logs(id,organization_id,user_id,user_name,user_role,action,action_type,entity,entity_id,details)
+  values('aud-life-'||gen_random_uuid()::text,p_organization_id,v_actor_id,
+    coalesce(v_actor_name,'مستخدم النظام'),coalesce(v_actor_role,'viewer'),
+    case p_action when 'start' then 'بدء مهمة' when 'pause' then 'إيقاف مهمة مؤقتاً' else 'استئناف مهمة' end,
+    'update','task',p_task_id,coalesce(p_reason,''));
 
   return jsonb_build_object('task_id',p_task_id,'status',v_status,'time_added_minutes',v_elapsed);
 end;
