@@ -80,7 +80,7 @@ create or replace function public.record_task_outcome_bundle(
 )
 returns jsonb
 language plpgsql
-security invoker
+security definer
 set search_path = pg_catalog, public, private
 as $$
 declare
@@ -334,7 +334,7 @@ create or replace function public.create_task_bundle(
 )
 returns jsonb
 language plpgsql
-security invoker
+security definer
 set search_path = pg_catalog, public, private
 as $$
 declare
@@ -1294,3 +1294,14 @@ with check (
       and (m.role<>'field_officer' or notifications.user_id=m.app_user_id)
   )
 );
+create policy notifications_scoped_insert on public.notifications
+for insert to authenticated
+with check (
+  exists (
+    select 1 from public.organization_members m
+    where m.organization_id=notifications.organization_id
+      and m.auth_user_id=(select auth.uid()) and m.active
+      and (m.role<>'field_officer' or notifications.user_id=m.app_user_id)
+  )
+);
+
