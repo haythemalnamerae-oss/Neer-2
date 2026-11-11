@@ -1179,3 +1179,118 @@ for each row execute function private.audit_task_child_change();
 drop trigger if exists task_assignees_audit on public.task_assignees;
 create trigger task_assignees_audit after insert or update or delete on public.task_assignees
 for each row execute function private.audit_task_child_change();
+
+
+create or replace function private.guard_field_subtask_assignment()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_role text;
+  v_app_user_id text;
+begin
+  select m.role,m.app_user_id into v_role,v_app_user_id
+  from public.organization_members m
+  where m.organization_id=new.organization_id
+    and m.auth_user_id=auth.uid()
+    and m.active
+  limit 1;
+  if v_role='field_officer' and (
+    new.assignee_id is null or new.assignee_id is distinct from v_app_user_id
+  ) then
+    raise exception using errcode = '42501', message = 'Field officers may only assign subtasks to themselves';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function private.guard_field_subtask_assignment() from public, anon;
+grant execute on function private.guard_field_subtask_assignment() to authenticated;
+drop trigger if exists task_subtasks_guard_assignee on public.task_subtasks;
+create trigger task_subtasks_guard_assignee
+before insert or update of assignee_id on public.task_subtasks
+for each row execute function private.guard_field_subtask_assignment();
+
+-- Keep follow-up rows visible to the assignee for field officers and to authorized
+-- organization staff for supervision and reporting.
+drop policy if exists org_member_access on public.follow_ups;
+create policy follow_ups_scoped_select on public.follow_ups
+for select to authenticated
+using (
+  exists (
+    select 1 from public.organization_members m
+    where m.organization_id=follow_ups.organization_id
+      and m.auth_user_id=(select auth.uid()) and m.active
+      and (m.role<>'field_officer' or follow_ups.assigned_to=m.app_user_id)
+  )
+);
+create policy follow_ups_scoped_insert on public.follow_ups
+for insert to authenticated
+with check (
+  exists (
+    select 1 from public.organization_members m
+    where m.organization_id=follow_ups.organization_id
+      and m.auth_user_id=(select auth.uid()) and m.active
+      and (m.role<>'field_officer' or follow_ups.assigned_to=m.app_user_id)
+  )
+);
+create policy follow_ups_scoped_update on public.follow_ups
+for update to authenticated
+using (
+  exists (
+    select 1 from public.organization_members m
+    where m.organization_id=follow_ups.organization_id
+      and m.auth_user_id=(select auth.uid()) and m.active
+      and (m.role<>'field_officer' or follow_ups.assigned_to=m.app_user_id)
+  )
+)
+with check (
+  exists (
+    select 1 from public.organization_members m
+    where m.organization_id=follow_ups.organization_id
+      and m.auth_user_id=(select auth.uid()) and m.active
+      and (m.role<>'field_officer' or follow_ups.assigned_to=m.app_user_id)
+  )
+);
+create policy follow_ups_scoped_delete on public.follow_ups
+for delete to authenticated
+using (
+  exists (
+    select 1 from public.organization_members m
+    where m.organization_id=follow_ups.organization_id
+      and m.auth_user_id=(select auth.uid()) and m.active
+      and (m.role<>'field_officer' or follow_ups.assigned_to=m.app_user_id)
+  )
+);
+
+drop policy if exists org_member_access on public.notifications;
+create policy notifications_scoped_select on public.notifications
+for select to authenticated
+using (
+  exists (
+    select 1 from public.organization_members m
+    where m.organization_id=notifications.organization_id
+      and m.auth_user_id=(select auth.uid()) and m.active
+      and (m.role<>'field_officer' or notifications.user_id is null or notifications.user_id=m.app_user_id)
+  )
+);
+create policy notifications_scoped_update on public.notifications
+for update to authenticated
+using (
+  exists (
+    select 1 from public.organization_members m
+    where m.organization_id=notifications.organization_id
+      and m.auth_user_id=(select auth.uid()) and m.active
+      and (m.role<>'field_officer' or notifications.user_id=m.app_user_id)
+  )
+)
+with check (
+  exists (
+    select 1 from public.organization_members m
+    where m.organization_id=notifications.organization_id
+      and m.auth_user_id=(select auth.uid()) and m.active
+      and (m.role<>'field_officer' or notifications.user_id=m.app_user_id)
+  )
+);
