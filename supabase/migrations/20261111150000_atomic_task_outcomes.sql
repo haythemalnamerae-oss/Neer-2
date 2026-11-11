@@ -458,6 +458,9 @@ begin
     if jsonb_typeof(v_item) <> 'string' or nullif(v_item #>> '{}','') is null then
       raise exception using errcode = '22023', message = 'Invalid task assignee id';
     end if;
+    if v_role='field_officer' and v_item #>> '{}' <> v_app_user_id then
+      raise exception using errcode = '42501', message = 'Field officers may only assign tasks to themselves';
+    end if;
     if not exists (
       select 1 from public.app_users u
       where u.organization_id = p_organization_id
