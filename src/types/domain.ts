@@ -141,6 +141,16 @@ export interface TaskComment {
 
 export type TaskTypeClassification = 'administrative' | 'field' | 'financial' | 'visit';
 
+export interface TaskAssignee {
+  id: string;
+  appUserId: string;
+  name?: string;
+  role?: Role;
+  isPrimary: boolean;
+  assignedBy?: string;
+  assignedAt: string;
+}
+
 export interface Task {
   id: string;
   code?: string;
