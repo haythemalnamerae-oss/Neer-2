@@ -15,7 +15,8 @@ import {
 } from 'lucide-react';
 import { Task, TaskOutcome, TaskOutcomeReason } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
-import { captureRequiredLocation, recordFieldLifecycleEvent, stopFieldLocationTracking } from '../../lib/operations/fieldEvents';
+import { captureRequiredLocation, stopFieldLocationTracking } from '../../lib/operations/fieldEvents';
+import { recordTaskOutcomeOnServer, uploadTaskAttachment } from '../../services/tasks.api';
 import { Button } from '../ui/button';
 
 interface TaskOutcomeModalProps {
@@ -133,12 +134,17 @@ export const TaskOutcomeModal: React.FC<TaskOutcomeModalProps> = ({
     }
   };
 
-  const handleSimulateUpload = () => {
+  const handleProofFileChange = async (file?: File) => {
+    if (!file) return;
     setIsUploading(true);
-    setTimeout(() => {
+    try {
+      const attachment = await uploadTaskAttachment(task.id, file, `إثبات الإنجاز - ${file.name}`, dataStore.getCurrentUser().name);
+      setProofUrl(attachment.url);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'تعذر رفع مستند الإثبات.');
+    } finally {
       setIsUploading(false);
-      setProofUrl('https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=600&auto=format&fit=crop&q=80');
-    }, 600);
+    }
   };
 
   const [createdSuccessInfo, setCreatedSuccessInfo] = useState<{
@@ -171,35 +177,35 @@ export const TaskOutcomeModal: React.FC<TaskOutcomeModalProps> = ({
       assigneeName: users.find((u) => u.id === followUpAssigneeId)?.name || task.assigneeName,
     } : undefined;
 
-    if (task.taskTypeCategory === 'field' || task.taskTypeCategory === 'visit') {
-      try {
+    try {
+      let eventPayload: { clientEventId: string; latitude: number; longitude: number; accuracyMeters: number; eventLabel: string } | undefined;
+      if (task.taskTypeCategory === 'field' || task.taskTypeCategory === 'visit') {
         const location = await captureRequiredLocation();
-        await recordFieldLifecycleEvent({
-          taskId: task.id,
-          eventType: task.taskTypeCategory === 'visit' ? 'visit_completed' : 'task_completed',
+        eventPayload = {
+          clientEventId: crypto.randomUUID(),
+          latitude: location.latitude,
+          longitude: location.longitude,
+          accuracyMeters: location.accuracyMeters,
           eventLabel: task.taskTypeCategory === 'visit' ? 'إنهاء الزيارة' : 'إنهاء المهمة الميدانية',
-          location,
-          details: { outcome: selectedOutcome, reason: finalReason, notes },
-        });
-      } catch (error) {
-        window.alert(error instanceof Error ? error.message : 'تعذر توثيق موقع إنهاء المهمة.');
-        return;
+        };
       }
-    }
 
-    stopFieldLocationTracking(task.id);
-    const res = dataStore.recordTaskOutcome(task.id, {
-      outcome: selectedOutcome,
-      reason: finalReason,
-      notes,
-      proofUrl,
-      followUp: followUpPayload,
-    });
+      const res = await recordTaskOutcomeOnServer(task.id, {
+        outcome: selectedOutcome,
+        reason: finalReason,
+        notes,
+        proofUrl,
+        followUp: followUpPayload,
+      }, eventPayload);
 
-    if (res.followUpTask && onViewChain) {
-      setCreatedSuccessInfo(res);
-    } else {
-      handleCloseModal();
+      stopFieldLocationTracking(task.id);
+      if (res.followUpTask && onViewChain) {
+        setCreatedSuccessInfo(res);
+      } else {
+        handleCloseModal();
+      }
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'تعذر حفظ نتيجة المهمة.');
     }
   };
 
@@ -485,16 +491,24 @@ export const TaskOutcomeModal: React.FC<TaskOutcomeModalProps> = ({
                 </button>
               </div>
             ) : (
-              <div 
-                onClick={handleSimulateUpload}
-                className="neu-inset p-5 rounded-2xl text-center cursor-pointer transition-all"
-              >
+              <label className="neu-inset p-5 rounded-2xl text-center cursor-pointer transition-all block">
                 <UploadCloud className="w-7 h-7 text-emerald-700 mx-auto mb-1.5" />
                 <p className="text-xs sm:text-sm font-bold text-slate-800">
-                  {isUploading ? 'جاري رفع الملف...' : 'اضغط لإرفاق صورة أو مستند الإثبات'}
+                  {isUploading ? 'جاري رفع الملف...' : 'اختر صورة أو مستند الإثبات'}
                 </p>
-                <p className="text-xs text-slate-500 mt-0.5">PNG, JPG, PDF حتى 10 ميغابايت</p>
-              </div>
+                <p className="text-xs text-slate-500 mt-0.5">PNG, JPG, WebP, PDF حتى 10 ميغابايت</p>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif,application/pdf"
+                  className="hidden"
+                  disabled={isUploading}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    void handleProofFileChange(file);
+                  }}
+                />
+              </label>
             )}
           </div>
 
