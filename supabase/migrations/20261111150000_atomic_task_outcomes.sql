@@ -235,7 +235,14 @@ begin
       v_task.task_type_category,v_task.client_name,v_task.client_contact,v_task.client_phone,
       v_task.proof_required,0,0, v_task.tags || array['سلسلة متابعة'],
       v_task.fund_id,null,0,null,
-      nullif(p_follow_up->>'notes',''),p_task_id,v_task.standing_account_id,'[]'::jsonb
+      nullif(p_follow_up->>'notes',''),p_task_id,v_task.standing_account_id,
+      coalesce(v_task.task_chain,'[]'::jsonb) || jsonb_build_array(jsonb_build_object(
+        'id',v_follow_id,
+        'title',coalesce(nullif(p_follow_up->>'title',''),'متابعة: '||v_task.title),
+        'status','scheduled',
+        'date',p_follow_up->>'dueDate',
+        'assigneeName',coalesce(v_follow_name,'')
+      ))
     );
 
     insert into public.task_checklist_items(id,organization_id,task_id,text,completed,sort_order)
