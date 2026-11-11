@@ -331,7 +331,9 @@ export async function uploadTaskAttachment(
       }),
     });
   } catch (error) {
-    await removeStoredObject(session, objectPath);
+    // The registration response may have been lost after the database committed.
+    // Keep the object rather than risk deleting a file referenced by committed metadata.
+    console.error('Task attachment registration did not confirm; private object retained for safe retry/cleanup:', error);
     throw error;
   }
   // Once metadata is committed, keep the object and report upload success even if the view refresh fails.
