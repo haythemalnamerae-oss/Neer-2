@@ -564,7 +564,7 @@ create or replace function public.register_task_attachment(
 )
 returns jsonb
 language plpgsql
-security invoker
+security definer
 set search_path = pg_catalog, public, private
 as $$
 declare
