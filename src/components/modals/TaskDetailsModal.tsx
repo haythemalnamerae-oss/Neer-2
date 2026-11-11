@@ -29,6 +29,11 @@ import {
 } from 'lucide-react';
 import { Task, TaskStatus, TaskStepStatus } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
+import {
+  addTaskDailyUpdate, addTaskSubtask, deleteTaskAttachmentOnServer,
+  getTaskAttachmentSignedUrl, refreshTaskSnapshot, setChecklistItem,
+  setTaskStepStatus, updateTaskFields, updateTaskSubtaskStatus, uploadTaskAttachment,
+} from '../../services/tasks.api';
 import { captureRequiredLocation, ensureFieldVisitCanStart, recordFieldLifecycleEvent, recordTaskEvent, startFieldLocationTracking, stopFieldLocationTracking, type FieldEventType } from '../../lib/operations/fieldEvents';
 import { formatCurrency, TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG } from '../../lib/utils/format';
 import { Badge } from '../ui/badge';
@@ -95,23 +100,24 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   };
 
   const handleStartTask = async () => {
-    if (!requiresFieldLocation) {
-      dataStore.startTask(task.id);
-      return;
-    }
     setIsLocating(true);
     try {
-      await ensureFieldVisitCanStart();
-      const location = await captureRequiredLocation();
-      await recordFieldLifecycleEvent({
-        taskId: task.id,
-        eventType: getFieldEventType('started'),
-        eventLabel: task.taskTypeCategory === 'visit' ? 'بدء الزيارة' : 'بدء المهمة الميدانية',
-        location,
-        details: { taskTitle: task.title },
-      });
-      dataStore.startTask(task.id, { lat: location.latitude, lng: location.longitude });
-      startFieldLocationTracking(task.id);
+      if (!requiresFieldLocation) {
+        const now = new Date().toISOString();
+        await updateTaskFields(task.id, { status: 'in_progress', actualStartTime: now, isPaused: false, pausedAt: null, pauseReason: null, isTimerRunning: true, timerStartedAt: now });
+      } else {
+        await ensureFieldVisitCanStart();
+        const location = await captureRequiredLocation();
+        await recordFieldLifecycleEvent({
+          taskId: task.id,
+          eventType: getFieldEventType('started'),
+          eventLabel: task.taskTypeCategory === 'visit' ? 'بدء الزيارة' : 'بدء المهمة الميدانية',
+          location,
+          details: { taskTitle: task.title },
+        });
+        await refreshTaskSnapshot();
+        startFieldLocationTracking(task.id);
+      }
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'تعذر توثيق الموقع والبدء.');
     } finally {
@@ -119,20 +125,16 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     }
   };
 
-  const handleConfirmPause = () => {
+  const handleConfirmPause = async () => {
     if (!pauseReasonInput.trim()) {
       alert('يرجى تدوين سبب إيقاف المهمة مؤقتاً');
       return;
     }
-    if (!requiresFieldLocation) {
-      dataStore.pauseTask(task.id, pauseReasonInput.trim());
-      setIsPausePromptOpen(false);
-      setPauseReasonInput('');
-      return;
-    }
     setIsLocating(true);
-    void (async () => {
-      try {
+    try {
+      if (!requiresFieldLocation) {
+        await updateTaskFields(task.id, { status: 'paused', isPaused: true, pausedAt: new Date().toISOString(), pauseReason: pauseReasonInput.trim(), isTimerRunning: false, timerStartedAt: null });
+      } else {
         const location = await captureRequiredLocation();
         await recordFieldLifecycleEvent({
           taskId: task.id,
@@ -141,35 +143,36 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
           location,
           details: { reason: pauseReasonInput.trim() },
         });
-        dataStore.pauseTask(task.id, pauseReasonInput.trim());
+        await refreshTaskSnapshot();
         stopFieldLocationTracking(task.id);
-        setIsPausePromptOpen(false);
-        setPauseReasonInput('');
-      } catch (error) {
-        window.alert(error instanceof Error ? error.message : 'تعذر توثيق الإيقاف المؤقت.');
-      } finally {
-        setIsLocating(false);
       }
-    })();
+      setIsPausePromptOpen(false);
+      setPauseReasonInput('');
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'تعذر توثيق الإيقاف المؤقت.');
+    } finally {
+      setIsLocating(false);
+    }
   };
 
   const handleResumeTask = async () => {
-    if (!requiresFieldLocation) {
-      dataStore.resumeTask(task.id);
-      return;
-    }
     setIsLocating(true);
     try {
-      await ensureFieldVisitCanStart();
-      const location = await captureRequiredLocation();
-      await recordFieldLifecycleEvent({
-        taskId: task.id,
-        eventType: getFieldEventType('resumed'),
-        eventLabel: 'استئناف العمل الميداني',
-        location,
-      });
-      dataStore.resumeTask(task.id);
-      startFieldLocationTracking(task.id);
+      if (!requiresFieldLocation) {
+        const now = new Date().toISOString();
+        await updateTaskFields(task.id, { status: 'in_progress', isPaused: false, pausedAt: null, pauseReason: null, isTimerRunning: true, timerStartedAt: now });
+      } else {
+        await ensureFieldVisitCanStart();
+        const location = await captureRequiredLocation();
+        await recordFieldLifecycleEvent({
+          taskId: task.id,
+          eventType: getFieldEventType('resumed'),
+          eventLabel: 'استئناف العمل الميداني',
+          location,
+        });
+        await refreshTaskSnapshot();
+        startFieldLocationTracking(task.id);
+      }
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'تعذر توثيق الاستئناف.');
     } finally {
@@ -177,25 +180,33 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     }
   };
 
-  const handleAddDailyUpdate = (e: React.FormEvent) => {
+  const handleAddDailyUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!dailyNoteInput.trim()) return;
-    dataStore.addTaskDailyUpdate(task.id, dailyNoteInput.trim());
-    setDailyNoteInput('');
+    try {
+      await addTaskDailyUpdate(task.id, dailyNoteInput.trim(), { id: currentUser.id, name: currentUser.name });
+      setDailyNoteInput('');
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'تعذر حفظ التقرير اليومي.');
+    }
   };
 
-  const handleStepStatusChange = (stepId: string, status: TaskStepStatus) => {
-    const note = stepNoteInputs[stepId];
-    dataStore.updateTaskStepStatus(task.id, stepId, status, note);
+  const handleStepStatusChange = async (stepId: string, status: TaskStepStatus, nextDate?: string) => {
+    try {
+      const note = stepNoteInputs[stepId];
+      await setTaskStepStatus(task.id, stepId, status, note, nextDate);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'تعذر تحديث المرحلة.');
+    }
   };
 
-  const handleConfirmDeferStep = (stepId: string) => {
+  const handleConfirmDeferStep = async (stepId: string) => {
     if (!deferredDateInput) {
       alert('يرجى تحديد تاريخ الخطوة القادمة');
       return;
     }
     const note = stepNoteInputs[stepId] || 'تم تأجيل الخطوة للموعد المحدد';
-    dataStore.updateTaskStepStatus(task.id, stepId, 'deferred', note, deferredDateInput);
+    await handleStepStatusChange(stepId, 'deferred', deferredDateInput);
     setDeferringStepId(null);
     setDeferredDateInput('');
   };
@@ -204,22 +215,19 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     e.preventDefault();
     if (!newSubTaskTitle.trim()) return;
     const assignee = users.find((u) => u.id === newSubTaskAssignee) || currentUser;
-    if (!requiresFieldLocation) {
-      dataStore.addSubTask(task.id, { title: newSubTaskTitle.trim(), assigneeId: assignee.id, assigneeName: assignee.name, status: 'scheduled', requiresApproval: true, isApproved: false });
-      setNewSubTaskTitle('');
-      return;
-    }
     try {
-      const location = await captureRequiredLocation();
-      await recordTaskEvent({
-        taskId: task.id,
-        standingAccountId: task.standingAccountId,
-        eventType: 'subtask_created',
-        eventLabel: 'إضافة مهمة فرعية أثناء التنفيذ',
-        location,
-        details: { title: newSubTaskTitle.trim(), assigneeId: assignee.id, assigneeName: assignee.name },
-      });
-      dataStore.addSubTask(task.id, {
+      if (requiresFieldLocation) {
+        const location = await captureRequiredLocation();
+        await recordTaskEvent({
+          taskId: task.id,
+          standingAccountId: task.standingAccountId,
+          eventType: 'subtask_created',
+          eventLabel: 'إضافة مهمة فرعية أثناء التنفيذ',
+          location,
+          details: { title: newSubTaskTitle.trim(), assigneeId: assignee.id, assigneeName: assignee.name },
+        });
+      }
+      await addTaskSubtask(task.id, {
         title: newSubTaskTitle.trim(),
         assigneeId: assignee.id,
         assigneeName: assignee.name,
@@ -229,12 +237,36 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
       });
       setNewSubTaskTitle('');
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'تعذر توثيق المهمة الفرعية.');
+      window.alert(error instanceof Error ? error.message : 'تعذر حفظ المهمة الفرعية.');
     }
   };
 
-  const handleToggleChecklist = (itemId: string) => {
-    dataStore.toggleTaskChecklistItem(task.id, itemId);
+  const handleToggleChecklist = async (itemId: string) => {
+    const item = task.checklist.find((entry) => entry.id === itemId);
+    if (!item) return;
+    try {
+      await setChecklistItem(task.id, itemId, !item.completed);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'تعذر تحديث بند الفحص.');
+    }
+  };
+
+  const handleOpenAttachment = async (objectPath: string) => {
+    try {
+      const url = await getTaskAttachmentSignedUrl(objectPath);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'تعذر فتح المرفق.');
+    }
+  };
+
+  const handleDeleteAttachment = async (attachmentId: string, objectPath: string) => {
+    if (!window.confirm('هل تريد حذف هذا المرفق نهائياً؟')) return;
+    try {
+      await deleteTaskAttachmentOnServer(task.id, attachmentId, objectPath);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'تعذر حذف المرفق.');
+    }
   };
 
   const hasChain = (task.taskChain && task.taskChain.length > 0) || Boolean(task.parentTaskId);
@@ -869,7 +901,10 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                         <input
                           type="checkbox"
                           checked={st.status === 'completed'}
-                          onChange={() => dataStore.updateSubTaskStatus(task.id, st.id, st.status === 'completed' ? 'scheduled' : 'completed')}
+                          onChange={async () => {
+                            try { await updateTaskSubtaskStatus(task.id, st.id, st.status === 'completed' ? 'scheduled' : 'completed'); }
+                            catch (error) { window.alert(error instanceof Error ? error.message : 'تعذر تحديث المهمة الفرعية.'); }
+                          }}
                           className="w-5 h-5 accent-[#345c47] rounded cursor-pointer"
                         />
                         <span className={`font-semibold ${st.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-800'}`}>
@@ -1001,21 +1036,18 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                       type="file"
                       accept="image/*,application/pdf"
                       className="hidden"
-                      onChange={(e) => {
+                      disabled={isUploadingDoc}
+                      onChange={async (e) => {
                         const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onload = () => {
-                            const dataUrl = reader.result as string;
-                            const sizeKb = `${Math.round(file.size / 1024)} KB`;
-                            dataStore.addTaskAttachment(task.id, {
-                              name: `${attachmentDocType} - ${file.name}`,
-                              url: dataUrl,
-                              size: sizeKb,
-                              type: file.type.startsWith('image/') ? 'image' : 'pdf',
-                            });
-                          };
-                          reader.readAsDataURL(file);
+                        e.target.value = '';
+                        if (!file) return;
+                        setIsUploadingDoc(true);
+                        try {
+                          await uploadTaskAttachment(task.id, file, `${attachmentDocType} - ${file.name}`, currentUser.name);
+                        } catch (error) {
+                          window.alert(error instanceof Error ? error.message : 'تعذر رفع المرفق.');
+                        } finally {
+                          setIsUploadingDoc(false);
                         }
                       }}
                     />
@@ -1056,16 +1088,15 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                             <span>بواسطة: {att.uploadedBy}</span>
                           </div>
                           <div className="flex items-center gap-2 pt-1">
-                            <a
-                              href={att.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
+                              type="button"
+                              onClick={() => void handleOpenAttachment(att.url)}
                               className="text-[11px] font-bold text-emerald-800 hover:underline"
                             >
                               معاينة / تحميل
-                            </a>
+                            </button>
                             <button
-                              onClick={() => dataStore.deleteTaskAttachment(task.id, att.id)}
+                              onClick={() => void handleDeleteAttachment(att.id, att.url)}
                               className="text-[11px] font-bold text-rose-600 hover:text-rose-800 cursor-pointer mr-auto"
                             >
                               حذف
