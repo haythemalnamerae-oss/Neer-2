@@ -1854,6 +1854,20 @@ export class OpsDataStore {
   }
 
 
+  /** Replace operational collections with the latest authenticated server snapshot. */
+  public hydrateOperationalData(data: {
+    tasks: Task[];
+    followUps: FollowUp[];
+    notifications: NotificationItem[];
+    auditLogs?: AuditLog[];
+  }): void {
+    this.tasks = data.tasks;
+    this.followUps = data.followUps;
+    this.notifications = data.notifications;
+    if (data.auditLogs) this.auditLogs = data.auditLogs;
+    this.notify();
+  }
+
   /** Replace only finance collections after an authenticated server refresh. */
   public hydrateFinanceData(data: {
     funds: PettyCashFund[];
