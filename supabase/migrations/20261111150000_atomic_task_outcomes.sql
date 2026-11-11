@@ -574,8 +574,9 @@ begin
   if not private.can_access_task(p_organization_id,p_task_id,'edit') then
     raise exception using errcode = '42501', message = 'Task edit permission required';
   end if;
-  if p_id is null or p_name is null or length(p_name)>240
-     or p_type not in ('image','pdf')
+  if p_id is null or p_name is null or btrim(p_name) = '' or length(p_name)>240
+     or p_type is null or p_type not in ('image','pdf')
+     or p_object_path is null
      or p_object_path not like p_organization_id::text || '/' || p_task_id || '/%' then
     raise exception using errcode = '22023', message = 'Invalid task attachment metadata';
   end if;
