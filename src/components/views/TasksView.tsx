@@ -13,7 +13,7 @@ import { dataStore } from '../../lib/storage';
 import { hasPermission } from '../../lib/rbac/permissions';
 import { TASK_PRIORITY_CONFIG, TASK_STATUS_CONFIG, formatCurrency } from '../../lib/utils/format';
 import { Button } from '../ui/button';
-import { deleteTaskOnServer } from '../../services/tasks.api';
+import { cancelTaskOnServer } from '../../services/tasks.api';
 
 interface TasksViewProps {
   onOpenNewTask: () => void;
@@ -65,7 +65,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
     e.stopPropagation();
     if (!canDeleteTask) return;
     if (!window.confirm('هل تريد إلغاء هذه المهمة؟ ستبقى محفوظة في السجل للمراجعة والتدقيق.')) return;
-    try { await deleteTaskOnServer(taskId); }
+    try { await cancelTaskOnServer(taskId); }
     catch (error) { window.alert(error instanceof Error ? error.message : 'تعذر حذف المهمة.'); }
   };
 
