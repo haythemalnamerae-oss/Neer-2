@@ -21,6 +21,94 @@ create index if not exists task_assignees_user_task_idx
   on public.task_assignees(organization_id, app_user_id, task_id);
 
 alter table public.task_assignees enable row level security;
+grant select, insert, update, delete on public.task_assignees to authenticated;
+grant usage on schema public to authenticated;
+
+alter table public.task_steps
+  add column if not exists next_step_date date;
+
+create or replace function private.can_access_task(
+  target_org uuid,
+  target_task_id text,
+  required_action text
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = pg_catalog, public, private
+as $
+  select exists (
+    select 1
+    from public.tasks t
+    join public.organization_members m
+      on m.organization_id = t.organization_id
+     and m.auth_user_id = (select auth.uid())
+     and m.active
+    where t.organization_id = target_org
+      and t.id = target_task_id
+      and (
+        m.role = 'admin'
+        or (
+          exists (
+            select 1 from public.role_permissions rp
+            where rp.organization_id = m.organization_id
+              and rp.role_key = m.role
+              and rp.permission_key = 'tasks.' || required_action
+              and rp.granted
+          )
+          and (
+            m.role <> 'field_officer'
+            or t.assignee_id = m.app_user_id
+            or exists (
+              select 1 from public.task_assignees ta
+              where ta.organization_id = t.organization_id
+                and ta.task_id = t.id
+                and ta.app_user_id = m.app_user_id
+            )
+          )
+        )
+      )
+  );
+$;
+
+create or replace function private.can_manage_task_assignee(
+  target_org uuid,
+  target_task_id text,
+  target_user_id text
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = pg_catalog, public, private
+as $
+  select exists (
+    select 1
+    from public.organization_members m
+    where m.organization_id = target_org
+      and m.auth_user_id = (select auth.uid())
+      and m.active
+      and (
+        m.role = 'admin'
+        or (
+          exists (
+            select 1 from public.role_permissions rp
+            where rp.organization_id = m.organization_id
+              and rp.role_key = m.role
+              and rp.permission_key = 'tasks.edit'
+              and rp.granted
+          )
+          and private.can_access_task(target_org, target_task_id, 'edit')
+          and (m.role <> 'field_officer' or target_user_id = m.app_user_id)
+        )
+      )
+  );
+$;
+
+revoke all on function private.can_manage_task_assignee(uuid,text,text) from public, anon;
+grant execute on function private.can_manage_task_assignee(uuid,text,text) to authenticated;
+
 drop policy if exists task_assignees_scoped_select on public.task_assignees;
 drop policy if exists task_assignees_scoped_insert on public.task_assignees;
 drop policy if exists task_assignees_scoped_update on public.task_assignees;
@@ -34,10 +122,10 @@ with check (private.can_access_task(organization_id, task_id, 'edit'));
 create policy task_assignees_scoped_update on public.task_assignees
 for update to authenticated
 using (private.can_access_task(organization_id, task_id, 'edit'))
-with check (private.can_access_task(organization_id, task_id, 'edit'));
+with check (private.can_manage_task_assignee(organization_id, task_id, app_user_id));
 create policy task_assignees_scoped_delete on public.task_assignees
 for delete to authenticated
-using (private.can_access_task(organization_id, task_id, 'edit'));
+using (private.can_manage_task_assignee(organization_id, task_id, app_user_id));
 
 create or replace function private.sync_primary_task_assignee()
 returns trigger
