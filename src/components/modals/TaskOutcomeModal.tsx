@@ -160,8 +160,8 @@ export const TaskOutcomeModal: React.FC<TaskOutcomeModalProps> = ({
     if (onSuccess) onSuccess();
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (isSubmittingOutcome || isUploading) return;
     setIsSubmittingOutcome(true);
     const isNonCompleted = selectedOutcome !== 'completed';
@@ -548,10 +548,7 @@ export const TaskOutcomeModal: React.FC<TaskOutcomeModalProps> = ({
             size="md"
             type="button"
             disabled={isSubmittingOutcome || isUploading}
-            onClick={(event) => {
-              event.preventDefault();
-              void handleSubmit({ preventDefault: () => undefined } as React.FormEvent);
-            }}
+            onClick={() => void handleSubmit()}
             icon={<CheckCircle2 className="w-4 h-4 ml-1" />}
           >
             {isSubmittingOutcome ? 'جارٍ حفظ النتيجة...' : selectedOutcome === 'completed'
