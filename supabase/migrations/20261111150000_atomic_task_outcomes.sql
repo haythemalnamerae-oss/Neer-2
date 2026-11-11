@@ -425,8 +425,9 @@ begin
   ) values (
     v_task_id, p_organization_id, trim(p_task->>'title'),
     coalesce(p_task->>'description',''), coalesce(p_task->>'priority','medium'),
-    coalesce(p_task->>'status','scheduled'), p_task->>'assigneeId',
-    coalesce(p_task->>'assigneeName',''), nullif(p_task->>'assigneeAvatar',''),
+    'scheduled', p_task->>'assigneeId',
+    coalesce((select u.name from public.app_users u where u.organization_id=p_organization_id and u.id=p_task->>'assigneeId' and u.active),''),
+    (select u.avatar from public.app_users u where u.organization_id=p_organization_id and u.id=p_task->>'assigneeId' and u.active),
     nullif(p_task->>'supervisorId',''), nullif(p_task->>'supervisorName',''),
     v_app_user_id, coalesce((select u.name from public.app_users u where u.organization_id=p_organization_id and u.id=v_app_user_id),''),
     coalesce(p_task->'supervisors','[]'::jsonb),
@@ -508,7 +509,7 @@ begin
       coalesce(nullif(p_subtask->>'id',''), 'sub-' || v_task_id),
       p_organization_id,p_task->>'parentTaskId',trim(p_task->>'title'),
       p_task->>'assigneeId',coalesce(p_task->>'assigneeName',''),
-      coalesce(p_task->>'status','scheduled'),
+      'scheduled',
       coalesce((p_subtask->>'requiresApproval')::boolean,false),false,false,
       nullif(p_task->>'dueDate','')::date,nullif(p_subtask->>'notes','')
     );
@@ -516,7 +517,7 @@ begin
 
   insert into public.task_history(id,organization_id,task_id,action,performed_by,notes)
   values('hist-' || v_task_id,p_organization_id,v_task_id,
-    'إنشاء المهمة وتكليف ' || coalesce(p_task->>'assigneeName',''),
+    'إنشاء المهمة وتكليف ' || coalesce((select u.name from public.app_users u where u.organization_id=p_organization_id and u.id=p_task->>'assigneeId'),''),
     coalesce((select u.name from public.app_users u where u.organization_id=p_organization_id and u.id=v_app_user_id),''),
     'تم إنشاء المهمة مع حفظ خطواتها وقائمة الفحص والمكلفين في معاملة واحدة');
 
