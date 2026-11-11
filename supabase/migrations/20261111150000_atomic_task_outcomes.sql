@@ -895,8 +895,22 @@ begin
     or new.timer_started_at is distinct from old.timer_started_at
     or new.rejection_reason is distinct from old.rejection_reason
     or new.approval_notes is distinct from old.approval_notes
+    or new.task_chain is distinct from old.task_chain
+    or new.chain_follow_up_task_id is distinct from old.chain_follow_up_task_id
+    or new.parent_task_id is distinct from old.parent_task_id
   ) and coalesce(v_transition,'') not in ('lifecycle','outcome','review') then
     raise exception using errcode = '42501', message = 'Task state changes must use an approved workflow';
+  end if;
+
+  if new.parent_task_id is distinct from old.parent_task_id then
+    raise exception using errcode = '42501', message = 'Task parent link is immutable after creation';
+  end if;
+
+  if v_transition <> 'outcome' and (
+    new.task_chain is distinct from old.task_chain
+    or new.chain_follow_up_task_id is distinct from old.chain_follow_up_task_id
+  ) then
+    raise exception using errcode = '42501', message = 'Task chain links must be changed by the outcome workflow';
   end if;
 
   if v_transition = 'lifecycle' and (
