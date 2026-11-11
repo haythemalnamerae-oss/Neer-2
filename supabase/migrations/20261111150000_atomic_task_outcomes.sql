@@ -535,7 +535,7 @@ begin
     'info',false,'tasks'
   from public.task_assignees ta
   where ta.organization_id=p_organization_id and ta.task_id=v_task_id
-  on conflict (id) do nothing;
+  on conflict (organization_id,id) do nothing;
 
   return jsonb_build_object('task',to_jsonb(v_task),'checklist_count',
     jsonb_array_length(coalesce(p_checklist,'[]'::jsonb)),
