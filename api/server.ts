@@ -97,6 +97,49 @@ app.get('/api/v1/me', async (req, res) => {
   return res.json(rows[0]);
 });
 
+app.post('/api/v1/tasks/create-bundle', async (req, res) => {
+  const auth = (req as AuthenticatedRequest).auth;
+  try {
+    if (!(await allowed(auth, 'tasks', 'create'))) {
+      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Missing permission tasks.create.' } });
+    }
+    if (!auth.appUserId) {
+      return res.status(403).json({ error: { code: 'OPERATIONAL_PROFILE_REQUIRED', message: 'A linked operational user profile is required.' } });
+    }
+    const body = req.body as Record<string, any> | undefined;
+    const task = body?.task;
+    const checklist = body?.checklist ?? [];
+    const steps = body?.steps ?? [];
+    const subtask = body?.subtask ?? null;
+    if (!body || !task || typeof task !== 'object' || Array.isArray(task) ||
+        !idPattern.test(String(task.id || '')) || typeof task.title !== 'string' || !task.title.trim() ||
+        typeof task.assigneeId !== 'string' || !idPattern.test(task.assigneeId) ||
+        !Array.isArray(checklist) || checklist.length > 500 ||
+        !Array.isArray(steps) || steps.length > 250 ||
+        (subtask !== null && (typeof subtask !== 'object' || Array.isArray(subtask)))) {
+      return res.status(400).json({ error: { code: 'INVALID_TASK_BUNDLE', message: 'Task, assignee, checklist and steps payload is invalid.' } });
+    }
+    if (auth.role === 'field_officer' && task.assigneeId !== auth.appUserId) {
+      return res.status(403).json({ error: { code: 'TASK_ASSIGNMENT_FORBIDDEN', message: 'Field officers may only assign tasks to themselves.' } });
+    }
+    const response = await supabaseFetch('/rest/v1/rpc/create_task_bundle', auth.token, {
+      method: 'POST',
+      body: JSON.stringify({
+        p_organization_id: auth.organizationId,
+        p_task: task,
+        p_checklist: checklist,
+        p_steps: steps,
+        p_subtask: subtask,
+      }),
+    });
+    if (!response.ok) return sendDbError(res, response.status, await response.text());
+    return res.status(201).json(await response.json());
+  } catch (error) {
+    console.error('Atomic task creation failed:', error);
+    return res.status(503).json({ error: { code: 'TASK_CREATION_FAILED', message: 'The task bundle could not be saved. No local task was created.' } });
+  }
+});
+
 app.get('/api/v1/admin/permissions', async (req, res) => {
   const auth = (req as AuthenticatedRequest).auth;
   if (auth.role !== 'admin') return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Admin role required.' } });
