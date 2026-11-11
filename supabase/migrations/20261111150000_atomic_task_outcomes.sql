@@ -825,3 +825,100 @@ join public.app_users u
 where t.assignee_id is not null
 on conflict (organization_id,task_id,app_user_id)
 do update set is_primary=true,assigned_by=excluded.assigned_by;
+
+
+create or replace function private.audit_task_child_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_payload jsonb;
+  v_org uuid;
+  v_task_id text;
+  v_record_id text;
+  v_actor_id text;
+  v_actor_name text;
+  v_actor_role text;
+  v_action_type text := lower(tg_op);
+  v_action_label text;
+  v_summary text;
+begin
+  if tg_op = 'DELETE' then
+    v_payload := to_jsonb(old);
+  else
+    v_payload := to_jsonb(new);
+  end if;
+  v_org := (v_payload->>'organization_id')::uuid;
+  v_task_id := v_payload->>'task_id';
+  v_record_id := v_payload->>'id';
+
+  select m.app_user_id,coalesce(u.name,''),coalesce(m.role,'viewer')
+    into v_actor_id,v_actor_name,v_actor_role
+  from public.organization_members m
+  left join public.app_users u on u.organization_id=m.organization_id and u.id=m.app_user_id
+  where m.organization_id=v_org and m.auth_user_id=auth.uid() and m.active
+  limit 1;
+
+  v_action_label := case tg_table_name
+    when 'task_checklist_items' then 'بند قائمة الفحص'
+    when 'task_steps' then 'مرحلة تنفيذ'
+    when 'task_subtasks' then 'مهمة فرعية'
+    when 'task_daily_updates' then 'تقرير يومي'
+    when 'task_comments' then 'تعليق على المهمة'
+    when 'task_assignees' then 'مكلف بالمهمة'
+    else 'سجل تابع للمهمة'
+  end;
+  v_summary := case
+    when tg_table_name='task_steps' then coalesce(v_payload->>'title','')
+    when tg_table_name='task_subtasks' then coalesce(v_payload->>'title','')
+    when tg_table_name='task_checklist_items' then coalesce(v_payload->>'text','')
+    when tg_table_name='task_assignees' then coalesce(v_payload->>'app_user_name',v_payload->>'app_user_id','')
+    when tg_table_name='task_daily_updates' then coalesce(v_payload->>'update_date','')
+    when tg_table_name='task_comments' then case when coalesce((v_payload->>'is_internal')::boolean,false) then 'تعليق داخلي' else 'تعليق للفريق' end
+    else ''
+  end;
+
+  insert into public.task_history(id,organization_id,task_id,action,performed_by,notes)
+  values(
+    'hist-child-'||gen_random_uuid()::text,
+    v_org,v_task_id,
+    v_action_type||' '||v_action_label,
+    coalesce(nullif(v_actor_name,''),'مستخدم النظام'),
+    nullif(v_summary,'')
+  );
+
+  insert into public.audit_logs(id,organization_id,user_id,user_name,user_role,action,action_type,entity,entity_id,details)
+  values(
+    'aud-child-'||gen_random_uuid()::text,
+    v_org,v_actor_id,coalesce(v_actor_name,'مستخدم النظام'),coalesce(v_actor_role,'viewer'),
+    v_action_type||' '||v_action_label,v_action_type,tg_table_name,v_record_id,
+    jsonb_build_object('task_id',v_task_id,'record_id',v_record_id,'operation',tg_op)::text
+  );
+
+  if tg_op='DELETE' then return old; else return new; end if;
+end;
+$$;
+
+revoke all on function private.audit_task_child_change() from public, anon;
+grant execute on function private.audit_task_child_change() to authenticated;
+
+drop trigger if exists task_checklist_audit on public.task_checklist_items;
+create trigger task_checklist_audit after insert or update or delete on public.task_checklist_items
+for each row execute function private.audit_task_child_change();
+drop trigger if exists task_steps_audit on public.task_steps;
+create trigger task_steps_audit after insert or update or delete on public.task_steps
+for each row execute function private.audit_task_child_change();
+drop trigger if exists task_subtasks_audit on public.task_subtasks;
+create trigger task_subtasks_audit after insert or update or delete on public.task_subtasks
+for each row execute function private.audit_task_child_change();
+drop trigger if exists task_daily_updates_audit on public.task_daily_updates;
+create trigger task_daily_updates_audit after insert or update or delete on public.task_daily_updates
+for each row execute function private.audit_task_child_change();
+drop trigger if exists task_comments_audit on public.task_comments;
+create trigger task_comments_audit after insert or update or delete on public.task_comments
+for each row execute function private.audit_task_child_change();
+drop trigger if exists task_assignees_audit on public.task_assignees;
+create trigger task_assignees_audit after insert or update or delete on public.task_assignees
+for each row execute function private.audit_task_child_change();
