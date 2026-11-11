@@ -1,4 +1,4 @@
-import type { Task, TaskStepStatus, TaskAttachment } from '../types/domain';
+import type { Task, TaskOutcome, TaskStepStatus, TaskAttachment } from '../types/domain';
 import { apiRequest, getSession, loadUiSnapshot, SessionError, type ApiSession } from '../lib/api/session';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
@@ -98,6 +98,53 @@ export async function createTaskBundle(
     throw new TaskSavedRefreshError('تم حفظ المهمة بنجاح على الخادم، لكن تعذر تحديث القائمة. أعد تحميل الصفحة ولا تعاود إنشاء المهمة.');
   }
   return task;
+}
+
+export async function recordTaskOutcomeOnServer(
+  taskId: string,
+  payload: {
+    outcome: TaskOutcome;
+    reason?: string;
+    notes?: string;
+    proofUrl?: string;
+    followUp?: {
+      title: string;
+      dueDate: string;
+      dueTime?: string;
+      reason?: string;
+      notes?: string;
+      assigneeId?: string;
+      assigneeName?: string;
+    };
+  },
+  event?: { clientEventId: string; latitude: number; longitude: number; accuracyMeters: number; eventLabel: string },
+): Promise<{ updatedTask: Task; followUpTask?: Task }> {
+  const session = requireSession();
+  const followUp = payload.followUp ? {
+    ...payload.followUp,
+    id: newId('tsk'),
+  } : null;
+  await apiRequest(session, '/tasks/record-outcome', {
+    method: 'POST',
+    body: JSON.stringify({
+      taskId,
+      requestId: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : newId('req'),
+      outcome: payload.outcome,
+      reason: payload.reason || null,
+      notes: payload.notes || null,
+      proofUrl: payload.proofUrl || null,
+      followUp,
+      event: event || null,
+    }),
+  });
+  await refreshAfterMutation(session);
+  const tasks = (await import('../lib/storage')).dataStore.getTasks();
+  const updatedTask = tasks.find((item) => item.id === taskId);
+  if (!updatedTask) throw new TaskSavedRefreshError('تم حفظ نتيجة المهمة، لكن تعذر العثور عليها بعد تحديث البيانات. أعد تحميل الصفحة.');
+  return {
+    updatedTask,
+    followUpTask: followUp ? tasks.find((item) => item.id === followUp.id) : undefined,
+  };
 }
 
 export async function updateTaskFields(taskId: string, updates: Record<string, unknown>): Promise<void> {
