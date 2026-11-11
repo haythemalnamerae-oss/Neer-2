@@ -477,7 +477,6 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
         ...collaboratorTasks.map((task) => task.task_id),
       ])].filter((id) => idPattern.test(id));
       const assignedFilter = assignedIds.length ? `in.(${assignedIds.join(',')})` : 'eq.__no_assigned_task__';
-      if (req.params.resource === 'task-assignees' && req.method === 'GET') query.set('app_user_id', `eq.${auth.appUserId}`);
       if (req.method === 'GET' || req.method === 'PATCH' || req.method === 'DELETE') query.set('task_id', assignedFilter);
       if (req.method === 'POST' || req.method === 'PATCH') {
         const requestedTaskId = (req.body as Record<string, unknown> | undefined)?.task_id;
