@@ -44,7 +44,7 @@ export const PerformanceEvaluationView: React.FC = () => {
   // --- 1. PRODUCTIVITY & EMPLOYEE EVALUATION ("من اشتغل أكثر؟") ---
   const employeeStats = useMemo(() => {
     return users.map((user) => {
-      const userTasks = tasks.filter((t) => t.assigneeId === user.id);
+      const userTasks = tasks.filter((t) => t.assigneeId === user.id || t.assignees?.some((assignee) => assignee.appUserId === user.id));
       const completedTasks = userTasks.filter((t) => t.status === 'completed' || t.status === 'approved');
       const inProgressTasks = userTasks.filter((t) => t.status === 'in_progress' || t.status === 'started');
       const deferredTasks = userTasks.filter((t) => t.status === 'deferred' || t.outcome === 'unable_to_execute' || t.outcome === 'not_completed');
