@@ -184,6 +184,35 @@ app.post('/api/v1/tasks/record-outcome', async (req, res) => {
   }
 });
 
+app.post('/api/v1/tasks/lifecycle', async (req, res) => {
+  const auth = (req as AuthenticatedRequest).auth;
+  try {
+    if (!(await allowed(auth, 'tasks', 'edit'))) {
+      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Missing permission tasks.edit.' } });
+    }
+    const body = req.body as Record<string, any> | undefined;
+    if (!body || typeof body.taskId !== 'string' || !idPattern.test(body.taskId) ||
+        !['start','pause','resume'].includes(body.action) ||
+        (body.action === 'pause' && (typeof body.reason !== 'string' || !body.reason.trim()))) {
+      return res.status(400).json({ error: { code: 'INVALID_TASK_LIFECYCLE', message: 'Task lifecycle payload is invalid.' } });
+    }
+    const response = await supabaseFetch('/rest/v1/rpc/update_task_lifecycle', auth.token, {
+      method: 'POST',
+      body: JSON.stringify({
+        p_organization_id: auth.organizationId,
+        p_task_id: body.taskId,
+        p_action: body.action,
+        p_reason: body.reason || null,
+      }),
+    });
+    if (!response.ok) return sendDbError(res, response.status, await response.text());
+    return res.status(200).json(await response.json());
+  } catch (error) {
+    console.error('Task lifecycle update failed:', error);
+    return res.status(503).json({ error: { code: 'TASK_LIFECYCLE_FAILED', message: 'The task lifecycle update could not be saved.' } });
+  }
+});
+
 app.get('/api/v1/admin/permissions', async (req, res) => {
   const auth = (req as AuthenticatedRequest).auth;
   if (auth.role !== 'admin') return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Admin role required.' } });
