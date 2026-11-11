@@ -36,6 +36,7 @@ import {
 } from '../../services/tasks.api';
 import { captureRequiredLocation, ensureFieldVisitCanStart, recordFieldLifecycleEvent, recordTaskEvent, startFieldLocationTracking, stopFieldLocationTracking, type FieldEventType } from '../../lib/operations/fieldEvents';
 import { formatCurrency, TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG } from '../../lib/utils/format';
+import { FinanceApiService } from '../../services/finance-api.service';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 
@@ -250,6 +251,14 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
       await setChecklistItem(task.id, itemId, !item.completed);
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'تعذر تحديث بند الفحص.');
+    }
+  };
+
+  const handleCoverDeficit = async (expenseId: string) => {
+    try {
+      await FinanceApiService.coverDeficit(expenseId);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'تعذر تغطية العجز من الصندوق.');
     }
   };
 
@@ -693,7 +702,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                             <button
                               type="button"
                               onClick={() => {
-                                dataStore.coverDeficitExpenseFromCash(exp.id, currentUser.name);
+                                void handleCoverDeficit(exp.id);
                               }}
                               className="neu-raised px-3 py-1.5 rounded-xl text-xs font-black text-emerald-800 hover:text-emerald-950 active:neu-inset transition-all cursor-pointer"
                             >
