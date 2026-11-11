@@ -557,7 +557,7 @@ begin
   limit 1;
 
   if p_action = 'start' then
-    if v_task.status in ('completed','approved','pending_approval','cancelled') then
+    if v_task.status in ('completed','approved','pending_approval','cancelled','paused') or (v_task.status='in_progress' and not v_task.is_paused) then
       raise exception using errcode = '22023', message = 'This task cannot be started from its current state';
     end if;
     update public.tasks set status='in_progress',actual_start_time=coalesce(actual_start_time,v_now),
