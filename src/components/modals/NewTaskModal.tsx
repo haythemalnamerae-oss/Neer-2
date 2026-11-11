@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createTaskBundle } from '../../services/tasks.api';
 import { dataStore } from '../../lib/storage';
 import { TaskPriority, TaskTypeClassification, TaskStep } from '../../types/domain';
 import { Modal } from '../ui/modal';
@@ -52,6 +53,7 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
     { title: 'مرحلة الفحص والتسليم النهائي', order: 3 },
   ]);
   const [newStepInput, setNewStepInput] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const recentTaskTypes: string[] = Array.from(
     new Set(allExistingTasks.map((t) => t.taskType).filter((type): type is string => Boolean(type)))
@@ -91,7 +93,7 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
     setSteps(updated);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !dueDate || (locationRequired && !location.trim())) {
       alert('يرجى ملء جميع الحقول الإلزامية');
@@ -140,7 +142,9 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
     }
     const effectiveFundId = selectedFund?.id;
 
-    const createdTask = dataStore.addTask({
+    setIsSubmitting(true);
+    try {
+      await createTaskBundle({
       title,
       description: additionalAssigneesNames.length > 0 
         ? `${description}\n[فريق العمل المشارك: ${additionalAssigneesNames.join('، ')}]`
@@ -181,19 +185,13 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
       taskFundSpent: 0,
       taskFundRemaining: numFundAmount > 0 ? numFundAmount : undefined,
       parentTaskId: isSubTask && parentTaskId ? parentTaskId : undefined,
-    });
-
-    // If sub-task of existing task, link to parent task's subtasks array as well!
-    if (isSubTask && parentTaskId) {
-      dataStore.addSubTask(parentTaskId, {
-        title,
-        assigneeId: assignedUser.id,
-        assigneeName: assignedUser.name,
-        status: 'scheduled',
-        requiresApproval,
-        isApproved: false,
-        dueDate,
-      });
+      }, { requiresApproval });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'تعذر إنشاء المهمة. حاول مرة أخرى.';
+      alert(message);
+      return;
+    } finally {
+      setIsSubmitting(false);
     }
 
     onClose();
