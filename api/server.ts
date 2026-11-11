@@ -374,6 +374,12 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
   const resource = resources[req.params.resource as keyof typeof resources];
   if (!resource) return res.status(404).json({ error: { code: 'RESOURCE_NOT_FOUND', message: 'Unknown API resource.' } });
   if (req.params.id && !idPattern.test(req.params.id)) return res.status(400).json({ error: { code: 'INVALID_ID', message: 'Invalid record id.' } });
+  if (req.params.resource === 'tasks' && req.method === 'POST') {
+    return res.status(409).json({ error: { code: 'TASK_BUNDLE_REQUIRED', message: 'Create tasks through the atomic create-bundle workflow.' } });
+  }
+  if (req.params.resource === 'tasks' && req.method === 'PATCH') {
+    return res.status(409).json({ error: { code: 'TASK_WORKFLOW_REQUIRED', message: 'Use dedicated lifecycle, outcome, and review workflows for task state changes.' } });
+  }
   const action = (req.method === 'POST' && (taskChildResources.has(req.params.resource) || req.params.resource === 'task-events')) || (['task-attachments','task-assignees'].includes(req.params.resource) && req.method === 'DELETE') ? 'edit' : req.method === 'GET' ? 'view' : req.method === 'POST' ? 'create' : req.method === 'PATCH' ? 'edit' : req.method === 'DELETE' ? 'delete' : '';
   if (action !== 'view' && transactionOnlyResources.has(req.params.resource)) {
     return res.status(409).json({ error: { code: 'FINANCIAL_TRANSACTION_REQUIRED', message: 'Financial records are read-only through generic CRUD. Use a dedicated transactional workflow so balances, approvals, and audit records remain atomic.' } });
