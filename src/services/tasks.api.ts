@@ -280,10 +280,13 @@ function storageHeaders(session: ApiSession, contentType?: string): HeadersInit 
 
 async function removeStoredObject(session: ApiSession, objectPath: string): Promise<void> {
   if (!supabaseUrl || !supabaseAnonKey) return;
-  await fetch(`${supabaseUrl}/storage/v1/object/${ATTACHMENT_BUCKET}/${objectPath.split('/').map(encodeURIComponent).join('/')}`, {
+  const response = await fetch(`${supabaseUrl}/storage/v1/object/${ATTACHMENT_BUCKET}/${objectPath.split('/').map(encodeURIComponent).join('/')}`, {
     method: 'DELETE',
     headers: storageHeaders(session),
   });
+  if (!response.ok && response.status !== 404) {
+    throw new Error('تعذر حذف الملف من التخزين الآمن.');
+  }
 }
 
 export async function uploadTaskAttachment(
@@ -355,6 +358,6 @@ export async function getTaskAttachmentSignedUrl(objectPath: string): Promise<st
 
 export async function deleteTaskAttachmentOnServer(taskId: string, attachmentId: string, objectPath: string): Promise<void> {
   const session = requireSession();
-  await removeStoredObject(session, objectPath);
   await mutateTaskResource(session, 'task-attachments', 'DELETE', `id=eq.${encodeURIComponent(attachmentId)}&task_id=eq.${encodeURIComponent(taskId)}`);
+  await removeStoredObject(session, objectPath);
 }
