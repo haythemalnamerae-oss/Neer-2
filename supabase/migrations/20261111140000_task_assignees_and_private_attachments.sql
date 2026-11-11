@@ -158,7 +158,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = ''
-as $$$
+as $
 begin
   if tg_op = 'UPDATE' and old.assignee_id is not distinct from new.assignee_id then
     return new;
