@@ -271,6 +271,18 @@ begin
       'warning',false,'daily');
   end if;
 
+  insert into public.notifications(id,organization_id,user_id,title,message,type,is_read,target_view)
+  values(
+    'notif-outcome-'||p_request_id::text,
+    p_organization_id,
+    v_task.creator_id,
+    case when p_outcome='completed' then 'مهمة جاهزة للاعتماد' else 'مهمة تتطلب المتابعة' end,
+    coalesce(v_actor_name,'مستخدم النظام')||' سجل نتيجة المهمة "'||v_task.title||'": '||p_outcome,
+    case when p_outcome='completed' then 'success' else 'alert' end,
+    false,
+    'daily'
+  );
+
   insert into public.audit_logs(
     id,organization_id,user_id,user_name,user_role,action,action_type,entity,entity_id,details
   ) values (
