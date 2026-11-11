@@ -194,6 +194,7 @@ export async function loadUiSnapshot(session: ApiSession): Promise<void> {
   const data = Object.fromEntries(values);
 
   const users = (data.users || []).map(asDomainUser);
+  const userNamesById = new Map(users.map((user) => [user.id, user.name]));
   let currentProfileId: string | undefined;
   if (!session.appUserId || users.length === 0) {
     const currentProfile = await apiRequest<Record<string, any>>(session, '/me');
@@ -240,7 +241,7 @@ export async function loadUiSnapshot(session: ApiSession): Promise<void> {
     task.assignees = children(assignees, task.id).map((item) => ({
       id: item.id,
       appUserId: item.appUserId,
-      name: item.appUserName || (item.appUserId === session.appUserId ? (users[0]?.name || task.assigneeName) : undefined),
+      name: item.appUserName || userNamesById.get(item.appUserId) || (item.appUserId === session.appUserId ? (users[0]?.name || task.assigneeName) : undefined),
       isPrimary: Boolean(item.isPrimary),
       assignedBy: item.assignedBy,
       assignedAt: item.createdAt,
