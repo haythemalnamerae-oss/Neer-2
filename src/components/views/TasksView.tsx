@@ -64,7 +64,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
   const handleDeleteTask = async (e: React.MouseEvent, taskId: string) => {
     e.stopPropagation();
     if (!canDeleteTask) return;
-    if (!window.confirm('هل أنت متأكد من حذف هذه المهمة نهائياً؟')) return;
+    if (!window.confirm('هل تريد إلغاء هذه المهمة؟ ستبقى محفوظة في السجل للمراجعة والتدقيق.')) return;
     try { await deleteTaskOnServer(taskId); }
     catch (error) { window.alert(error instanceof Error ? error.message : 'تعذر حذف المهمة.'); }
   };
