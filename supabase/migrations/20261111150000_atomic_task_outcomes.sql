@@ -58,6 +58,15 @@ with check (
   or private.can_assign_task(organization_id, assignee_id, 'followup')
 );
 
+drop policy if exists task_events_actor_insert on public.task_events;
+create policy task_events_actor_insert on public.task_events
+for insert to authenticated
+with check (
+  actor_auth_user_id = (select auth.uid())
+  and private.is_org_member(organization_id)
+  and private.can_access_task(organization_id, task_id, 'edit')
+);
+
 create or replace function public.record_task_outcome_bundle(
   p_organization_id uuid,
   p_task_id text,
