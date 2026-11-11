@@ -13,6 +13,7 @@ import { dataStore } from '../../lib/storage';
 import { hasPermission } from '../../lib/rbac/permissions';
 import { TASK_PRIORITY_CONFIG, TASK_STATUS_CONFIG, formatCurrency } from '../../lib/utils/format';
 import { Button } from '../ui/button';
+import { deleteTaskOnServer } from '../../services/tasks.api';
 
 interface TasksViewProps {
   onOpenNewTask: () => void;
@@ -60,12 +61,12 @@ export const TasksView: React.FC<TasksViewProps> = ({
     return true;
   });
 
-  const handleDeleteTask = (e: React.MouseEvent, taskId: string) => {
+  const handleDeleteTask = async (e: React.MouseEvent, taskId: string) => {
     e.stopPropagation();
     if (!canDeleteTask) return;
-    if (window.confirm('هل أنت متأكد من حذف هذه المهمة نهائياً؟')) {
-      dataStore.deleteTask(taskId);
-    }
+    if (!window.confirm('هل أنت متأكد من حذف هذه المهمة نهائياً؟')) return;
+    try { await deleteTaskOnServer(taskId); }
+    catch (error) { window.alert(error instanceof Error ? error.message : 'تعذر حذف المهمة.'); }
   };
 
   const kanbanColumns: { id: TaskStatus; label: string }[] = [
