@@ -1160,7 +1160,7 @@ begin
 
   insert into public.task_history(id,organization_id,task_id,action,performed_by,notes)
   values(
-    'hist-child-'||gen_random_uuid()::text,
+    'hist-child-'||pg_catalog.gen_random_uuid()::text,
     v_org,v_task_id,
     v_action_type||' '||v_action_label,
     coalesce(nullif(v_actor_name,''),'مستخدم النظام'),
@@ -1169,7 +1169,7 @@ begin
 
   insert into public.audit_logs(id,organization_id,user_id,user_name,user_role,action,action_type,entity,entity_id,details)
   values(
-    'aud-child-'||gen_random_uuid()::text,
+    'aud-child-'||pg_catalog.gen_random_uuid()::text,
     v_org,v_actor_id,coalesce(v_actor_name,'مستخدم النظام'),coalesce(v_actor_role,'viewer'),
     v_action_type||' '||v_action_label,v_action_type,tg_table_name,v_record_id,
     jsonb_build_object('task_id',v_task_id,'record_id',v_record_id,'operation',tg_op)::text
