@@ -877,6 +877,11 @@ begin
     raise exception using errcode = '42501', message = 'Task fund allocation requires management permission';
   end if;
 
+  if new.budget is distinct from old.budget
+     and not private.has_org_role(old.organization_id,array['admin','ops_manager']) then
+    raise exception using errcode = '42501', message = 'Task budget requires management permission';
+  end if;
+
   if (
     new.status is distinct from old.status
     or new.outcome is distinct from old.outcome
