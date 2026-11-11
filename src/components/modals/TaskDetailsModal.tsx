@@ -32,7 +32,7 @@ import { dataStore } from '../../lib/storage';
 import {
   addTaskDailyUpdate, addTaskSubtask, deleteTaskAttachmentOnServer,
   getTaskAttachmentSignedUrl, refreshTaskSnapshot, setChecklistItem,
-  setTaskStepStatus, updateTaskFields, updateTaskSubtaskStatus, uploadTaskAttachment,
+  setTaskStepStatus, updateTaskLifecycle, updateTaskSubtaskStatus, uploadTaskAttachment,
 } from '../../services/tasks.api';
 import { captureRequiredLocation, ensureFieldVisitCanStart, recordFieldLifecycleEvent, recordTaskEvent, startFieldLocationTracking, stopFieldLocationTracking, type FieldEventType } from '../../lib/operations/fieldEvents';
 import { formatCurrency, TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG } from '../../lib/utils/format';
@@ -103,8 +103,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     setIsLocating(true);
     try {
       if (!requiresFieldLocation) {
-        const now = new Date().toISOString();
-        await updateTaskFields(task.id, { status: 'in_progress', actualStartTime: now, isPaused: false, pausedAt: null, pauseReason: null, isTimerRunning: true, timerStartedAt: now });
+        await updateTaskLifecycle(task.id, 'start');
       } else {
         await ensureFieldVisitCanStart();
         const location = await captureRequiredLocation();
@@ -133,7 +132,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     setIsLocating(true);
     try {
       if (!requiresFieldLocation) {
-        await updateTaskFields(task.id, { status: 'paused', isPaused: true, pausedAt: new Date().toISOString(), pauseReason: pauseReasonInput.trim(), isTimerRunning: false, timerStartedAt: null });
+        await updateTaskLifecycle(task.id, 'pause', pauseReasonInput.trim());
       } else {
         const location = await captureRequiredLocation();
         await recordFieldLifecycleEvent({
@@ -159,8 +158,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     setIsLocating(true);
     try {
       if (!requiresFieldLocation) {
-        const now = new Date().toISOString();
-        await updateTaskFields(task.id, { status: 'in_progress', isPaused: false, pausedAt: null, pauseReason: null, isTimerRunning: true, timerStartedAt: now });
+        await updateTaskLifecycle(task.id, 'resume');
       } else {
         await ensureFieldVisitCanStart();
         const location = await captureRequiredLocation();
@@ -191,12 +189,14 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     }
   };
 
-  const handleStepStatusChange = async (stepId: string, status: TaskStepStatus, nextDate?: string) => {
+  const handleStepStatusChange = async (stepId: string, status: TaskStepStatus, nextDate?: string): Promise<boolean> => {
     try {
       const note = stepNoteInputs[stepId];
       await setTaskStepStatus(task.id, stepId, status, note, nextDate);
+      return true;
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'تعذر تحديث المرحلة.');
+      return false;
     }
   };
 
@@ -205,8 +205,8 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
       alert('يرجى تحديد تاريخ الخطوة القادمة');
       return;
     }
-    const note = stepNoteInputs[stepId] || 'تم تأجيل الخطوة للموعد المحدد';
-    await handleStepStatusChange(stepId, 'deferred', deferredDateInput);
+    const saved = await handleStepStatusChange(stepId, 'deferred', deferredDateInput);
+    if (!saved) return;
     setDeferringStepId(null);
     setDeferredDateInput('');
   };
