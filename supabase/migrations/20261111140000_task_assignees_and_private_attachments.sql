@@ -89,6 +89,12 @@ as $$
     where m.organization_id = target_org
       and m.auth_user_id = (select auth.uid())
       and m.active
+      and exists (
+        select 1 from public.app_users u
+        where u.organization_id = target_org
+          and u.id = target_user_id
+          and u.active
+      )
       and (
         m.role = 'admin'
         or (
