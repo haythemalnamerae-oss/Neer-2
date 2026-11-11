@@ -575,11 +575,11 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
         </div>
 
         <div className="pt-4 border-t border-black/[0.04] flex items-center justify-end gap-3">
-          <Button variant="outline" size="md" type="button" onClick={onClose}>
+          <Button variant="outline" size="md" type="button" onClick={onClose} disabled={isSubmitting}>
             إلغاء
           </Button>
-          <Button variant="primary" size="md" type="submit">
-            إنشاء البطاقة الذكية
+          <Button variant="primary" size="md" type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'جارٍ الحفظ...' : 'إنشاء البطاقة الذكية'}
           </Button>
         </div>
       </form>
