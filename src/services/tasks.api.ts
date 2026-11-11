@@ -1,7 +1,7 @@
 import type { Task } from '../types/domain';
 import { apiRequest, getSession, loadUiSnapshot, SessionError } from '../lib/api/session';
 
-type NewTaskData = Omit<Task, 'id' | 'spentAmount' | 'history' | 'createdAt'>;
+export class TaskSavedRefreshError extends Error {\n  constructor(message: string) { super(message); this.name = 'TaskSavedRefreshError'; }\n}\n\ntype NewTaskData = Omit<Task, 'id' | 'spentAmount' | 'history' | 'createdAt'>;
 
 function newId(prefix: string): string {
   const suffix = typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -66,7 +66,7 @@ export async function createTaskBundle(
     await loadUiSnapshot(session);
   } catch (error) {
     console.error('Task was saved, but the UI snapshot could not be refreshed:', error);
-    throw new Error('تم حفظ المهمة بنجاح على الخادم، لكن تعذر تحديث القائمة. أعد تحميل الصفحة ولا تعاود إنشاء المهمة.');
+    throw new TaskSavedRefreshError('تم حفظ المهمة بنجاح على الخادم، لكن تعذر تحديث القائمة. أعد تحميل الصفحة ولا تعاود إنشاء المهمة.');
   }
   return task;
 }
