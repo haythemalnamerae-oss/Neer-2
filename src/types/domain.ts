@@ -160,6 +160,7 @@ export interface Task {
   status: TaskStatus;
   assigneeId: string;
   assigneeName: string;
+  assignees?: TaskAssignee[];
   assigneeAvatar?: string;
   supervisorId?: string;
   supervisorName?: string;
