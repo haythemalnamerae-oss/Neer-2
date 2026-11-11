@@ -96,6 +96,18 @@ declare
   v_chain jsonb;
   v_elapsed integer := 0;
 begin
+  if nullif(p_proof_url,'') is not null and not exists (
+    select 1
+    from public.task_attachments a
+    join storage.objects o
+      on o.bucket_id='task-attachments' and o.name=a.url
+    where a.organization_id=p_organization_id
+      and a.task_id=p_task_id
+      and a.url=p_proof_url
+  ) then
+    raise exception using errcode = '22023', message = 'Proof file must be uploaded and attached to this task first';
+  end if;
+
   if auth.uid() is null then
     raise exception using errcode = '28000', message = 'Authentication required';
   end if;
@@ -535,6 +547,70 @@ $$;
 revoke all on function public.create_task_bundle(uuid,jsonb,jsonb,jsonb,jsonb) from public, anon;
 grant execute on function public.create_task_bundle(uuid,jsonb,jsonb,jsonb,jsonb) to authenticated;
 
+
+create or replace function public.register_task_attachment(
+  p_organization_id uuid,
+  p_task_id text,
+  p_id text,
+  p_name text,
+  p_object_path text,
+  p_size text,
+  p_type text
+)
+returns jsonb
+language plpgsql
+security invoker
+set search_path = pg_catalog, public, private
+as $$
+declare
+  v_user_id text;
+  v_user_name text;
+  v_user_role text;
+  v_row public.task_attachments%rowtype;
+begin
+  if auth.uid() is null then
+    raise exception using errcode = '28000', message = 'Authentication required';
+  end if;
+  if not private.can_access_task(p_organization_id,p_task_id,'edit') then
+    raise exception using errcode = '42501', message = 'Task edit permission required';
+  end if;
+  if p_id is null or p_name is null or length(p_name)>240
+     or p_type not in ('image','pdf')
+     or p_object_path not like p_organization_id::text || '/' || p_task_id || '/%' then
+    raise exception using errcode = '22023', message = 'Invalid task attachment metadata';
+  end if;
+  if not exists (
+    select 1 from storage.objects o
+    where o.bucket_id='task-attachments' and o.name=p_object_path
+  ) then
+    raise exception using errcode = 'P0002', message = 'Uploaded object was not found in private task storage';
+  end if;
+
+  select m.app_user_id,u.name,m.role
+    into v_user_id,v_user_name,v_user_role
+  from public.organization_members m
+  left join public.app_users u on u.organization_id=m.organization_id and u.id=m.app_user_id
+  where m.organization_id=p_organization_id and m.auth_user_id=auth.uid() and m.active
+  limit 1;
+
+  insert into public.task_attachments(id,organization_id,task_id,name,url,size,type,uploaded_by)
+  values(p_id,p_organization_id,p_task_id,p_name,p_object_path,coalesce(p_size,''),p_type,coalesce(v_user_name,''))
+  returning * into v_row;
+
+  insert into public.task_history(id,organization_id,task_id,action,performed_by,notes)
+  values('hist-attachment-'||p_id,p_organization_id,p_task_id,'إرفاق مستند بالمهمة',
+    coalesce(v_user_name,'مستخدم النظام'),p_name);
+
+  insert into public.audit_logs(id,organization_id,user_id,user_name,user_role,action,action_type,entity,entity_id,details)
+  values('aud-attachment-'||p_id,p_organization_id,v_user_id,coalesce(v_user_name,'مستخدم النظام'),
+    coalesce(v_user_role,'viewer'),'إضافة مرفق مهمة','create','task_attachment',p_id,p_object_path);
+
+  return to_jsonb(v_row);
+end;
+$$;
+
+revoke all on function public.register_task_attachment(uuid,text,text,text,text,text,text) from public, anon;
+grant execute on function public.register_task_attachment(uuid,text,text,text,text,text,text) to authenticated;
 
 create or replace function public.update_task_lifecycle(
   p_organization_id uuid,
