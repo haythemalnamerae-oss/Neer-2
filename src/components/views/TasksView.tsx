@@ -265,6 +265,11 @@ export const TasksView: React.FC<TasksViewProps> = ({
                           />
                           <span className="font-bold text-[#183122]">{task.assigneeName}</span>
                         </div>
+                        {task.assignees && task.assignees.length > 1 && (
+                          <span className="text-[10px] text-[#547362] block mt-1">
+                            فريق ({task.assignees.length}): {task.assignees.slice(1).map((assignee) => users.find((user) => user.id === assignee.appUserId)?.name || assignee.name || assignee.appUserId).join('، ')}
+                          </span>
+                        )}
                       </td>
 
                       <td className="p-4 font-mono text-[#4A6857] text-xs sm:text-sm">
