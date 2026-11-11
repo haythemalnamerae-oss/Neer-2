@@ -1250,6 +1250,7 @@ using (
       and m.auth_user_id=(select auth.uid()) and m.active
       and (m.role<>'field_officer' or follow_ups.assigned_to=m.app_user_id)
   )
+  and (follow_ups.task_id is null or private.can_access_task(follow_ups.organization_id,follow_ups.task_id,'edit'))
 )
 with check (
   exists (
