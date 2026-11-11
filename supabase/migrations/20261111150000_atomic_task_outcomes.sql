@@ -499,7 +499,22 @@ begin
   values('hist-' || v_task_id,p_organization_id,v_task_id,
     'إنشاء المهمة وتكليف ' || coalesce(p_task->>'assigneeName',''),
     coalesce((select u.name from public.app_users u where u.organization_id=p_organization_id and u.id=v_app_user_id),''),
-    'تم إنشاء المهمة مع حفظ خطواتها وقائمة الفحص في معاملة واحدة');
+    'تم إنشاء المهمة مع حفظ خطواتها وقائمة الفحص والمكلفين في معاملة واحدة');
+
+  insert into public.audit_logs(
+    id,organization_id,user_id,user_name,user_role,action,action_type,entity,entity_id,details
+  ) values(
+    'aud-task-'||v_task_id,p_organization_id,v_app_user_id,
+    coalesce((select u.name from public.app_users u where u.organization_id=p_organization_id and u.id=v_app_user_id),''),
+    v_role,'إنشاء مهمة','create','task',v_task_id,trim(p_task->>'title')
+  );
+
+  insert into public.notifications(id,organization_id,user_id,title,message,type,is_read,target_view)
+  values(
+    'notif-task-'||v_task_id,p_organization_id,p_task->>'assigneeId',
+    'تكليف مهمة جديدة','تم تكليفك بالمهمة: '||trim(p_task->>'title'),
+    'info',false,'tasks'
+  );
 
   return jsonb_build_object('task',to_jsonb(v_task),'checklist_count',
     jsonb_array_length(coalesce(p_checklist,'[]'::jsonb)),
