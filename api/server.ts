@@ -409,6 +409,9 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
   const resource = resources[req.params.resource as keyof typeof resources];
   if (!resource) return res.status(404).json({ error: { code: 'RESOURCE_NOT_FOUND', message: 'Unknown API resource.' } });
   if (req.params.id && !idPattern.test(req.params.id)) return res.status(400).json({ error: { code: 'INVALID_ID', message: 'Invalid record id.' } });
+  if (req.params.resource === 'task-history' && req.method === 'POST') {
+    return res.status(409).json({ error: { code: 'TASK_HISTORY_IMMUTABLE', message: 'Task history is written only by audited server workflows.' } });
+  }
   if (req.params.resource === 'task-attachments' && req.method === 'POST') {
     return res.status(409).json({ error: { code: 'TASK_ATTACHMENT_WORKFLOW_REQUIRED', message: 'Register uploaded task files through the verified attachment workflow.' } });
   }
