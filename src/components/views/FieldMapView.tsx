@@ -42,7 +42,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
   const canCreateTask = hasPermission(currentUser.role, 'tasks', 'create');
   const canEditTask = hasPermission(currentUser.role, 'tasks', 'edit');
   const visibleTasks = currentUser.role === 'field_officer'
-    ? tasks.filter((task) => task.assigneeId === currentUser.id)
+    ? tasks.filter((task) => task.assigneeId === currentUser.id || task.assignees?.some((assignee) => assignee.appUserId === currentUser.id))
     : canViewAllTasks ? tasks : [];
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
