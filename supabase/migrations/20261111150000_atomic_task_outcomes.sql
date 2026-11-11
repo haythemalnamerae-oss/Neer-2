@@ -510,3 +510,88 @@ $$;
 
 revoke all on function public.create_task_bundle(uuid,jsonb,jsonb,jsonb,jsonb) from public, anon;
 grant execute on function public.create_task_bundle(uuid,jsonb,jsonb,jsonb,jsonb) to authenticated;
+
+
+create or replace function public.update_task_lifecycle(
+  p_organization_id uuid,
+  p_task_id text,
+  p_action text,
+  p_reason text default null
+)
+returns jsonb
+language plpgsql
+security invoker
+set search_path = pg_catalog, public, private
+as $$
+declare
+  v_task public.tasks%rowtype;
+  v_actor_name text;
+  v_now timestamptz := clock_timestamp();
+  v_elapsed integer := 0;
+  v_status text;
+begin
+  if auth.uid() is null then
+    raise exception using errcode = '28000', message = 'Authentication required';
+  end if;
+  if p_action not in ('start','pause','resume') then
+    raise exception using errcode = '22023', message = 'Unsupported lifecycle action';
+  end if;
+  if p_action = 'pause' and coalesce(nullif(btrim(p_reason),''),'') = '' then
+    raise exception using errcode = '22023', message = 'A pause reason is required';
+  end if;
+  if not private.can_access_task(p_organization_id,p_task_id,'edit') then
+    raise exception using errcode = '42501', message = 'Task edit permission required';
+  end if;
+
+  select * into v_task from public.tasks
+  where organization_id=p_organization_id and id=p_task_id
+  for update;
+  if not found then
+    raise exception using errcode = 'P0002', message = 'Task not found';
+  end if;
+
+  select u.name into v_actor_name
+  from public.organization_members m
+  left join public.app_users u on u.organization_id=m.organization_id and u.id=m.app_user_id
+  where m.organization_id=p_organization_id and m.auth_user_id=auth.uid() and m.active
+  limit 1;
+
+  if p_action = 'start' then
+    if v_task.status in ('completed','approved','pending_approval','cancelled') then
+      raise exception using errcode = '22023', message = 'This task cannot be started from its current state';
+    end if;
+    update public.tasks set status='in_progress',actual_start_time=coalesce(actual_start_time,v_now),
+      is_paused=false,paused_at=null,pause_reason=null,is_timer_running=true,
+      timer_started_at=v_now,updated_at=v_now
+    where organization_id=p_organization_id and id=p_task_id returning status into v_status;
+  elsif p_action = 'pause' then
+    if v_task.status <> 'in_progress' or v_task.is_paused then
+      raise exception using errcode = '22023', message = 'Only an active task can be paused';
+    end if;
+    if v_task.is_timer_running and v_task.timer_started_at is not null then
+      v_elapsed := greatest(1,round(extract(epoch from (v_now-v_task.timer_started_at))/60)::integer);
+    end if;
+    update public.tasks set status='paused',is_paused=true,paused_at=v_now,
+      pause_reason=nullif(btrim(p_reason),''),time_spent_minutes=time_spent_minutes+v_elapsed,
+      is_timer_running=false,timer_started_at=null,updated_at=v_now
+    where organization_id=p_organization_id and id=p_task_id returning status into v_status;
+  else
+    if not v_task.is_paused and v_task.status <> 'paused' then
+      raise exception using errcode = '22023', message = 'Only a paused task can be resumed';
+    end if;
+    update public.tasks set status='in_progress',is_paused=false,paused_at=null,
+      pause_reason=null,is_timer_running=true,timer_started_at=v_now,updated_at=v_now
+    where organization_id=p_organization_id and id=p_task_id returning status into v_status;
+  end if;
+
+  insert into public.task_history(id,organization_id,task_id,action,performed_by,notes)
+  values('hist-life-'||gen_random_uuid()::text,p_organization_id,p_task_id,
+    case p_action when 'start' then 'بدء تنفيذ المهمة' when 'pause' then 'إيقاف المهمة مؤقتاً' else 'استئناف تنفيذ المهمة' end,
+    coalesce(v_actor_name,'مستخدم النظام'),nullif(btrim(p_reason),''));
+
+  return jsonb_build_object('task_id',p_task_id,'status',v_status,'time_added_minutes',v_elapsed);
+end;
+$$;
+
+revoke all on function public.update_task_lifecycle(uuid,text,text,text) from public, anon;
+grant execute on function public.update_task_lifecycle(uuid,text,text,text) to authenticated;
