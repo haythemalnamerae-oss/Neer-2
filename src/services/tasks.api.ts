@@ -1,5 +1,6 @@
 import type { Task, TaskOutcome, TaskStepStatus, TaskAttachment } from '../types/domain';
-import { apiRequest, getSession, loadUiSnapshot, SessionError, type ApiSession } from '../lib/api/session';
+import { apiRequest, getSession, loadUiSnapshot, refreshSession, SessionError, type ApiSession } from '../lib/api/session';
+import { dataStore } from '../lib/storage';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -140,7 +141,7 @@ export async function recordTaskOutcomeOnServer(
     }),
   });
   await refreshAfterMutation(session);
-  const tasks = (await import('../lib/storage')).dataStore.getTasks();
+  const tasks = dataStore.getTasks();
   const updatedTask = tasks.find((item) => item.id === taskId);
   if (!updatedTask) throw new TaskSavedRefreshError('تم حفظ نتيجة المهمة، لكن تعذر العثور عليها بعد تحديث البيانات. أعد تحميل الصفحة.');
   return {
@@ -282,7 +283,7 @@ export async function uploadTaskAttachment(
   displayName: string,
   uploadedBy: string,
 ): Promise<TaskAttachment> {
-  const session = requireSession();
+  const session = await refreshSession(requireSession());
   if (!supabaseUrl || !supabaseAnonKey) throw new SessionError('إعدادات Supabase غير مكتملة لرفع الملفات.');
   if (!file || file.size <= 0 || file.size > MAX_ATTACHMENT_BYTES) throw new Error('حجم الملف يجب ألا يتجاوز 10 ميجابايت.');
   const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf']);
@@ -321,16 +322,17 @@ export async function uploadTaskAttachment(
         uploaded_by: uploadedBy,
       }),
     });
-    await refreshAfterMutation(session);
-    return attachment;
   } catch (error) {
     await removeStoredObject(session, objectPath);
     throw error;
   }
+  // Once metadata is committed, keep the object even if the UI refresh fails.
+  await refreshAfterMutation(session);
+  return attachment;
 }
 
 export async function getTaskAttachmentSignedUrl(objectPath: string): Promise<string> {
-  const session = requireSession();
+  const session = await refreshSession(requireSession());
   if (!supabaseUrl || !supabaseAnonKey) throw new SessionError('إعدادات Supabase غير مكتملة.');
   const response = await fetch(`${supabaseUrl}/storage/v1/object/sign/${ATTACHMENT_BUCKET}/${objectPath.split('/').map(encodeURIComponent).join('/')}`, {
     method: 'POST',
