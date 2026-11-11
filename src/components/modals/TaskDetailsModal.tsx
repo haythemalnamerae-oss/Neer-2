@@ -459,6 +459,11 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
               <div>
                 <span className="text-[10px] text-slate-500 block">المنفذ المكلّف</span>
                 <strong className="text-slate-800 font-extrabold">{task.assigneeName}</strong>
+                {task.assignees && task.assignees.length > 1 && (
+                  <span className="block text-[10px] text-slate-500 mt-1">
+                    فريق التنفيذ: {task.assignees.map((assignee) => users.find((user) => user.id === assignee.appUserId)?.name || assignee.name || assignee.appUserId).join('، ')}
+                  </span>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 rounded-2xl neu-inset-sm">
