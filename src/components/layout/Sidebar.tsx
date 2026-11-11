@@ -78,7 +78,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const allTasks = dataStore.getTasks();
   const tasks = currentUser.role === 'field_officer'
-    ? allTasks.filter((task) => task.assigneeId === currentUser.id)
+    ? allTasks.filter((task) => task.assigneeId === currentUser.id || task.assignees?.some((assignee) => assignee.appUserId === currentUser.id))
     : allTasks;
   const pendingTasksCount = tasks.filter(
     (task) => task.status === 'in_progress' || task.status === 'started'
