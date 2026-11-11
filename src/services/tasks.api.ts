@@ -119,6 +119,7 @@ export async function recordTaskOutcomeOnServer(
     };
   },
   event?: { clientEventId: string; latitude: number; longitude: number; accuracyMeters: number; eventLabel: string },
+  requestId?: string,
 ): Promise<{ updatedTask: Task; followUpTask?: Task }> {
   const session = requireSession();
   const followUp = payload.followUp ? {
@@ -129,7 +130,7 @@ export async function recordTaskOutcomeOnServer(
     method: 'POST',
     body: JSON.stringify({
       taskId,
-      requestId: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : newId('req'),
+      requestId: requestId || (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : newId('req')),
       outcome: payload.outcome,
       reason: payload.reason || null,
       notes: payload.notes || null,
