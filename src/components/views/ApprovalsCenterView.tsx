@@ -10,6 +10,7 @@ import { dataStore } from '../../lib/storage';
 import { hasPermission } from '../../lib/rbac/permissions';
 import { formatCurrency } from '../../lib/utils/format';
 import { FinanceApiService } from '../../services/finance-api.service';
+import { updateTaskStatusOnServer } from '../../services/tasks.api';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 
@@ -51,15 +52,16 @@ export const ApprovalsCenterView: React.FC<ApprovalsCenterViewProps> = ({ onSele
     }
   };
 
-  const handleApproveTask = (id: string) => {
-    dataStore.updateTaskStatus(id, 'completed');
+  const handleApproveTask = async (id: string) => {
+    try { await updateTaskStatusOnServer(id, 'completed'); }
+    catch (error) { window.alert(error instanceof Error ? error.message : 'تعذر اعتماد المهمة.'); }
   };
 
-  const handleRejectTask = (id: string) => {
+  const handleRejectTask = async (id: string) => {
     const reason = window.prompt('سبب رفض اعتماد المهمة:', 'إعادة الفحص الميداني لوجود ملاحظات جودة');
-    if (reason) {
-      dataStore.updateTaskStatus(id, 'rejected');
-    }
+    if (!reason?.trim()) return;
+    try { await updateTaskStatusOnServer(id, 'rejected', reason.trim()); }
+    catch (error) { window.alert(error instanceof Error ? error.message : 'تعذر رفض المهمة.'); }
   };
 
   const handleApproveSettlement = async (id: string) => {
