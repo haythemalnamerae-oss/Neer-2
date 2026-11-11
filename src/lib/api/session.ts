@@ -1,4 +1,4 @@
-import type { Role, PettyCashFund, Expense, Settlement, CashReceipt, StandingAccount, StandingAccountEntry } from '../../types/domain';
+import type { Role, PettyCashFund, Expense, Settlement, CashReceipt, StandingAccount, StandingAccountEntry, TaskAssignee } from '../../types/domain';
 import { dataStore } from '../storage';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
@@ -182,7 +182,7 @@ const fromSnake = (row: Record<string, any>) => {
 
 /** Loads the initial server snapshot before importing the legacy synchronous UI store. */
 export async function loadUiSnapshot(session: ApiSession): Promise<void> {
-  const common = ['tasks','task-checklist','task-steps','task-subtasks','task-updates','task-history','task-attachments','task-comments','task-events','follow-ups','notifications'];
+  const common = ['tasks','task-checklist','task-steps','task-subtasks','task-updates','task-history','task-attachments','task-comments','task-events','task-assignees','follow-ups','notifications'];
   const finance = ['funds','expenses','settlements','settlement-expenses','cash-receipts','standing-accounts','fund-transactions','standing-account-entries'];
   const canReadUserDirectory = session.role === 'admin' || session.role === 'ops_manager';
   const canReadFinance = session.role === 'admin' || session.role === 'finance_officer';
@@ -210,6 +210,7 @@ export async function loadUiSnapshot(session: ApiSession): Promise<void> {
   const authUserNames = new Map((data.users || []).map((user: Record<string, any>) => [user.auth_user_id, user.name]));
   const attachments = byId(data['task-attachments']);
   const comments = byId(data['task-comments']);
+  const assignees = byId(data['task-assignees']);
   const children = (map: Map<string, any>, taskId: string) => [...map.values()].filter((item) => item.taskId === taskId);
 
   const tasks = (data.tasks || []).map((raw) => {
@@ -231,6 +232,14 @@ export async function loadUiSnapshot(session: ApiSession): Promise<void> {
     task.history = [...storedHistory, ...eventHistory].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
     task.attachments = children(attachments, task.id).map((item) => ({ id: item.id, name: item.name, url: item.url, size: item.size, type: item.type, uploadedBy: item.uploadedBy, uploadedAt: item.createdAt }));
     task.comments = children(comments, task.id).map((item) => ({ id: item.id, authorId: item.authorId || '', authorName: item.authorName, authorAvatar: item.authorAvatar, authorRole: item.authorRole, text: item.text, createdAt: item.createdAt, mentions: item.mentions, isInternal: item.isInternal }));
+    task.assignees = children(assignees, task.id).map((item) => ({
+      id: item.id,
+      appUserId: item.appUserId,
+      name: item.appUserId === session.appUserId ? (users[0]?.name || task.assigneeName) : undefined,
+      isPrimary: Boolean(item.isPrimary),
+      assignedBy: item.assignedBy,
+      assignedAt: item.createdAt,
+    })) as TaskAssignee[];
     return task;
   });
 
