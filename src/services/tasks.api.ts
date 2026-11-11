@@ -60,7 +60,13 @@ export async function createTaskBundle(
     body: JSON.stringify(payload),
   });
 
-  // Re-hydrate only after the server confirms the complete transaction.
-  await loadUiSnapshot(session);
+  // The task is committed at this point. A snapshot refresh failure must never
+  // be reported as a failed create, otherwise the user may submit a duplicate.
+  try {
+    await loadUiSnapshot(session);
+  } catch (error) {
+    console.error('Task was saved, but the UI snapshot could not be refreshed:', error);
+    throw new Error('تم حفظ المهمة بنجاح على الخادم، لكن تعذر تحديث القائمة. أعد تحميل الصفحة ولا تعاود إنشاء المهمة.');
+  }
   return task;
 }
