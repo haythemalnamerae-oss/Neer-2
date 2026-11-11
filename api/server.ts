@@ -486,6 +486,13 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
         if (req.method === 'PATCH' && requestedTaskId !== undefined && (typeof requestedTaskId !== 'string' || !assignedIds.includes(requestedTaskId))) {
           return res.status(403).json({ error: { code: 'TASK_ACCESS_FORBIDDEN', message: 'The related task is not assigned to this field officer.' } });
         }
+        if (req.params.resource === 'task-subtasks' && (req.method === 'POST' || req.method === 'PATCH')) {
+          const requestedAssignee = (req.body as Record<string, unknown> | undefined)?.assignee_id;
+          if ((req.method === 'POST' && requestedAssignee !== auth.appUserId) ||
+              (req.method === 'PATCH' && requestedAssignee !== undefined && requestedAssignee !== auth.appUserId)) {
+            return res.status(403).json({ error: { code: 'SUBTASK_ASSIGNMENT_FORBIDDEN', message: 'Field officers may only assign subtasks to themselves.' } });
+          }
+        }
       }
     } else if (req.params.resource === 'follow-ups') {
       if (req.method === 'GET' || req.method === 'PATCH' || req.method === 'DELETE') query.set('assigned_to', `eq.${auth.appUserId}`);
