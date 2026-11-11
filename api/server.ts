@@ -155,8 +155,18 @@ app.post('/api/v1/tasks/record-outcome', async (req, res) => {
     if (!body || typeof taskId !== 'string' || !idPattern.test(taskId) ||
         typeof requestId !== 'string' || !uuidPattern.test(requestId) ||
         !['completed','partially_completed','not_completed','unable_to_execute','needs_followup'].includes(outcome) ||
-        (followUp !== null && (typeof followUp !== 'object' || Array.isArray(followUp))) ||
-        (event !== null && (typeof event !== 'object' || Array.isArray(event)))) {
+        (followUp !== null && (
+          typeof followUp !== 'object' || Array.isArray(followUp) ||
+          typeof followUp.id !== 'string' || !idPattern.test(followUp.id) ||
+          typeof followUp.title !== 'string' || !followUp.title.trim() || followUp.title.length > 240 ||
+          typeof followUp.assigneeId !== 'string' || !idPattern.test(followUp.assigneeId) ||
+          typeof followUp.dueDate !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(followUp.dueDate)
+        )) ||
+        (event !== null && (
+          typeof event !== 'object' || Array.isArray(event) ||
+          typeof event.clientEventId !== 'string' || !uuidPattern.test(event.clientEventId) ||
+          !Number.isFinite(event.latitude) || !Number.isFinite(event.longitude) || !Number.isFinite(event.accuracyMeters)
+        ))) {
       return res.status(400).json({ error: { code: 'INVALID_TASK_OUTCOME', message: 'Task outcome payload is invalid.' } });
     }
     if (auth.role === 'field_officer' && followUp?.assigneeId && followUp.assigneeId !== auth.appUserId) {
