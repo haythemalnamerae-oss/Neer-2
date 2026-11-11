@@ -179,9 +179,13 @@ export async function updateTaskStatusOnServer(taskId: string, status: string, n
   await refreshAfterMutation(session);
 }
 
-export async function deleteTaskOnServer(taskId: string): Promise<void> {
+export async function deleteTaskOnServer(taskId: string, reason = 'تم إلغاء المهمة من سجل المهام'): Promise<void> {
   const session = requireSession();
-  await mutateTaskResource(session, 'tasks', 'DELETE', `id=eq.${encodeURIComponent(taskId)}`);
+  await apiRequest(session, '/tasks/cancel', {
+    method: 'POST',
+    body: JSON.stringify({ taskId, reason }),
+  });
+  await refreshAfterMutation(session);
 }
 
 export async function setChecklistItem(taskId: string, itemId: string, completed: boolean): Promise<void> {
