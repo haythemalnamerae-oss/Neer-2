@@ -163,6 +163,15 @@ export async function updateTaskFields(taskId: string, updates: Record<string, u
   await mutateTaskResource(session, 'tasks', 'PATCH', `id=eq.${encodeURIComponent(taskId)}`, snakeCase);
 }
 
+export async function updateTaskLifecycle(taskId: string, action: 'start' | 'pause' | 'resume', reason?: string): Promise<void> {
+  const session = requireSession();
+  await apiRequest(session, '/tasks/lifecycle', {
+    method: 'POST',
+    body: JSON.stringify({ taskId, action, reason: reason || null }),
+  });
+  await refreshAfterMutation(session);
+}
+
 export async function refreshTaskSnapshot(): Promise<void> {
   await refreshAfterMutation(requireSession());
 }
