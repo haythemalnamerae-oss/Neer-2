@@ -316,6 +316,12 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
   } catch (error) { console.error(error); return res.status(503).json({ error: { code: 'PERMISSIONS_UNAVAILABLE', message: 'Permission service is unavailable. Apply the RBAC migration.' } }); }
   if (req.params.resource === 'task-events' && req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: { code: 'APPEND_ONLY', message: 'Field events can only be read or appended.' } });
   if (req.params.id && req.params.resource === 'task-events' && req.method !== 'GET') return res.status(405).json({ error: { code: 'APPEND_ONLY', message: 'Field events cannot be changed or deleted.' } });
+  if (req.params.resource === 'tasks' && req.method === 'PATCH') {
+    const requestedStatus = (req.body as Record<string, unknown> | undefined)?.status;
+    if (['completed','approved','rejected'].includes(String(requestedStatus)) && !(await allowed(auth, 'tasks', 'approve'))) {
+      return res.status(403).json({ error: { code: 'TASK_APPROVAL_FORBIDDEN', message: 'A task approval permission is required for this status transition.' } });
+    }
+  }
   if (req.method === 'POST' && req.params.id) return res.status(405).json({ error: { code: 'METHOD_NOT_ALLOWED', message: 'Create records on the collection path.' } });
   if ((req.method === 'PATCH' || req.method === 'DELETE') && !req.params.id) return res.status(400).json({ error: { code: 'ID_REQUIRED', message: 'Update/delete requires a record id.' } });
 
@@ -403,10 +409,25 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
   const body = req.body as Record<string, unknown> | undefined;
   if ((req.method === 'POST' || req.method === 'PATCH') && (!body || typeof body !== 'object' || Array.isArray(body))) return res.status(400).json({ error: { code: 'INVALID_BODY', message: 'JSON object required.' } });
   if (body && ('organization_id' in body || 'organizationId' in body)) return res.status(400).json({ error: { code: 'PROTECTED_FIELD', message: 'Organization id is server controlled.' } });
+  let trustedBody = body;
+  if (body && req.method === 'POST' && ['task-updates','task-comments','task-history','task-attachments','task-assignees'].includes(req.params.resource)) {
+    if (!auth.appUserId) return res.status(403).json({ error: { code: 'OPERATIONAL_PROFILE_REQUIRED', message: 'A linked operational profile is required.' } });
+    const profileQuery = new URLSearchParams({ select: 'id,name,role_title_ar,avatar', organization_id: `eq.${auth.organizationId}`, id: `eq.${auth.appUserId}`, limit: '1' });
+    const profileResponse = await supabaseFetch(`/rest/v1/app_users?${profileQuery}`, auth.token);
+    if (!profileResponse.ok) return sendDbError(res, profileResponse.status, await profileResponse.text());
+    const profiles = await profileResponse.json() as Array<{ id: string; name: string; role_title_ar?: string; avatar?: string }>;
+    const profile = profiles[0];
+    if (!profile) return res.status(403).json({ error: { code: 'OPERATIONAL_PROFILE_REQUIRED', message: 'A linked operational profile is required.' } });
+    if (req.params.resource === 'task-updates') trustedBody = { ...body, author_id: profile.id, author_name: profile.name };
+    if (req.params.resource === 'task-comments') trustedBody = { ...body, author_id: profile.id, author_name: profile.name, author_avatar: profile.avatar || null, author_role: profile.role_title_ar || auth.role };
+    if (req.params.resource === 'task-history') trustedBody = { ...body, performed_by: profile.name };
+    if (req.params.resource === 'task-attachments') trustedBody = { ...body, uploaded_by: profile.name };
+    if (req.params.resource === 'task-assignees') trustedBody = { ...body, assigned_by: profile.id };
+  }
   const response = await supabaseFetch(`/rest/v1/${resource.table}?${query}`, auth.token, {
     method: req.method,
     headers: req.method === 'POST' || req.method === 'PATCH' ? { Prefer: 'return=representation' } : {},
-    ...(req.method === 'POST' || req.method === 'PATCH' ? { body: JSON.stringify({ ...body, organization_id: auth.organizationId, ...(req.params.resource === 'task-events' ? { actor_auth_user_id: auth.userId, occurred_at: new Date().toISOString() } : {}) }) } : {}),
+    ...(req.method === 'POST' || req.method === 'PATCH' ? { body: JSON.stringify({ ...trustedBody, organization_id: auth.organizationId, ...(req.params.resource === 'task-events' ? { actor_auth_user_id: auth.userId, occurred_at: new Date().toISOString() } : {}) }) } : {}),
   });
   if (!response.ok) return sendDbError(res, response.status, await response.text());
   if (response.status === 204) return res.status(204).end();
