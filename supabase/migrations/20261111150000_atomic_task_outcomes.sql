@@ -1326,3 +1326,85 @@ with check (
   )
 );
 
+
+
+create or replace function private.trust_task_child_actor()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_app_user_id text;
+  v_name text;
+  v_role text;
+  v_role_title text;
+  v_avatar text;
+begin
+  if auth.uid() is null then
+    return new;
+  end if;
+  select m.app_user_id,u.name,m.role,u.role_title_ar,u.avatar
+    into v_app_user_id,v_name,v_role,v_role_title,v_avatar
+  from public.organization_members m
+  join public.app_users u
+    on u.organization_id=m.organization_id and u.id=m.app_user_id
+  where m.organization_id=new.organization_id
+    and m.auth_user_id=auth.uid()
+    and m.active and u.active
+  limit 1;
+  if not found then
+    raise exception using errcode = '42501', message = 'Active operational profile required';
+  end if;
+
+  case tg_table_name
+    when 'task_comments' then
+      new.author_id := v_app_user_id;
+      new.author_name := v_name;
+      new.author_avatar := v_avatar;
+      new.author_role := coalesce(v_role_title,v_role);
+    when 'task_daily_updates' then
+      new.author_id := v_app_user_id;
+      new.author_name := v_name;
+    when 'task_history' then
+      new.performed_by := v_name;
+    when 'task_attachments' then
+      new.uploaded_by := v_name;
+    when 'task_assignees' then
+      new.assigned_by := v_app_user_id;
+  end case;
+  return new;
+end;
+$$;
+
+revoke all on function private.trust_task_child_actor() from public, anon;
+grant execute on function private.trust_task_child_actor() to authenticated;
+
+drop trigger if exists task_comments_trust_actor on public.task_comments;
+create trigger task_comments_trust_actor before insert on public.task_comments
+for each row execute function private.trust_task_child_actor();
+drop trigger if exists task_daily_updates_trust_actor on public.task_daily_updates;
+create trigger task_daily_updates_trust_actor before insert on public.task_daily_updates
+for each row execute function private.trust_task_child_actor();
+drop trigger if exists task_history_trust_actor on public.task_history;
+create trigger task_history_trust_actor before insert on public.task_history
+for each row execute function private.trust_task_child_actor();
+drop trigger if exists task_attachments_trust_actor on public.task_attachments;
+create trigger task_attachments_trust_actor before insert on public.task_attachments
+for each row execute function private.trust_task_child_actor();
+drop trigger if exists task_assignees_trust_actor on public.task_assignees;
+create trigger task_assignees_trust_actor before insert on public.task_assignees
+for each row execute function private.trust_task_child_actor();
+
+drop policy if exists taskAttachments_scoped_insert on public.task_attachments;
+create policy taskAttachments_scoped_insert on public.task_attachments
+for insert to authenticated
+with check (
+  private.can_access_task(organization_id,task_id,'edit')
+  and url like organization_id::text || '/' || task_id || '/%'
+  and exists (
+    select 1 from storage.objects o
+    where o.bucket_id='task-attachments' and o.name=task_attachments.url
+  )
+);
+drop policy if exists taskAttachments_scoped_update on public.task_attachments;
