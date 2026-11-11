@@ -282,7 +282,9 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   const handleOpenAttachment = async (objectPath: string) => {
     const popup = window.open('about:blank', '_blank');
     try {
-      const url = await getTaskAttachmentSignedUrl(objectPath);
+      const legacyUrl = objectPath.startsWith('https://') || objectPath.startsWith('http://') ||
+        objectPath.startsWith('data:image/') || objectPath.startsWith('data:application/pdf');
+      const url = legacyUrl ? objectPath : await getTaskAttachmentSignedUrl(objectPath);
       if (popup) popup.location.href = url;
       else window.location.href = url;
     } catch (error) {
