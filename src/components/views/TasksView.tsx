@@ -318,7 +318,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
                           {canDeleteTask && <button
                             onClick={(e) => handleDeleteTask(e, task.id)}
                             className="w-10 h-10 rounded-xl neu-button flex items-center justify-center text-[#96372B] cursor-pointer"
-                            title="حذف المهمة"
+                            title="إلغاء المهمة"
                           >
                             <Trash2 className="w-4.5 h-4.5 stroke-[2.2]" />
                           </button>}
