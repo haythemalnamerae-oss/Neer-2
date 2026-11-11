@@ -187,8 +187,9 @@ export async function loadUiSnapshot(session: ApiSession): Promise<void> {
   const canReadUserDirectory = session.role === 'admin' || session.role === 'ops_manager';
   const canReadFinance = session.role === 'admin' || session.role === 'finance_officer';
   const canReadFieldFinance = session.role === 'field_officer';
+  const canReadAudit = session.role === 'admin' || session.role === 'ops_manager' || session.role === 'finance_officer';
   const financeCollections = canReadFinance ? finance : canReadFieldFinance ? ['funds','expenses','standing-accounts'] : [];
-  const collections = [...common, ...financeCollections, ...(canReadUserDirectory ? ['users'] : [])];
+  const collections = [...common, ...financeCollections, ...(canReadUserDirectory ? ['users'] : []), ...(canReadAudit ? ['audit-logs'] : [])];
   const values = await Promise.all(collections.map(async (name) => [name, await apiRequest<Record<string, any>[]>(session, `/${name}?limit=500`)] as const));
   const data = Object.fromEntries(values);
 
