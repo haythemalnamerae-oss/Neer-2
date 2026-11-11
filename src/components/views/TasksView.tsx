@@ -315,7 +315,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
                           >
                             النتيجة
                           </Button>}
-                          {canDeleteTask && <button
+                          {canDeleteTask && !['completed','approved','pending_approval','cancelled'].includes(task.status) && <button
                             onClick={(e) => handleDeleteTask(e, task.id)}
                             className="w-10 h-10 rounded-xl neu-button flex items-center justify-center text-[#96372B] cursor-pointer"
                             title="إلغاء المهمة"
