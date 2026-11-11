@@ -1,4 +1,4 @@
-import type { Task, TaskOutcome, TaskStepStatus, TaskAttachment } from '../types/domain';
+import type { Task, TaskStepStatus, TaskAttachment } from '../types/domain';
 import { apiRequest, getSession, loadUiSnapshot, SessionError, type ApiSession } from '../lib/api/session';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
@@ -113,6 +113,17 @@ export async function updateTaskFields(taskId: string, updates: Record<string, u
   await mutateTaskResource(session, 'tasks', 'PATCH', `id=eq.${encodeURIComponent(taskId)}`, snakeCase);
 }
 
+export async function refreshTaskSnapshot(): Promise<void> {
+  await refreshAfterMutation(requireSession());
+}
+
+export async function updateTaskStatusOnServer(taskId: string, status: string, notes?: string): Promise<void> {
+  const updates: Record<string, unknown> = { status };
+  if (status === 'rejected') updates.rejection_reason = notes || null;
+  if (status === 'completed' || status === 'approved') updates.actual_end_time = new Date().toISOString();
+  await updateTaskFields(taskId, updates);
+}
+
 export async function deleteTaskOnServer(taskId: string): Promise<void> {
   const session = requireSession();
   await mutateTaskResource(session, 'tasks', 'DELETE', `id=eq.${encodeURIComponent(taskId)}`);
@@ -135,7 +146,7 @@ export async function setTaskStepStatus(
     status,
     notes: notes || null,
     completed_at: status === 'completed' ? new Date().toISOString() : null,
-    next_step_date: nextStepDate || null,
+    ...(nextStepDate ? { next_step_date: nextStepDate } : {}),
   });
 }
 
