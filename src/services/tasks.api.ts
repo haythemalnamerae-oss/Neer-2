@@ -47,7 +47,11 @@ async function mutateTaskResource<T = unknown>(
     method,
     ...(payload ? { body: JSON.stringify(payload) } : {}),
   });
-  await refreshAfterMutation(session);
+  try {
+    await refreshAfterMutation(session);
+  } catch (error) {
+    console.error('Task mutation was committed but the view refresh failed; reload to see the latest state:', error);
+  }
   return result;
 }
 
@@ -272,9 +276,10 @@ function storageHeaders(session: ApiSession, contentType?: string): HeadersInit 
 
 async function removeStoredObject(session: ApiSession, objectPath: string): Promise<void> {
   if (!supabaseUrl || !supabaseAnonKey) return;
+  const freshSession = await refreshSession(session);
   const response = await fetch(`${supabaseUrl}/storage/v1/object/${ATTACHMENT_BUCKET}/${objectPath.split('/').map(encodeURIComponent).join('/')}`, {
     method: 'DELETE',
-    headers: storageHeaders(session),
+    headers: storageHeaders(freshSession),
   });
   if (!response.ok && response.status !== 404) {
     throw new Error('تعذر حذف الملف من التخزين الآمن.');
@@ -330,8 +335,12 @@ export async function uploadTaskAttachment(
     await removeStoredObject(session, objectPath);
     throw error;
   }
-  // Once metadata is committed, keep the object even if the UI refresh fails.
-  await refreshAfterMutation(session);
+  // Once metadata is committed, keep the object and report upload success even if the view refresh fails.
+  try {
+    await refreshAfterMutation(session);
+  } catch (error) {
+    console.error('Attachment was saved but the task view could not refresh:', error);
+  }
   return attachment;
 }
 
@@ -350,6 +359,15 @@ export async function getTaskAttachmentSignedUrl(objectPath: string): Promise<st
 
 export async function deleteTaskAttachmentOnServer(taskId: string, attachmentId: string, objectPath: string): Promise<void> {
   const session = requireSession();
-  await mutateTaskResource(session, 'task-attachments', 'DELETE', `id=eq.${encodeURIComponent(attachmentId)}&task_id=eq.${encodeURIComponent(taskId)}`);
-  await removeStoredObject(session, objectPath);
+  await apiRequest(session, `/task-attachments?id=eq.${encodeURIComponent(attachmentId)}&task_id=eq.${encodeURIComponent(taskId)}`, {
+    method: 'DELETE',
+  });
+  if (objectPath.startsWith(`${session.organizationId}/${taskId}/`)) {
+    await removeStoredObject(session, objectPath);
+  }
+  try {
+    await refreshAfterMutation(session);
+  } catch (error) {
+    console.error('Attachment metadata was deleted but the task view could not refresh:', error);
+  }
 }
