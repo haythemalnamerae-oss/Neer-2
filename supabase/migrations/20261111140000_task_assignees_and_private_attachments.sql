@@ -172,7 +172,7 @@ begin
     insert into public.task_assignees (
       id, organization_id, task_id, app_user_id, assigned_by, is_primary
     ) values (
-      'asg-' || new.id || '-' || new.assignee_id, new.organization_id, new.id, new.assignee_id,
+      'asg-' || new.organization_id::text || '-' || new.id || '-' || new.assignee_id, new.organization_id, new.id, new.assignee_id,
       new.creator_id, true
     )
     on conflict (organization_id, task_id, app_user_id)
