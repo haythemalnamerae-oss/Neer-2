@@ -104,6 +104,7 @@ export const TaskOutcomeModal: React.FC<TaskOutcomeModalProps> = ({
   const [notes, setNotes] = useState('');
   const [proofUrl, setProofUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [outcomeRequestId] = useState(() => crypto.randomUUID());
 
   // Follow-up chain toggle & form
   const [createFollowUp, setCreateFollowUp] = useState(false);
@@ -196,7 +197,7 @@ export const TaskOutcomeModal: React.FC<TaskOutcomeModalProps> = ({
         notes,
         proofUrl,
         followUp: followUpPayload,
-      }, eventPayload);
+      }, eventPayload, outcomeRequestId);
 
       stopFieldLocationTracking(task.id);
       if (res.followUpTask && onViewChain) {
