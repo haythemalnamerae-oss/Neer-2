@@ -10,7 +10,6 @@ create table if not exists private.task_outcome_requests (
 );
 revoke all on private.task_outcome_requests from public, anon;
 grant usage on schema private to authenticated;
-grant select, insert, update on private.task_outcome_requests to authenticated;
 
 create or replace function private.can_assign_task(
   target_org uuid,
