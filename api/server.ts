@@ -24,7 +24,7 @@ const resources = {
 } as const;
 
 type Role = 'admin' | 'ops_manager' | 'finance_officer' | 'field_officer' | 'viewer';
-type AuthContext = { token: string; userId: string; organizationId: string; role: Role };
+type AuthContext = { token: string; userId: string; organizationId: string; appUserId: string | null; role: Role };
 type AuthenticatedRequest = Request & { auth: AuthContext };
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const idPattern = /^[a-zA-Z0-9_-]{1,120}$/;
@@ -32,6 +32,7 @@ const allowedFilters = new Set(['id','status','priority','assignee_id','fund_id'
 const permissionActions = new Set(['view','create','edit','delete','approve']);
 // Financial balances and approvals must only change through atomic, audited database workflows.
 const transactionOnlyResources = new Set(['funds','expenses','settlements','settlement-expenses','cash-receipts','standing-accounts','fund-transactions','standing-account-entries']);
+const taskChildResources = new Set(['task-checklist','task-steps','task-subtasks','task-updates','task-history','task-attachments','task-comments','task-events']);
 
 async function supabaseFetch(path: string, token: string, init: RequestInit = {}) {
   return fetch(`${supabaseUrl}${path}`, { ...init, headers: { apikey: supabaseAnonKey!, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...init.headers } });
@@ -47,13 +48,13 @@ async function authenticate(req: Request, res: Response, next: NextFunction) {
     if (!user.id) return res.status(401).json({ error: { code: 'INVALID_TOKEN', message: 'Authenticated user was not returned.' } });
     const orgId = req.header('x-organization-id');
     if (!orgId || !uuidPattern.test(orgId)) return res.status(400).json({ error: { code: 'ORGANIZATION_REQUIRED', message: 'Provide a valid x-organization-id header.' } });
-    const q = new URLSearchParams({ select: 'organization_id,role,active', auth_user_id: `eq.${user.id}`, organization_id: `eq.${orgId}`, active: 'eq.true', limit: '1' });
+    const q = new URLSearchParams({ select: 'organization_id,role,active,app_user_id', auth_user_id: `eq.${user.id}`, organization_id: `eq.${orgId}`, active: 'eq.true', limit: '1' });
     const membershipResponse = await supabaseFetch(`/rest/v1/organization_members?${q}`, token);
     if (!membershipResponse.ok) throw new Error(`Membership lookup failed (${membershipResponse.status}).`);
-    const rows = await membershipResponse.json() as Array<{ organization_id: string; role: Role; active: boolean }>;
+    const rows = await membershipResponse.json() as Array<{ organization_id: string; role: Role; active: boolean; app_user_id: string | null }>;
     const member = rows[0];
     if (!member || !['admin','ops_manager','finance_officer','field_officer','viewer'].includes(member.role)) return res.status(403).json({ error: { code: 'NOT_ORG_MEMBER', message: 'No active membership for this organization.' } });
-    (req as AuthenticatedRequest).auth = { token, userId: user.id, organizationId: member.organization_id, role: member.role };
+    (req as AuthenticatedRequest).auth = { token, userId: user.id, organizationId: member.organization_id, appUserId: member.app_user_id, role: member.role };
     return next();
   } catch (error) {
     console.error('API authentication failed:', error);
@@ -233,6 +234,34 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
 
   const query = new URLSearchParams({ select: '*', organization_id: `eq.${auth.organizationId}` });
   if (req.params.id) query.set('id', `eq.${req.params.id}`);
+
+  // Enforce field-officer row scope at the API boundary as defense in depth.
+  // The database RLS policies remain authoritative; this prevents broad snapshot
+  // requests from returning another field officer's tasks and related records.
+  if (auth.role === 'field_officer') {
+    if (!auth.appUserId) return res.status(403).json({ error: { code: 'FIELD_PROFILE_REQUIRED', message: 'A linked operational user profile is required.' } });
+    if (req.method === 'GET' && req.params.resource === 'tasks') {
+      query.set('assignee_id', `eq.${auth.appUserId}`);
+    } else if (req.method === 'GET' && taskChildResources.has(req.params.resource)) {
+      const assignedQuery = new URLSearchParams({
+        select: 'id',
+        organization_id: `eq.${auth.organizationId}`,
+        assignee_id: `eq.${auth.appUserId}`,
+        limit: '5000',
+      });
+      const assignedResponse = await supabaseFetch(`/rest/v1/tasks?${assignedQuery}`, auth.token);
+      if (!assignedResponse.ok) return sendDbError(res, assignedResponse.status, await assignedResponse.text());
+      const assignedTasks = await assignedResponse.json() as Array<{ id: string }>;
+      const assignedIds = assignedTasks.map((task) => task.id).filter((id) => idPattern.test(id));
+      query.set('task_id', assignedIds.length ? `in.(${assignedIds.join(',')})` : 'eq.__no_assigned_task__');
+    } else if (req.method === 'GET' && req.params.resource === 'follow-ups') {
+      query.set('assigned_to', `eq.${auth.appUserId}`);
+    } else if (req.method === 'GET' && req.params.resource === 'funds') {
+      query.set('holder_id', `eq.${auth.appUserId}`);
+    } else if (req.method === 'GET' && req.params.resource === 'notifications') {
+      query.set('or', `(user_id.eq.${auth.appUserId},user_id.is.null)`);
+    }
+  }
   for (const [key, value] of Object.entries(req.query)) {
     if (key === 'limit' || key === 'offset') {
       const n = Number(value);
