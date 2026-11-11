@@ -1442,7 +1442,14 @@ begin
     new.organization_id,new.task_id,
     coalesce(nullif(new.event_label,''),new.event_type),
     coalesce(nullif(new.actor_name,''),v_actor_name,'مستخدم النظام'),
-    jsonb_build_object('event_type',new.event_type,'event_id',new.id,'details',new.details)::text
+    nullif(concat_ws(' | ',
+      case when new.latitude is not null and new.longitude is not null
+        then format('GPS: %s, %s • الدقة %sم',new.latitude,new.longitude,coalesce(new.accuracy_meters::text,'غير محددة'))
+        else null end,
+      nullif(new.details->>'outcome',''),
+      nullif(new.details->>'reason',''),
+      nullif(new.details->>'notes','')
+    ),'')
   );
 
   insert into public.audit_logs(id,organization_id,user_id,user_name,user_role,action,action_type,entity,entity_id,details)
