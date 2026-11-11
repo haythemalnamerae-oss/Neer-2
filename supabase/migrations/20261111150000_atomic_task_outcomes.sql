@@ -96,6 +96,22 @@ declare
   v_chain jsonb;
   v_elapsed integer := 0;
 begin
+  if auth.uid() is null then
+    raise exception using errcode = '28000', message = 'Authentication required';
+  end if;
+  if p_request_id is null or p_organization_id is null or p_task_id is null then
+    raise exception using errcode = '22023', message = 'Organization, task and idempotency key are required';
+  end if;
+  if p_outcome is null or p_outcome not in ('completed','partially_completed','not_completed','unable_to_execute','needs_followup') then
+    raise exception using errcode = '22023', message = 'Unsupported task outcome';
+  end if;
+  if p_outcome <> 'completed' and coalesce(nullif(btrim(p_reason),''),'') = '' then
+    raise exception using errcode = '22023', message = 'A reason is required for an incomplete outcome';
+  end if;
+  if not private.can_access_task(p_organization_id,p_task_id,'edit') then
+    raise exception using errcode = '42501', message = 'Task edit permission required';
+  end if;
+
   if nullif(p_proof_url,'') is not null and not exists (
     select 1
     from public.task_attachments a
@@ -106,22 +122,6 @@ begin
       and a.url=p_proof_url
   ) then
     raise exception using errcode = '22023', message = 'Proof file must be uploaded and attached to this task first';
-  end if;
-
-  if auth.uid() is null then
-    raise exception using errcode = '28000', message = 'Authentication required';
-  end if;
-  if p_request_id is null or p_organization_id is null or p_task_id is null then
-    raise exception using errcode = '22023', message = 'Organization, task and idempotency key are required';
-  end if;
-  if p_outcome not in ('completed','partially_completed','not_completed','unable_to_execute','needs_followup') then
-    raise exception using errcode = '22023', message = 'Unsupported task outcome';
-  end if;
-  if p_outcome <> 'completed' and coalesce(nullif(btrim(p_reason),''),'') = '' then
-    raise exception using errcode = '22023', message = 'A reason is required for an incomplete outcome';
-  end if;
-  if not private.can_access_task(p_organization_id,p_task_id,'edit') then
-    raise exception using errcode = '42501', message = 'Task edit permission required';
   end if;
 
   insert into private.task_outcome_requests(organization_id,request_id,task_id)
