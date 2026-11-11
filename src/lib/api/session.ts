@@ -262,13 +262,9 @@ export async function loadUiSnapshot(session: ApiSession): Promise<void> {
   const followUps = (data['follow-ups'] || []).map((row) => ({ ...fromSnake(row), assignedTo: row.assigned_to, scheduledDate: row.scheduled_date, lastContactDate: row.last_contact_date }));
   const notifications = (data.notifications || []).map(fromSnake);
 
-  const storeData: Record<string, unknown> = {
-    ops_users_v3: users, ops_tasks_v3: tasks, ops_funds_v3: funds, ops_expenses_v3: expenses,
-    ops_settlements_v3: settlements, ops_follow_ups_v3: followUps, ops_notifications_v3: notifications,
-    ops_audit_logs_v3: [], ops_cash_receipts_v3: cashReceipts,
-    ops_standing_accounts_v3: standingAccounts,
-  };
-  for (const [key, value] of Object.entries(storeData)) localStorage.setItem(key, JSON.stringify(value));
+  // The server snapshot replaces in-memory operational state. Do not persist shared
+  // records to localStorage: that cache is not authoritative and can resurrect stale data.
+  const auditLogs = (data['audit-logs'] || []).map(fromSnake);
+  dataStore.hydrateOperationalData({ tasks, followUps, notifications, auditLogs });
   dataStore.hydrateFinanceData({ funds: canReadFinance || canReadFieldFinance ? funds : [], expenses: canReadFinance || canReadFieldFinance ? expenses : [], settlements: canReadFinance ? settlements : [], cashReceipts: canReadFinance ? cashReceipts : [], standingAccounts: canReadFinance || canReadFieldFinance ? standingAccounts : [], users, currentUserId: session.appUserId || currentProfileId });
-  if (session.appUserId) localStorage.setItem('ops_current_user_id_v3', JSON.stringify(session.appUserId));
 }
