@@ -37,7 +37,7 @@ language sql
 stable
 security definer
 set search_path = pg_catalog, public, private
-as $
+as $$
   select exists (
     select 1
     from public.tasks t
@@ -70,7 +70,7 @@ as $
         )
       )
   );
-$;
+$$;
 
 create or replace function private.can_manage_task_assignee(
   target_org uuid,
@@ -82,7 +82,7 @@ language sql
 stable
 security definer
 set search_path = pg_catalog, public, private
-as $
+as $$
   select exists (
     select 1
     from public.organization_members m
@@ -104,7 +104,7 @@ as $
         )
       )
   );
-$;
+$$;
 
 revoke all on function private.can_manage_task_assignee(uuid,text,text) from public, anon;
 grant execute on function private.can_manage_task_assignee(uuid,text,text) to authenticated;
@@ -118,10 +118,10 @@ for select to authenticated
 using (private.can_access_task(organization_id, task_id, 'view'));
 create policy task_assignees_scoped_insert on public.task_assignees
 for insert to authenticated
-with check (private.can_access_task(organization_id, task_id, 'edit'));
+with check (private.can_manage_task_assignee(organization_id, task_id, app_user_id));
 create policy task_assignees_scoped_update on public.task_assignees
 for update to authenticated
-using (private.can_access_task(organization_id, task_id, 'edit'))
+using (private.can_manage_task_assignee(organization_id, task_id, app_user_id))
 with check (private.can_manage_task_assignee(organization_id, task_id, app_user_id));
 create policy task_assignees_scoped_delete on public.task_assignees
 for delete to authenticated
@@ -132,7 +132,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = ''
-as $$
+as $$$
 begin
   if tg_op = 'UPDATE' and old.assignee_id is not distinct from new.assignee_id then
     return new;
