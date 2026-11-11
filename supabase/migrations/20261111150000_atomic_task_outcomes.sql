@@ -1228,6 +1228,7 @@ using (
       and m.auth_user_id=(select auth.uid()) and m.active
       and (m.role<>'field_officer' or follow_ups.assigned_to=m.app_user_id)
   )
+  and (follow_ups.task_id is null or private.can_access_task(follow_ups.organization_id,follow_ups.task_id,'edit'))
 );
 create policy follow_ups_scoped_insert on public.follow_ups
 for insert to authenticated
@@ -1238,6 +1239,7 @@ with check (
       and m.auth_user_id=(select auth.uid()) and m.active
       and (m.role<>'field_officer' or follow_ups.assigned_to=m.app_user_id)
   )
+  and (follow_ups.task_id is null or private.can_access_task(follow_ups.organization_id,follow_ups.task_id,'edit'))
 );
 create policy follow_ups_scoped_update on public.follow_ups
 for update to authenticated
@@ -1256,6 +1258,7 @@ with check (
       and m.auth_user_id=(select auth.uid()) and m.active
       and (m.role<>'field_officer' or follow_ups.assigned_to=m.app_user_id)
   )
+  and (follow_ups.task_id is null or private.can_access_task(follow_ups.organization_id,follow_ups.task_id,'edit'))
 );
 create policy follow_ups_scoped_delete on public.follow_ups
 for delete to authenticated
@@ -1266,6 +1269,7 @@ using (
       and m.auth_user_id=(select auth.uid()) and m.active
       and (m.role<>'field_officer' or follow_ups.assigned_to=m.app_user_id)
   )
+  and (follow_ups.task_id is null or private.can_access_task(follow_ups.organization_id,follow_ups.task_id,'edit'))
 );
 
 drop policy if exists org_member_access on public.notifications;
