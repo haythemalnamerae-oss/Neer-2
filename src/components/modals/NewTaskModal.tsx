@@ -146,9 +146,7 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
     try {
       await createTaskBundle({
       title,
-      description: additionalAssigneesNames.length > 0 
-        ? `${description}\n[فريق العمل المشارك: ${additionalAssigneesNames.join('، ')}]`
-        : description,
+      description,
       priority,
       status: 'scheduled',
       taskTypeCategory,
@@ -176,7 +174,6 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
         category,
         location ? location.split('-')[0].trim() : 'إداري',
         ...(isSubTask ? ['مهمة فرعية'] : []),
-        ...additionalAssigneesNames,
       ],
       checklist: checklistItems,
       steps: initialSteps,
@@ -185,7 +182,7 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
       taskFundSpent: 0,
       taskFundRemaining: numFundAmount > 0 ? numFundAmount : undefined,
       parentTaskId: isSubTask && parentTaskId ? parentTaskId : undefined,
-      }, { requiresApproval });
+      }, { requiresApproval, assigneeIds });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'تعذر إنشاء المهمة. حاول مرة أخرى.';
       if (error instanceof TaskSavedRefreshError) {
