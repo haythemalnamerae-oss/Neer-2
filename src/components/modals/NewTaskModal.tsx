@@ -40,7 +40,6 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
   const [budget, setBudget] = useState('2000');
   const [fundId, setFundId] = useState('');
   const [taskFundAmount, setTaskFundAmount] = useState('');
-  const [secondaryFundId, setSecondaryFundId] = useState('');
   const [isSubTask, setIsSubTask] = useState(false);
   const [parentTaskId, setParentTaskId] = useState('');
   const [requiresApproval, setRequiresApproval] = useState(true);
@@ -99,7 +98,11 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
       return;
     }
 
-    const primaryAssigneeId = assigneeIds[0] || users[0].id;
+    if (users.length === 0) {
+      alert('لا يوجد مستخدمون نشطون لتكليف المهمة. أضف مستخدمًا أولاً.');
+      return;
+    }
+    const primaryAssigneeId = assigneeIds.find((id) => users.some((u) => u.id === id)) || users[0].id;
     const assignedUser = users.find((u) => u.id === primaryAssigneeId) || users[0];
     const supervisorUsers = users.filter((u) => supervisorIds.includes(u.id));
 
@@ -125,42 +128,17 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
       .filter((u) => assigneeIds.slice(1).includes(u.id))
       .map((u) => u.name);
 
-    const numFundAmount = parseFloat(taskFundAmount) || 0;
+    const numFundAmount = Number(taskFundAmount) || 0;
     const selectedFund = funds.find((f) => f.id === fundId);
-    let effectiveFundId = fundId || undefined;
-
-    // Handle multi-fund depletion split if fund amount exceeds primary fund balance
-    if (selectedFund && numFundAmount > 0) {
-      if (numFundAmount > selectedFund.currentBalance && secondaryFundId) {
-        const secondaryFund = funds.find((f) => f.id === secondaryFundId);
-        const avail1 = selectedFund.currentBalance;
-        const neededFromSecondary = numFundAmount - avail1;
-
-        // Deduct full balance of fund 1
-        dataStore.updateFund(selectedFund.id, {
-          currentBalance: 0,
-          spentBalance: selectedFund.spentBalance + avail1,
-          status: 'depleted',
-        });
-
-        // Deduct remainder from fund 2
-        if (secondaryFund) {
-          const newBal2 = Math.max(0, secondaryFund.currentBalance - neededFromSecondary);
-          dataStore.updateFund(secondaryFund.id, {
-            currentBalance: newBal2,
-            spentBalance: secondaryFund.spentBalance + neededFromSecondary,
-            status: newBal2 <= 0 ? 'depleted' : (newBal2 / secondaryFund.totalAllocation) * 100 <= secondaryFund.warningThreshold ? 'warning' : 'active',
-          });
-        }
-      } else if (numFundAmount <= selectedFund.currentBalance) {
-        const newBal = selectedFund.currentBalance - numFundAmount;
-        dataStore.updateFund(selectedFund.id, {
-          currentBalance: newBal,
-          spentBalance: selectedFund.spentBalance + numFundAmount,
-          status: newBal <= 0 ? 'depleted' : (newBal / selectedFund.totalAllocation) * 100 <= selectedFund.warningThreshold ? 'warning' : 'active',
-        });
-      }
+    if (!Number.isFinite(numFundAmount) || numFundAmount < 0) {
+      alert('قيمة المبلغ المخصص للمهمة غير صحيحة.');
+      return;
     }
+    if (numFundAmount > 0 && !selectedFund) {
+      alert('اختر العهدة المرتبطة قبل تحديد مبلغ مخصص للمهمة.');
+      return;
+    }
+    const effectiveFundId = selectedFund?.id;
 
     const createdTask = dataStore.addTask({
       title,
@@ -228,7 +206,6 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
     setStandingAccountId('');
     setProofRequired('');
     setTaskFundAmount('');
-    setSecondaryFundId('');
     setIsSubTask(false);
     setParentTaskId('');
   };
@@ -558,15 +535,15 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
           />
           <Input
             type="number"
-            label="المبلغ المسحوب من العهدة للمهمة (اختياري)"
+            label="المبلغ المخصص للمهمة (اختياري)"
             placeholder="0"
             value={taskFundAmount}
             onChange={(e) => setTaskFundAmount(e.target.value)}
           />
         </div>
 
-        {/* Fund Allocation & Multi-Fund Depletion */}
-        <div className="space-y-3">
+        {/* Assigning a task budget must never post a cash transaction. */}
+        <div className="space-y-2">
           <div className="space-y-1.5">
             <label className="block text-xs font-bold text-slate-700">العهدة النقدية المرتبطة (اختياري)</label>
             <select
@@ -582,38 +559,9 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
               ))}
             </select>
           </div>
-
-          {/* Cascade warning and second fund choice if fund amount > primary balance */}
-          {fundId && parseFloat(taskFundAmount) > 0 && (() => {
-            const f1 = funds.find((f) => f.id === fundId);
-            const req = parseFloat(taskFundAmount);
-            if (f1 && req > f1.currentBalance) {
-              const shortage = req - f1.currentBalance;
-              return (
-                <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-2">
-                  <div className="font-bold flex items-center gap-1.5">
-                    <span>⚠️ رصيد {f1.name} الحالي هو {f1.currentBalance} {f1.currency} فقط (المبلغ المطلوب: {req} {f1.currency})</span>
-                  </div>
-                  <p className="text-[11px] text-amber-800">
-                    سيتم استهلاك رصيد {f1.name} كاملاً (يصبح رصيدها 0). يرجى اختيار عهدة ثانية لتغطية المتبقي ({shortage} {f1.currency}):
-                  </p>
-                  <select
-                    value={secondaryFundId}
-                    onChange={(e) => setSecondaryFundId(e.target.value)}
-                    className="w-full bg-white border border-amber-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800"
-                  >
-                    <option value="">اختر العهدة الثانوية البديلة...</option>
-                    {funds.filter((f) => f.id !== fundId).map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.name} (المتاح: {f.currentBalance} {f.currency})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              );
-            }
-            return null;
-          })()}
+          <p className="rounded-xl border border-sky-100 bg-sky-50 px-3 py-2 text-[11px] leading-5 text-sky-900">
+            ربط العهدة وتحديد مبلغ المهمة لا يخصمان من الرصيد. يُسجّل الصرف الفعلي من شاشة المصروفات، ولا يتغير رصيد العهدة إلا عبر الاعتماد المالي.
+          </p>
         </div>
 
         <div className="space-y-1.5">
