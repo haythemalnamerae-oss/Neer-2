@@ -861,6 +861,21 @@ begin
   end if;
 
   if (
+    new.spent_amount is distinct from old.spent_amount
+    or new.task_fund_spent is distinct from old.task_fund_spent
+    or new.task_fund_remaining is distinct from old.task_fund_remaining
+  ) and not private.has_org_role(old.organization_id,array['admin','ops_manager','finance_officer']) then
+    raise exception using errcode = '42501', message = 'Task spending totals are controlled by finance workflows';
+  end if;
+
+  if (
+    new.fund_id is distinct from old.fund_id
+    or new.task_fund_amount is distinct from old.task_fund_amount
+  ) and not private.has_org_role(old.organization_id,array['admin','ops_manager']) then
+    raise exception using errcode = '42501', message = 'Task fund allocation requires management permission';
+  end if;
+
+  if (
     new.status is distinct from old.status
     or new.outcome is distinct from old.outcome
     or new.outcome_reason is distinct from old.outcome_reason
