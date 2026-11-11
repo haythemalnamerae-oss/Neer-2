@@ -30,7 +30,7 @@ import {
 import { Task, TaskStatus, TaskStepStatus } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
 import {
-  addTaskDailyUpdate, addTaskSubtask, deleteTaskAttachmentOnServer,
+  addTaskComment, addTaskDailyUpdate, addTaskSubtask, deleteTaskAttachmentOnServer,
   getTaskAttachmentSignedUrl, refreshTaskSnapshot, setChecklistItem,
   setTaskStepStatus, updateTaskLifecycle, updateTaskSubtaskStatus, uploadTaskAttachment,
 } from '../../services/tasks.api';
@@ -56,10 +56,12 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   onViewChain,
   onAddExpense,
 }) => {
-  const [activeTab, setActiveTab] = useState<'details' | 'steps' | 'subtasks' | 'daily_updates' | 'checklist' | 'attachments' | 'history'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'steps' | 'subtasks' | 'daily_updates' | 'checklist' | 'attachments' | 'comments' | 'history'>('details');
   const [isPausePromptOpen, setIsPausePromptOpen] = useState(false);
   const [pauseReasonInput, setPauseReasonInput] = useState('');
   const [dailyNoteInput, setDailyNoteInput] = useState('');
+  const [commentInput, setCommentInput] = useState('');
+  const [isInternalComment, setIsInternalComment] = useState(false);
   const [newSubTaskTitle, setNewSubTaskTitle] = useState('');
   const [newSubTaskAssignee, setNewSubTaskAssignee] = useState('');
   const [stepNoteInputs, setStepNoteInputs] = useState<Record<string, string>>({});
@@ -248,6 +250,23 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
       await setChecklistItem(task.id, itemId, !item.completed);
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'تعذر تحديث بند الفحص.');
+    }
+  };
+
+  const handleAddComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!commentInput.trim()) return;
+    try {
+      await addTaskComment(task.id, commentInput.trim(), {
+        id: currentUser.id,
+        name: currentUser.name,
+        avatar: currentUser.avatar,
+        role: currentUser.roleTitleAr || currentUser.role,
+      }, [], isInternalComment);
+      setCommentInput('');
+      setIsInternalComment(false);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'تعذر حفظ التعليق.');
     }
   };
 
@@ -550,6 +569,15 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
             <span>المستندات والفواتير ({task.attachments ? task.attachments.length : 0})</span>
           </button>
 
+          <button
+            onClick={() => setActiveTab('comments')}
+            className={`py-2 px-3.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'comments' ? 'neu-raised text-emerald-800 font-black' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4" />
+            <span>المناقشات ({task.comments?.length || 0})</span>
+          </button>
           <button
             onClick={() => setActiveTab('history')}
             className={`py-2 px-3.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
@@ -1123,7 +1151,47 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
             </div>
           )}
 
-          {/* TAB 7: History */}
+          {/* TAB 7: Comments */}
+          {activeTab === 'comments' && (
+            <div className="space-y-4">
+              <div className="space-y-3">
+                {(task.comments || []).length > 0 ? task.comments!.map((comment) => (
+                  <div key={comment.id} className="neu-raised rounded-2xl p-4 space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <strong className="text-xs sm:text-sm text-slate-800">{comment.authorName}</strong>
+                      <span className="text-[10px] text-slate-500">{comment.createdAt ? new Date(comment.createdAt).toLocaleString('ar') : ''}</span>
+                    </div>
+                    {comment.isInternal && <Badge variant="warning" size="sm">داخلي للإدارة</Badge>}
+                    <p className="text-xs sm:text-sm text-slate-700 whitespace-pre-wrap">{comment.text}</p>
+                  </div>
+                )) : (
+                  <div className="neu-inset-sm rounded-2xl p-5 text-center text-xs text-slate-500">لا توجد مناقشات مسجلة لهذه المهمة.</div>
+                )}
+              </div>
+              <form onSubmit={handleAddComment} className="neu-inset-sm rounded-2xl p-4 space-y-3">
+                <label className="block text-xs font-extrabold text-slate-700">إضافة تعليق أو تحديث للفريق</label>
+                <textarea
+                  rows={3}
+                  value={commentInput}
+                  onChange={(e) => setCommentInput(e.target.value)}
+                  placeholder="اكتب ملاحظة أو استفساراً مرتبطاً بالمهمة..."
+                  className="w-full neu-inset rounded-xl p-3 text-xs sm:text-sm text-slate-800"
+                  required
+                />
+                {(currentUser.role === 'admin' || currentUser.role === 'ops_manager') && (
+                  <label className="flex items-center gap-2 text-xs text-slate-700">
+                    <input type="checkbox" checked={isInternalComment} onChange={(e) => setIsInternalComment(e.target.checked)} />
+                    تعليق داخلي للإدارة فقط
+                  </label>
+                )}
+                <div className="flex justify-end">
+                  <Button type="submit" variant="primary" size="sm" disabled={!commentInput.trim()}>إرسال التعليق</Button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* TAB 8: History */}
           {activeTab === 'history' && (
             <div className="space-y-3">
               <div className="border-r-2 border-emerald-800/20 pr-4 mr-2 space-y-4">
