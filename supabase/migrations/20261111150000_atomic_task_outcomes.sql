@@ -510,11 +510,13 @@ begin
   );
 
   insert into public.notifications(id,organization_id,user_id,title,message,type,is_read,target_view)
-  values(
-    'notif-task-'||v_task_id,p_organization_id,p_task->>'assigneeId',
+  select 'notif-task-'||v_task_id||'-'||ta.app_user_id,
+    p_organization_id,ta.app_user_id,
     'تكليف مهمة جديدة','تم تكليفك بالمهمة: '||trim(p_task->>'title'),
     'info',false,'tasks'
-  );
+  from public.task_assignees ta
+  where ta.organization_id=p_organization_id and ta.task_id=v_task_id
+  on conflict (id) do nothing;
 
   return jsonb_build_object('task',to_jsonb(v_task),'checklist_count',
     jsonb_array_length(coalesce(p_checklist,'[]'::jsonb)),
