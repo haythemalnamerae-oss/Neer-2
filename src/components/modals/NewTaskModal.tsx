@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { createTaskBundle } from '../../services/tasks.api';
+import { createTaskBundle, TaskSavedRefreshError } from '../../services/tasks.api';
 import { dataStore } from '../../lib/storage';
 import { TaskPriority, TaskTypeClassification, TaskStep } from '../../types/domain';
 import { Modal } from '../ui/modal';
@@ -188,6 +188,19 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
       }, { requiresApproval });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'تعذر إنشاء المهمة. حاول مرة أخرى.';
+      if (error instanceof TaskSavedRefreshError) {
+        setTitle('');
+        setDescription('');
+        setLocation('');
+        setClientName('');
+        setClientPhone('');
+        setStandingAccountId('');
+        setProofRequired('');
+        setTaskFundAmount('');
+        setIsSubTask(false);
+        setParentTaskId('');
+        onClose();
+      }
       alert(message);
       return;
     } finally {
