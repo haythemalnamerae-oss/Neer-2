@@ -100,40 +100,94 @@ using (private.can_access_task(organization_id, id, 'delete'));
 
 -- Child records inherit the access of their parent task.
 drop policy if exists org_member_access on public.task_checklist_items;
-create policy task_checklist_scoped_access on public.task_checklist_items
-for all to authenticated
-using (private.can_access_task(organization_id, task_id, 'edit'))
+create policy taskChecklistItems_scoped_select on public.task_checklist_items
+for select to authenticated
+using (private.can_access_task(organization_id, task_id, 'view'));
+create policy taskChecklistItems_scoped_insert on public.task_checklist_items
+for insert to authenticated
 with check (private.can_access_task(organization_id, task_id, 'edit') or private.can_access_task(organization_id, task_id, 'create'));
+create policy taskChecklistItems_scoped_update on public.task_checklist_items
+for update to authenticated
+using (private.can_access_task(organization_id, task_id, 'edit'))
+with check (private.can_access_task(organization_id, task_id, 'edit'));
+create policy taskChecklistItems_scoped_delete on public.task_checklist_items
+for delete to authenticated
+using (private.can_access_task(organization_id, task_id, 'delete'));
 
 drop policy if exists org_member_access on public.task_steps;
-create policy task_steps_scoped_access on public.task_steps
-for all to authenticated
-using (private.can_access_task(organization_id, task_id, 'edit'))
+create policy taskSteps_scoped_select on public.task_steps
+for select to authenticated
+using (private.can_access_task(organization_id, task_id, 'view'));
+create policy taskSteps_scoped_insert on public.task_steps
+for insert to authenticated
 with check (private.can_access_task(organization_id, task_id, 'edit') or private.can_access_task(organization_id, task_id, 'create'));
+create policy taskSteps_scoped_update on public.task_steps
+for update to authenticated
+using (private.can_access_task(organization_id, task_id, 'edit'))
+with check (private.can_access_task(organization_id, task_id, 'edit'));
+create policy taskSteps_scoped_delete on public.task_steps
+for delete to authenticated
+using (private.can_access_task(organization_id, task_id, 'delete'));
 
 drop policy if exists org_member_access on public.task_subtasks;
-create policy task_subtasks_scoped_access on public.task_subtasks
-for all to authenticated
-using (private.can_access_task(organization_id, task_id, 'edit'))
+create policy taskSubtasks_scoped_select on public.task_subtasks
+for select to authenticated
+using (private.can_access_task(organization_id, task_id, 'view'));
+create policy taskSubtasks_scoped_insert on public.task_subtasks
+for insert to authenticated
 with check (private.can_access_task(organization_id, task_id, 'edit') or private.can_access_task(organization_id, task_id, 'create'));
+create policy taskSubtasks_scoped_update on public.task_subtasks
+for update to authenticated
+using (private.can_access_task(organization_id, task_id, 'edit'))
+with check (private.can_access_task(organization_id, task_id, 'edit'));
+create policy taskSubtasks_scoped_delete on public.task_subtasks
+for delete to authenticated
+using (private.can_access_task(organization_id, task_id, 'delete'));
 
 drop policy if exists org_member_access on public.task_daily_updates;
-create policy task_daily_updates_scoped_access on public.task_daily_updates
-for all to authenticated
-using (private.can_access_task(organization_id, task_id, 'edit'))
+create policy taskDailyUpdates_scoped_select on public.task_daily_updates
+for select to authenticated
+using (private.can_access_task(organization_id, task_id, 'view'));
+create policy taskDailyUpdates_scoped_insert on public.task_daily_updates
+for insert to authenticated
 with check (private.can_access_task(organization_id, task_id, 'edit') or private.can_access_task(organization_id, task_id, 'create'));
+create policy taskDailyUpdates_scoped_update on public.task_daily_updates
+for update to authenticated
+using (private.can_access_task(organization_id, task_id, 'edit'))
+with check (private.can_access_task(organization_id, task_id, 'edit'));
+create policy taskDailyUpdates_scoped_delete on public.task_daily_updates
+for delete to authenticated
+using (private.can_access_task(organization_id, task_id, 'delete'));
 
 drop policy if exists org_member_access on public.task_attachments;
-create policy task_attachments_scoped_access on public.task_attachments
-for all to authenticated
-using (private.can_access_task(organization_id, task_id, 'edit'))
+create policy taskAttachments_scoped_select on public.task_attachments
+for select to authenticated
+using (private.can_access_task(organization_id, task_id, 'view'));
+create policy taskAttachments_scoped_insert on public.task_attachments
+for insert to authenticated
 with check (private.can_access_task(organization_id, task_id, 'edit') or private.can_access_task(organization_id, task_id, 'create'));
+create policy taskAttachments_scoped_update on public.task_attachments
+for update to authenticated
+using (private.can_access_task(organization_id, task_id, 'edit'))
+with check (private.can_access_task(organization_id, task_id, 'edit'));
+create policy taskAttachments_scoped_delete on public.task_attachments
+for delete to authenticated
+using (private.can_access_task(organization_id, task_id, 'delete'));
 
 drop policy if exists org_member_access on public.task_comments;
-create policy task_comments_scoped_access on public.task_comments
-for all to authenticated
-using (private.can_access_task(organization_id, task_id, 'edit'))
+create policy taskComments_scoped_select on public.task_comments
+for select to authenticated
+using (private.can_access_task(organization_id, task_id, 'view'));
+create policy taskComments_scoped_insert on public.task_comments
+for insert to authenticated
 with check (private.can_access_task(organization_id, task_id, 'edit') or private.can_access_task(organization_id, task_id, 'create'));
+create policy taskComments_scoped_update on public.task_comments
+for update to authenticated
+using (private.can_access_task(organization_id, task_id, 'edit'))
+with check (private.can_access_task(organization_id, task_id, 'edit'));
+create policy taskComments_scoped_delete on public.task_comments
+for delete to authenticated
+using (private.can_access_task(organization_id, task_id, 'delete'));
 
 -- History is append-only to authenticated clients; task updates are represented by new rows.
 drop policy if exists org_member_access on public.task_history;
