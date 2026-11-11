@@ -906,7 +906,7 @@ begin
     raise exception using errcode = '42501', message = 'Task parent link is immutable after creation';
   end if;
 
-  if v_transition <> 'outcome' and (
+  if coalesce(v_transition,'') <> 'outcome' and (
     new.task_chain is distinct from old.task_chain
     or new.chain_follow_up_task_id is distinct from old.chain_follow_up_task_id
   ) then
