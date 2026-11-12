@@ -46,6 +46,16 @@ export const TasksView: React.FC<TasksViewProps> = ({
     return () => { active = false; };
   }, []);
 
+  const refreshTaskRequests = async () => {
+    setRequestError('');
+    try {
+      const rows = await listTaskRequests();
+      setTaskRequests(rows.filter((row) => ['submitted','changes_requested'].includes(row.status)));
+    } catch (error) {
+      setRequestError(error instanceof Error ? error.message : 'تعذر تحديث طلبات المهام.');
+    }
+  };
+
   const handleRequestResubmit = async (request: TaskRequestRecord) => {
     const title = window.prompt('تعديل عنوان الطلب:', String(request.payload.title || ''));
     if (!title?.trim()) return;
@@ -158,6 +168,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
           <div className="flex items-center justify-between gap-3">
             <h3 className="font-black text-sm text-[#142B1D]">طلبات إنشاء المهام</h3>
             <span className="text-xs font-bold text-slate-500">{taskRequests.length} طلبات بانتظار المراجعة</span>
+            <Button size="sm" variant="outline" onClick={() => void refreshTaskRequests()}>تحديث الطلبات</Button>
           </div>
           {requestError && <p className="text-xs text-rose-700">{requestError}</p>}
           {taskRequests.length === 0 ? <p className="text-xs text-slate-500">لا توجد طلبات ظاهرة لهذا الحساب.</p> :
