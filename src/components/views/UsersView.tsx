@@ -26,7 +26,7 @@ export const UsersView: React.FC = () => {
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-[#142B1D] font-serif-display">سجل المستخدمين وأذونات الوصول</h2>
           <p className="text-xs sm:text-sm text-[#4E6C5B] mt-1 font-medium">
-            إضافة وتعديل بيانات مستخدمي النظام وتعيين الأدوار الوظيفية
+            عرض ملفات المستخدمين والأدوار المرتبطة بعضويات Supabase الفعلية
           </p>
         </div>
 
