@@ -1878,8 +1878,13 @@ export class OpsDataStore {
     users?: User[];
     currentUserId?: string;
   }): void {
-    if (data.users) { this.users = data.users; safeSet(STORAGE_KEYS.USERS, this.users); }
-    if (data.currentUserId) { this.currentUserId = data.currentUserId; safeSet(STORAGE_KEYS.CURRENT_USER_ID, this.currentUserId); }
+    if (data.users) this.users = data.users;
+    if (data.currentUserId) this.currentUserId = data.currentUserId;
+    // Server identity is session-scoped. Never persist another account's
+    // directory or active profile into shared browser storage.
+    [STORAGE_KEYS.USERS, STORAGE_KEYS.CURRENT_USER_ID].forEach((key) => {
+      try { localStorage.removeItem(key); } catch { /* storage may be unavailable */ }
+    });
     this.funds = data.funds;
     this.expenses = data.expenses;
     this.settlements = data.settlements;
