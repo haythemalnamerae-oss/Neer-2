@@ -193,10 +193,13 @@ export async function loadUiSnapshot(session: ApiSession): Promise<void> {
   const canReadFieldFinance = session.role === 'field_officer';
   const canReadAudit = session.role === 'admin' || session.role === 'ops_manager' || session.role === 'finance_officer';
   const financeCollections = canReadFinance ? finance : canReadFieldFinance ? ['funds','expenses','standing-accounts'] : [];
-  const settingsCollections = session.role === 'admin' ? ['settings'] : [];
-  const collections = [...common, ...financeCollections, ...settingsCollections, ...(canReadUserDirectory ? ['users'] : []), ...(canReadAudit ? ['audit-logs'] : [])];
+  const canReadSettings = session.role === 'admin' || permissionState.grants?.['settings.view'] === true;
+  const collections = [...common, ...financeCollections, ...(canReadUserDirectory ? ['users'] : []), ...(canReadAudit ? ['audit-logs'] : [])];
   const values = await Promise.all(collections.map(async (name) => [name, await apiRequest<Record<string, any>[]>(session, `/${name}?limit=500`)] as const));
   const data = Object.fromEntries(values);
+  const settingsPayload = canReadSettings
+    ? await apiRequest<{ settings: Record<string, unknown> }>(session, '/settings/me')
+    : null;
 
   const users = (data.users || []).map(asDomainUser);
   const userNamesById = new Map(users.map((user) => [user.id, user.name]));
@@ -287,9 +290,8 @@ export async function loadUiSnapshot(session: ApiSession): Promise<void> {
   // records to localStorage: that cache is not authoritative and can resurrect stale data.
   const auditLogs = (data['audit-logs'] || []).map(fromSnake);
   dataStore.hydrateOperationalData({ tasks, followUps, notifications, auditLogs });
-  const savedSettings = (data.settings || [])[0]?.settings;
-  if (session.role === 'admin' && savedSettings && typeof savedSettings === 'object' && !Array.isArray(savedSettings)) {
-    dataStore.hydrateSettings(savedSettings);
+  if (settingsPayload?.settings && typeof settingsPayload.settings === 'object' && !Array.isArray(settingsPayload.settings)) {
+    dataStore.hydrateSettings(settingsPayload.settings);
   }
   dataStore.hydrateFinanceData({ funds: canReadFinance || canReadFieldFinance ? funds : [], expenses: canReadFinance || canReadFieldFinance ? expenses : [], settlements: canReadFinance ? settlements : [], cashReceipts: canReadFinance ? cashReceipts : [], standingAccounts: canReadFinance || canReadFieldFinance ? standingAccounts : [], users, currentUserId: session.appUserId || currentProfileId });
 }
