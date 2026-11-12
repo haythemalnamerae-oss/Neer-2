@@ -64,7 +64,7 @@
 | NewFundModal | `FinanceApiService.createFund` → `finance_create_fund` |
 | NewSettlementModal | `SettlementsService.create` → `FinanceApiService.createSettlement` → `finance_create_settlement` |
 | NewStandingAccountModal | `FinanceApiService.createStandingAccount` → `finance_create_standing_account` |
-| TaskDetailsModal | بدء/إيقاف/استئناف، الخطوات، checklist، subtask، daily update، comments، attachments؛ أغلبها عبر tasks.api وRPC/REST |
+| TaskDetailsModal | بدء/إيقاف/استئناف، الخطوات، checklist، subtask، daily update، comments، attachments، واعتماد/إعادة نتيجة المهمة عند `pending_approval`؛ أغلبها عبر tasks.api وRPC/REST |
 | StandingAccountDetailsModal | charge وsettlement عبر finance RPC |
 | TaskChainModal | عرض سلسلة المهام والتنقل بينها؛ لا يملك مسار كتابة مستقلًا |
 
@@ -93,6 +93,7 @@
 
 ملاحظات:
 - `TaskOutcomeModal` يحتفظ بمعرّف طلب النتيجة في حالة النموذج لتكرار المحاولة بنفس request ID.
+- `TaskDetailsModal` يعرض مراجعة الإنجاز فقط عند `pending_approval`، ويخفي بدء التنفيذ/إنهاء المهمة أثناء انتظار المراجعة. زر الاعتماد/الإعادة يتطلب `tasks.approve` ويمنع المنشئ من مراجعة نتيجته في الواجهة، مع إعادة التحقق الحاسمة داخل `review_task_approval`.
 - تسجيل نتيجة المهمة عملية ذرية في قاعدة البيانات، لكن رفع الإثبات يحدث قبل RPC النتيجة؛ إذا فشل تسجيل النتيجة قد يبقى ملف مرفوع غير مرتبط.
 - إضافة subtask ثم تسجيل حدث الموقع عمليتان منفصلتان؛ فشل الحدث لا يلغي subtask الذي حُفظ.
 - حذف metadata للمرفق يسبق حذف كائن Storage؛ فشل حذف الكائن بعد حذف metadata قد يترك كائنًا يتيمًا.
