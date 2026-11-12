@@ -168,8 +168,7 @@ export async function updateTaskLifecycle(taskId: string, action: 'start' | 'pau
     method: 'POST',
     body: JSON.stringify({ taskId, action, reason: reason || null }),
   });
-  try { await refreshAfterMutation(session); }
-  catch (error) { console.error('Task lifecycle saved but the view refresh failed:', error); }
+  await refreshAfterMutation(session);
 }
 
 export async function refreshTaskSnapshot(): Promise<void> {
@@ -193,8 +192,7 @@ export async function cancelTaskOnServer(taskId: string, reason = 'تم إلغا
     method: 'POST',
     body: JSON.stringify({ taskId, reason }),
   });
-  try { await refreshAfterMutation(session); }
-  catch (error) { console.error('Task cancellation saved but the view refresh failed:', error); }
+  await refreshAfterMutation(session);
 }
 
 export async function setChecklistItem(taskId: string, itemId: string, completed: boolean): Promise<void> {
