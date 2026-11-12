@@ -187,7 +187,7 @@ app.get('/api/v1/reports/summary', async (req, res) => {
       const settingsResponse = await supabaseFetch('/rest/v1/rpc/get_organization_settings', auth.token, {
         method: 'POST', body: JSON.stringify({ p_organization_id: auth.organizationId }),
       });
-      let currency = 'YER';
+      let currency = String(funds[0]?.currency || 'YER');
       if (settingsResponse.ok) {
         const settings = await settingsResponse.json() as Record<string, any>;
         currency = String(settings.currency || settings.general?.currency || currency);
