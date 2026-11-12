@@ -45,3 +45,28 @@ The database/API currently uses five role keys: `admin`, `ops_manager`, `finance
 ## Not yet proven
 
 No authenticated-user integration tests were run for cross-tenant reads/writes, unauthorized approvals, role escalation, storage path traversal, or direct RPC invocation. Static policy presence is not a substitute for those tests. No security control was weakened during this audit.
+
+
+## Follow-up security findings (2026-11-12)
+
+### Verified controls and bounded negative tests
+
+- All 28 public tables have RLS enabled and policies; 73 policies were enumerated with full USING/WITH CHECK expressions. The private helper functions for membership, role and task access check active organization membership, auth.uid(), role grants and task scope.
+- Table grants are not uniformly least-privilege: authenticated has SQL privileges on several tables where RLS currently denies writes by policy. This is not itself a bypass, but the security guarantee depends on preserving every policy and its helper.
+- The task-attachments bucket is private, capped at 10 MiB, and restricts JPEG/PNG/WebP/GIF/PDF. Three storage policies bind object paths to organization/task access.
+- A transaction-scoped non-member exercise was denied by finance creation and task lifecycle RPC authorization. The test transaction was rolled back; no production row was retained.
+- Security Advisor still reports 18 authenticated-callable SECURITY DEFINER functions and leaked-password protection disabled. Each privileged RPC remains a code-level trust boundary.
+
+### High-risk issues to remediate in a controlled migration
+
+1. audit_logs has an INSERT policy whose check is only private.is_org_member(organization_id). The policy design permits any authenticated organization member to attempt direct audit-event insertion. A targeted transaction test did not produce a successful forged insert, so exploitability was not established; nevertheless, the policy is broader than a trusted audit-writer model and should be narrowed to server-owned audit paths.
+2. finance_create_standing_entry accepts charge, payment, advance, and collection, but its body only appends a standing-account entry; it does not create the corresponding fund transaction or cash receipt for payment/advance/collection. Restrict the generic endpoint to charge entries or route cash-affecting types through fully atomic settlement workflows.
+3. finance_cover_deficit decreases funds.cash_box_balance and appends a negative fund_transactions.balance_delta, but does not change funds.current_balance. This can make the current-balance/transaction-ledger equation diverge after the first deficit-coverage operation. No rows exist to reproduce the mismatch today.
+4. Expense review does not visibly enforce submitter/approver separation. finance_review_expense allows an authorized finance member to approve a pending expense without checking that the reviewer differs from the submitter. Add maker-checker enforcement if required by the control policy.
+5. Several finance RPC audit records hard-code user_role (for example, fund creation logs admin; expense/settlement records log finance_officer) instead of deriving the actual membership role. Other finance RPCs (cash receipt, replenishment, standing-account create/entry, deficit coverage) do not write a corresponding audit log in their function body.
+6. Finance idempotency keys are generated anew by the browser for each call. A retry after an ambiguous network outcome can therefore become a new operation rather than replaying the original key. Keep a request key stable across retries and bind it to the operation payload.
+7. system_settings is empty and the Settings UI is local-only; server-side finance functions use database defaults. This creates policy drift between what the UI displays and what the server enforces.
+8. Role permission editing is persisted through the API, but most view visibility checks use the hard-coded ROLE_PERMISSIONS map. A saved DB grant change is not necessarily reflected by the client-side permission map.
+9. The main-only branch guard has contents: write and can delete non-reserved branches on its trigger conditions. It was not executed.
+
+Do not change these controls piecemeal without a migration that preserves legitimate UI/API contracts, adds rollback, and includes non-production negative tests.
