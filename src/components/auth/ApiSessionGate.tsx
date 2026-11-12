@@ -36,8 +36,21 @@ export const ApiSessionGate: React.FC<{ children: React.ReactNode }> = ({ childr
     } finally { setBusy(false); }
   };
 
-  // Keep the local demo experience available when Supabase is not configured.
-  // Authenticated API access remains disabled until both public variables exist.
+  // Never expose mock/demo records in a production deployment.
+  // Local demo mode is restricted to development builds only.
+  if (!hasSupabaseConfig && import.meta.env.PROD) {
+    return (
+      <main dir="rtl" className="min-h-screen bg-[#E5EBE7] px-4 py-10 flex items-center justify-center font-['Almarai',sans-serif]">
+        <section className="w-full max-w-md rounded-3xl bg-[#F4F7F5] p-7 shadow-xl border border-white/60 text-center">
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-700 text-2xl font-black text-white">!</div>
+          <h1 className="text-2xl font-black text-slate-900">الاتصال بقاعدة البيانات غير مُعدّ</h1>
+          <p role="alert" className="mt-3 rounded-xl bg-rose-50 p-3 text-sm leading-6 text-rose-800">
+            تم إيقاف وضع البيانات التجريبية في نسخة الإنتاج لحماية بيانات المؤسسة. أضف VITE_SUPABASE_URL وVITE_SUPABASE_ANON_KEY إلى إعدادات النشر ثم أعد البناء.
+          </p>
+        </section>
+      </main>
+    );
+  }
   if (!hasSupabaseConfig) return <>{children}</>;
   if (session && ready && !error) return <>{children}</>;
 
