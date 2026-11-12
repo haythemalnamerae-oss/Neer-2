@@ -3,7 +3,7 @@
 **Audit date:** 2026-11-12  
 **Supabase project:** `xtfuvxomfhlfjtpljofh` (Neer2 linked project)  
 **Database:** PostgreSQL 17.11, project status `ACTIVE_HEALTHY`  
-**Method:** baseline catalog and read-only SQL inspection before the five additive migrations documented below; no financial/business DML was executed during the subsequent fixes.
+**Method:** baseline catalog and read-only SQL inspection before the subsequent additive migrations documented below; no financial/business DML was executed during the subsequent fixes.
 
 ## Schema inventory
 
@@ -68,5 +68,5 @@ The finance tables were empty: 0 funds, 0 fund transactions, 0 expenses, 0 recei
 - Read-only anomaly queries returned zero negative fund balances, orphaned finance references, invalid amount/tax totals, duplicate active vendor invoices, settlement-link mismatches, closed settlements with unsettled expenses, rejected settlements retaining links, or current-balance/ledger differences. These checks are vacuous over empty operational tables.
 - No DB CHECK constraint enforces expenses.total_with_tax = amount + tax_amount; the current creation RPC computes it server-side. funds.holder_id also lacks a composite FK to an active app user; the fund-creation RPC validates the holder.
 - The system_settings table is still empty; Settings now reads and writes through organization-scoped RPCs, but actual organization values must be entered in the UI.
-- The latest remote migration ledger version is `20261112144750` with 35 applied migrations. Migration filenames added in this round were aligned to the remote versions; still run `supabase migration list` locally before any future `db push`.
+- The latest remote migration ledger version is `20261112150730` with 39 applied migrations. Migration filenames added in this round were aligned to the remote versions; still run `supabase migration list` locally before any future `db push`.
 - Full double-entry accounting and bank-account models remain absent.
