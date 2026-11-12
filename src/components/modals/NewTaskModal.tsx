@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { createTaskBundle, TaskSavedRefreshError } from '../../services/tasks.api';
+import { createTaskBundle, createTaskRequest, TaskSavedRefreshError } from '../../services/tasks.api';
 import { dataStore } from '../../lib/storage';
 import { TaskPriority, TaskTypeClassification, TaskStep } from '../../types/domain';
 import { Modal } from '../ui/modal';
@@ -144,7 +144,7 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
 
     setIsSubmitting(true);
     try {
-      await createTaskBundle({
+      const taskPayload = {
       title,
       description,
       priority,
@@ -182,7 +182,20 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
       taskFundSpent: 0,
       taskFundRemaining: numFundAmount > 0 ? numFundAmount : undefined,
       parentTaskId: isSubTask && parentTaskId ? parentTaskId : undefined,
-      }, { requiresApproval, assigneeIds });
+      };
+      if (currentUser.role === 'field_officer') {
+        await createTaskRequest({
+          ...taskPayload,
+          taskTypeKey: taskTypeCategory === 'visit' ? 'customer_visit'
+            : taskTypeCategory === 'financial' ? 'financial_collection'
+            : taskTypeCategory === 'administrative' ? 'procurement'
+            : 'field_maintenance',
+          requestedAssigneeIds: [currentUser.id],
+          approvalRequired: true,
+        });
+      } else {
+        await createTaskBundle(taskPayload, { requiresApproval, assigneeIds });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'تعذر إنشاء المهمة. حاول مرة أخرى.';
       if (error instanceof TaskSavedRefreshError) {
