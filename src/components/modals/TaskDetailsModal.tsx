@@ -990,7 +990,8 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                             try { await updateTaskSubtaskStatus(task.id, st.id, st.status === 'completed' ? 'scheduled' : 'completed'); }
                             catch (error) { window.alert(error instanceof Error ? error.message : 'تعذر تحديث المهمة الفرعية.'); }
                           }}
-                          className="w-5 h-5 accent-[#345c47] rounded cursor-pointer"
+                          disabled={st.approvalStatus === 'pending' || st.approvalStatus === 'rejected'}
+                          className="w-5 h-5 accent-[#345c47] rounded cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                         />
                         <span className={`font-semibold ${st.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-800'}`}>
                           {st.title}
