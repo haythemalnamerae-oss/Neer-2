@@ -14,7 +14,7 @@
 - 54 trigger event registrations on public tables.
 - Every table has at least one policy; no table has FORCE RLS.
 - Tenant identity is represented by organization_id; task and finance references use composite tenant-aware foreign keys.
-- 34 remote migrations; ledger range 20261107000000–20261112144750.
+- 35 remote migrations; ledger range 20261107000000–20261112144750.
 - Storage: one private task-attachments bucket; 10 MiB maximum; JPEG, PNG, WebP, GIF and PDF only; SELECT/INSERT/DELETE object policies bind the organization/task path.
 
 ## 2. Live data snapshot
@@ -123,7 +123,7 @@ All callable SECURITY DEFINER functions must remain individually reviewed for ac
 
 ## 8. Migration and documentation drift
 
-The live remote migration ledger now reports 34 applied migrations through `20261112144750`. Five additional task-governance migrations were applied in this execution: request/type/step workflows, composite-FK and cycle guards, type-key assignment and request resubmission, resubmission validation, and independent subtask task cards.
+The live remote migration ledger now reports 35 applied migrations through `20261112144750`. Five additional task-governance migrations were applied in this execution: request/type/step workflows, composite-FK and cycle guards, type-key assignment and request resubmission, resubmission validation, and independent subtask task cards.
 
 The two earlier finance migrations and other files whose planned timestamps differed from the remote ledger were renamed to match the applied remote versions. A superseded review-only task-creation draft was moved outside `supabase/migrations` so it cannot be applied accidentally. A local `supabase migration list` comparison is still required before any `db push`; no cloud build or deploy was run.
 
