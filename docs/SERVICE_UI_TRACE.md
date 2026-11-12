@@ -36,20 +36,20 @@
 | العهد والأرصدة | FundsView | snapshot مالي | تغذية، مقبوضات، عجز، تسوية وحسابات دائمة |
 | المصروفات والفواتير | ExpensesView | snapshot مالي | اعتماد ورفض عبر RPC؛ الإنشاء عبر NewExpenseModal |
 | التسويات | SettlementsView | snapshot مالي | مراجعة واعتماد ورفض عبر RPC؛ الطباعة محلية |
-| التقويم | CalendarView | snapshot المهام | إعادة الجدولة محلية فقط |
+| التقويم | CalendarView | snapshot المهام | إعادة الجدولة عبر `rescheduleTaskOnServer` وPATCH محدود لحقول التاريخ/الوقت |
 | التقارير | ReportsView | ReportsService من dataStore | تصدير CSV محلي |
 | الفريق الميداني | TeamView | بيانات users/tasks/funds المحملة | عرض وبحث وتصفية محلية |
-| المستخدمون | UsersView | dataStore | الإضافة محلية فقط؛ لا يوجد provisioning لـAuth |
+| المستخدمون | UsersView | dataStore snapshot | إنشاء المستخدم المحلي الوهمي معطل؛ provisioning الفعلي يتطلب دعوة Supabase Auth وربط العضوية والملف |
 | الأدوار والصلاحيات | RolesView | permission_catalog وrole_permissions | قراءة وحفظ مصفوفة RBAC عبر API |
 | سجل التدقيق | AuditLogsView | audit_logs من snapshot | قراءة وبحث محلي؛ لا توجد كتابة من الشاشة |
-| إعدادات المنشأة | SettingsView | إعدادات dataStore المحلية | الحفظ والتعطيل وإعادة التهيئة محلية |
+| إعدادات المنشأة | SettingsView | `system_settings` عبر RPC | القراءة والحفظ عبر RPCs بصلاحيات المؤسسة؛ لا يوجد زر لإعادة تهيئة بيانات الإنتاج |
 | عارض الشيفرة | CodeRepositoryViewer | sourceRegistry ثابت | عرض أمثلة/مصادر محلية؛ ليس مستكشفًا حيًا للمستودع |
 
 ## 3. المكونات المشتركة
 
-- `Sidebar`: التنقل الجانبي وإخفاء الوحدات وفق `hasPermission` الثابتة.
+- `Sidebar`: التنقل الجانبي وإخفاء الوحدات وفق `hasPermission` التي تستخدم grants المحملة من `/permissions/me` للجلسة.
 - `MobileBottomNav`: تنقل الهاتف ويستخدم المصفوفة الثابتة نفسها.
-- `Header`: إجراءات سريعة، الخط، الإشعارات، تسجيل الخروج. تحديد الإشعارات كمقروءة محلي.
+- `Header`: إجراءات سريعة، الخط، الإشعارات، تسجيل الخروج. قراءة الإشعارات وتحديدها كمقروءة عبر `notifications.api.ts` وAPI مع فلترة user_id.
 - `GlobalQuickActionFab`: فتح نماذج المهام والمصروفات والتنقل.
 - `ApiSessionGate`: المصادقة وتحميل اللقطة.
 - App يشترك في تغييرات dataStore ويعيد العرض، ويشغّل/يوقف تتبع GPS للمهام الميدانية النشطة.
@@ -96,7 +96,7 @@
 - تسجيل نتيجة المهمة عملية ذرية في قاعدة البيانات، لكن رفع الإثبات يحدث قبل RPC النتيجة؛ إذا فشل تسجيل النتيجة قد يبقى ملف مرفوع غير مرتبط.
 - إضافة subtask ثم تسجيل حدث الموقع عمليتان منفصلتان؛ فشل الحدث لا يلغي subtask الذي حُفظ.
 - حذف metadata للمرفق يسبق حذف كائن Storage؛ فشل حذف الكائن بعد حذف metadata قد يترك كائنًا يتيمًا.
-- `mutateTaskResource` يسجل فشل تحديث snapshot بعد نجاح الكتابة ولا يرفعه للمستخدم؛ قد تبقى الشاشة قديمة حتى إعادة التحميل.
+- `mutateTaskResource` يرفع خطأً واضحًا إذا نجحت الكتابة وفشل تحديث snapshot؛ يجب عدم إعادة العملية عند ظهور رسالة الحفظ مع فشل التحديث.
 - تحديث اللقطة يجلب حتى 500 سجل لكل مجموعة دون pagination.
 
 ## 6. تتبع الخدمات المالية
@@ -159,9 +159,9 @@ tasks, task-events, task-assignees, task-checklist, task-steps, task-subtasks, t
 
 ### P0 — تؤثر على صحة البيانات/التشغيل
 
-1. **مستخدمون محليون:** `UsersView` يستدعي `dataStore.addUser` فقط. لا يوجد مسار إنشاء Auth user ثم app_users ثم organization_members. كما أن القائمة تعرض خيارات `supervisor` و`manager` غير الموجودة ضمن Role المعتمد؛ اختيارها ينتج دورًا غير معروف وقد يؤدي إلى قراءة `ROLE_LABELS[u.role].badgeColor` من قيمة غير موجودة.
+1. **Provisioning المستخدمين غير متاح داخل الواجهة:** تم تعطيل الإضافة المحلية الوهمية وإزالة الأدوار غير المدعومة. يلزم بناء دعوة Supabase Auth موثوقة وربط app_users وorganization_members قبل تمكين إنشاء المستخدم من الواجهة. معروف وقد يؤدي إلى قراءة `ROLE_LABELS[u.role].badgeColor` من قيمة غير موجودة.
 2. **إعدادات محلية:** `SettingsView` يحفظ عبر `dataStore.updateSettings` إلى localStorage؛ لا يستدعي مورد settings أو system_settings. لقطة الخادم لا تحمل الإعدادات ولا تستبدلها، ولذلك قد تبقى إعدادات متصفح قديمة من مؤسسة أخرى. قيم الخادم الافتراضية للمالية قد تختلف عن المعروض في الواجهة.
-3. **تقويم محلي:** `CalendarView` يستدعي `dataStore.rescheduleTask`؛ لا يوجد استدعاء API لتعديل due_date. قد يعرض المتصفح موعدًا جديدًا بينما الخادم يحتفظ بالموعد القديم.
+3. **تم إصلاح التقويم:** `CalendarView` يستدعي `rescheduleTaskOnServer`، وAPI يسمح فقط بتعديل due_date/start_date/due_time ويترك تغييرات الحالة لمسارات lifecycle/outcome/review.
 4. **إيقاف الحساب الدائم محلي:** أزرار الإيقاف في FundsView وSettingsView تستدعي `dataStore.deleteStandingAccount` الذي يغير active في الذاكرة/localStorage فقط. المورد المالي لا يسمح CRUD عام للتعديل ولا يوجد workflow مخصص للتفعيل/الإيقاف.
 5. **تضارب الصلاحيات:** `RolesView` يقرأ ويكتب grants من Supabase، لكن `hasPermission` في `src/lib/rbac/permissions.ts` يقرأ `ROLE_PERMISSIONS` ثابتة. Sidebar وMobileBottomNav ومعظم أزرار العرض تستخدم هذه المصفوفة، بينما API يفحص role_permissions الفعلية. قد تظهر شاشة أو تختفي على خلاف صلاحية الخادم. لا تتحدث واجهة المستخدم فور تغيير grants.
 6. **التقارير غير مكتملة خادميًا:** ReportsService وDashboard وPerformanceEvaluation تحسب في المتصفح من dataStore. لا توجد استعلامات تجميع server-side أو pagination للتقارير؛ النتائج قد تكون ناقصة فوق حد 500 سجل لكل collection.
