@@ -175,8 +175,7 @@ app.get('/api/v1/reports/summary', async (req, res) => {
     const urgentTasks = tasks.filter((t) => t.priority === 'urgent' && !['completed','approved','cancelled'].includes(t.status)).length;
     const canReadUsers = await allowed(auth, 'users', 'view');
     const users = canReadUsers ? await fetchAllRows('/rest/v1/app_users?select=id,name,department,active&active=eq.true', auth.token) : [];
-    const canReadFinance = ['admin','finance_officer'].includes(auth.role) &&
-      await allowed(auth, 'funds', 'view') && await allowed(auth, 'expenses', 'view');
+    const canReadFinance = await allowed(auth, 'funds', 'view') && await allowed(auth, 'expenses', 'view');
     let finance: Record<string, unknown> | null = null;
     if (canReadFinance) {
       const [funds, expenses, settlements, standingAccounts, entries] = await Promise.all([
