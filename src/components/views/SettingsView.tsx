@@ -5,7 +5,6 @@ import {
   DollarSign,
   Bell,
   Database,
-  RotateCcw,
   CheckCircle2,
   Plus,
   Store,
@@ -18,12 +17,12 @@ import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { NewStandingAccountModal } from '../modals/NewStandingAccountModal';
+import { saveOrganizationSettings } from '../../services/settings.api';
 
 export const SettingsView: React.FC = () => {
   const initialSettings = dataStore.getSettings();
   const currentUser = dataStore.getCurrentUser();
   const canEditSettings = hasPermission(currentUser.role, 'settings', 'edit');
-  const canResetData = currentUser.role === 'admin';
   const canManageLocationPolicy = currentUser.role === 'admin';
   const canManageStandingAccounts = hasPermission(currentUser.role, 'funds', 'edit');
   const [companyName, setCompanyName] = useState(initialSettings.organizationName);
@@ -43,7 +42,7 @@ export const SettingsView: React.FC = () => {
   const [accountsVersion, setAccountsVersion] = useState(0);
   const accounts = dataStore.getStandingAccounts();
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const tax = Number(vatRate);
     const threshold = Number(warningThreshold);
@@ -53,7 +52,7 @@ export const SettingsView: React.FC = () => {
       return;
     }
     try {
-      dataStore.updateSettings({
+      await saveOrganizationSettings({
         organizationName: companyName.trim(), taxRegistrationNumber: taxNumber.trim(), headquarters: headquarters.trim(),
         currency: defaultCurrency, taxRate: tax, fundWarningThresholdPercent: threshold, singleExpenseLimit: expenseLimit,
         autoNotifyOnLowBalance: autoNotify, requireReceiptForExpense: requireReceipt, requireInvoiceNumber,
@@ -66,15 +65,6 @@ export const SettingsView: React.FC = () => {
     }
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
-  };
-
-  const handleResetData = () => {
-    if (!canResetData) return;
-    const confirmation = window.prompt('تحذير: سيؤدي هذا الإجراء إلى حذف جميع بيانات Neer-2 المحلية وإعادة البيانات التجريبية. اكتب RESET للمتابعة:');
-    if (confirmation === 'RESET') {
-      try { dataStore.resetToDefault(); window.location.reload(); }
-      catch (error) { alert(error instanceof Error ? error.message : 'تعذر إعادة تهيئة البيانات.'); }
-    }
   };
 
   if (!canEditSettings) return <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">لا تملك صلاحية تعديل إعدادات النظام.</div>;
@@ -252,22 +242,7 @@ export const SettingsView: React.FC = () => {
               <span className="text-xs sm:text-sm font-bold text-slate-700">اشتراط مدقق أول ومعتمد نهائي مختلفين لإغلاق التسوية</span>
             </label>
 
-            {canResetData && <div className="pt-4 border-t border-black/[0.04] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div>
-                <span className="text-xs sm:text-sm font-extrabold text-rose-700 block">إعادة تهيئة البيانات الافتراضية</span>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  استعادة المهام والعهد والفواتير النموذجية الأولية للاختبار والتجربة
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleResetData}
-                className="neu-raised px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold text-rose-700 hover:text-rose-800 active:neu-inset transition-all flex items-center gap-2 cursor-pointer"
-              >
-                <RotateCcw className="w-4 h-4 text-rose-600" />
-                <span>إعادة تعيين البيانات</span>
-              </button>
-            </div>}
+
           </div>
         </div>
 
