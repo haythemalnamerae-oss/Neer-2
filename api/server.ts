@@ -505,9 +505,9 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
     const keys = Object.keys(patch || {});
     const schedulableFields = new Set(['due_date', 'start_date', 'due_time']);
     if (!patch || keys.length === 0 || keys.some((key) => !schedulableFields.has(key)) ||
-        (patch.due_date !== undefined && (typeof patch.due_date !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(patch.due_date))) ||
-        (patch.start_date !== undefined && (typeof patch.start_date !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(patch.start_date))) ||
-        (patch.due_time !== undefined && patch.due_time !== null && (typeof patch.due_time !== 'string' || !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(patch.due_time)))) {
+        (patch.due_date !== undefined && (typeof patch.due_date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(patch.due_date))) ||
+        (patch.start_date !== undefined && (typeof patch.start_date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(patch.start_date))) ||
+        (patch.due_time !== undefined && patch.due_time !== null && (typeof patch.due_time !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(patch.due_time)))) {
       return res.status(409).json({ error: { code: 'TASK_WORKFLOW_REQUIRED', message: 'Only due date, start date and due time may be changed through scheduling. Lifecycle, outcome and approval require dedicated workflows.' } });
     }
   }
