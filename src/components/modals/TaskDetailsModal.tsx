@@ -30,7 +30,7 @@ import {
 import { Task, TaskStatus, TaskStepStatus } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
 import {
-  addTaskComment, addTaskDailyUpdate, addTaskSubtask, deleteTaskAttachmentOnServer,
+  addTaskComment, addTaskDailyUpdate, addTaskSubtask, configureTaskStep, reviewTaskStep, reviewTaskSubtask, deleteTaskAttachmentOnServer,
   getTaskAttachmentSignedUrl, refreshTaskSnapshot, setChecklistItem,
   setTaskStepStatus, updateTaskLifecycle, updateTaskSubtaskStatus, uploadTaskAttachment,
 } from '../../services/tasks.api';
@@ -863,6 +863,33 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                           </div>
                         )}
 
+                        {step.approvalStatus === 'pending' && (
+                          <div className="flex items-center gap-2 rounded-xl bg-amber-50 p-3">
+                            <span className="text-xs font-bold text-amber-900">المرحلة تنتظر الاعتماد</span>
+                            {currentUser.role !== 'field_officer' && <>
+                              <Button size="sm" variant="primary" onClick={() => void reviewTaskStep(task.id, step.id, 'approve').catch((error) => window.alert(error instanceof Error ? error.message : 'تعذر اعتماد المرحلة.'))}>اعتماد</Button>
+                              <Button size="sm" variant="outline" onClick={() => { const reason = window.prompt('سبب رفض المرحلة:'); if (reason?.trim()) void reviewTaskStep(task.id, step.id, 'reject', reason).catch((error) => window.alert(error instanceof Error ? error.message : 'تعذر رفض المرحلة.')); }}>إعادة للتنفيذ</Button>
+                            </>}
+                          </div>
+                        )}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 rounded-xl neu-inset-sm p-3">
+                          <label className="text-[11px] font-bold text-slate-600">المسؤول عن المرحلة
+                            <select className="mt-1 w-full" value={step.assignedTo || task.assigneeId} onChange={(e) => void configureTaskStep(task.id, step.id, { assigneeId: e.target.value || null, dependsOnStepId: step.dependsOnStepId || null, approvalRequired: Boolean(step.approvalRequired) }).catch((error) => window.alert(error instanceof Error ? error.message : 'تعذر تعيين المرحلة.'))}>
+                              {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+                            </select>
+                          </label>
+                          <label className="text-[11px] font-bold text-slate-600">تعتمد على مرحلة
+                            <select className="mt-1 w-full" value={step.dependsOnStepId || ''} onChange={(e) => void configureTaskStep(task.id, step.id, { assigneeId: step.assignedTo || task.assigneeId, dependsOnStepId: e.target.value || null, approvalRequired: Boolean(step.approvalRequired) }).catch((error) => window.alert(error instanceof Error ? error.message : 'تعذر حفظ الاعتمادية.'))}>
+                              <option value="">لا توجد</option>
+                              {task.steps?.filter((candidate) => candidate.id !== step.id).map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.title}</option>)}
+                            </select>
+                          </label>
+                          <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">
+                            <input type="checkbox" checked={Boolean(step.approvalRequired)} onChange={(e) => void configureTaskStep(task.id, step.id, { assigneeId: step.assignedTo || task.assigneeId, dependsOnStepId: step.dependsOnStepId || null, approvalRequired: e.target.checked }).catch((error) => window.alert(error instanceof Error ? error.message : 'تعذر حفظ إعداد الاعتماد.'))}/>
+                            تتطلب اعتمادًا بعد الإنجاز
+                          </label>
+                        </div>
+
                         {/* Step Details & Notes */}
                         <div className="flex items-center justify-between text-xs text-slate-600 pt-2 border-t border-black/[0.04] flex-wrap gap-2">
                           <div className="flex items-center gap-2">
@@ -972,9 +999,15 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                       <div className="flex items-center gap-3">
                         <span className="text-slate-500 text-xs">المكلف: <strong className="text-slate-700">{st.assigneeName}</strong></span>
                         {st.requiresApproval && (
-                          <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-xl ${st.isApproved ? 'neu-raised text-emerald-800' : 'neu-inset-sm text-amber-800'}`}>
-                            {st.isApproved ? 'معتمد' : 'بانتظار إذن المدير'}
+                          <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-xl ${st.approvalStatus === 'approved' || st.isApproved ? 'neu-raised text-emerald-800' : 'neu-inset-sm text-amber-800'}`}>
+                            {st.approvalStatus === 'approved' || st.isApproved ? 'معتمد' : st.approvalStatus === 'rejected' ? 'مرفوض' : 'بانتظار الاعتماد'}
                           </span>
+                        )}
+                        {st.approvalStatus === 'pending' && currentUser.role !== 'field_officer' && (
+                          <div className="flex gap-1">
+                            <Button size="sm" variant="primary" onClick={() => void reviewTaskSubtask(task.id, st.id, 'approve').catch((error) => window.alert(error instanceof Error ? error.message : 'تعذر اعتماد المهمة الفرعية.'))}>اعتماد</Button>
+                            <Button size="sm" variant="outline" onClick={() => { const reason = window.prompt('سبب رفض المهمة الفرعية:'); if (reason?.trim()) void reviewTaskSubtask(task.id, st.id, 'reject', reason).catch((error) => window.alert(error instanceof Error ? error.message : 'تعذر رفض المهمة الفرعية.')); }}>رفض</Button>
+                          </div>
                         )}
                       </div>
                     </div>
