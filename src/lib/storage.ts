@@ -1885,11 +1885,13 @@ export class OpsDataStore {
     this.settlements = data.settlements;
     this.cashReceipts = data.cashReceipts;
     this.standingAccounts = data.standingAccounts;
-    safeSet(STORAGE_KEYS.FUNDS, this.funds);
-    safeSet(STORAGE_KEYS.EXPENSES, this.expenses);
-    safeSet(STORAGE_KEYS.SETTLEMENTS, this.settlements);
-    safeSet(STORAGE_KEYS.CASH_RECEIPTS, this.cashReceipts);
-    safeSet(STORAGE_KEYS.STANDING_ACCOUNTS, this.standingAccounts);
+    // Authenticated server snapshots are authoritative. Remove legacy finance
+    // caches instead of persisting server data in browser storage, where stale
+    // records could survive account switches or be restored in demo mode.
+    [STORAGE_KEYS.FUNDS, STORAGE_KEYS.EXPENSES, STORAGE_KEYS.SETTLEMENTS,
+      STORAGE_KEYS.CASH_RECEIPTS, STORAGE_KEYS.STANDING_ACCOUNTS].forEach((key) => {
+      try { localStorage.removeItem(key); } catch { /* storage may be unavailable */ }
+    });
     this.notify();
   }
 
