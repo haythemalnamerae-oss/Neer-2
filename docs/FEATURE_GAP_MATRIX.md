@@ -66,3 +66,22 @@ loadUiSnapshot fetches each collection with limit=500 and no pagination loop. La
 - dataStore still initializes from mockData and legacy localStorage. Authenticated hydration replaces selected operational/finance collections, but Settings are not hydrated from the server.
 - PeerSyncEngine and sourceRegistry contain legacy/offline/demo material; the targeted code search found no active import of PeerSyncEngine. Treat embedded legacy schema/source snippets as documentation/demo, not the live Supabase schema.
 - The authenticated UI is not proof that every visible action is server-backed. The local-only rows above must be migrated before operational acceptance.
+
+
+## Complete UI and service trace (2026-11-12)
+
+The full static source trace of all 18 views mounted by App and the custom API/finance/task paths is documented in `docs/SERVICE_UI_TRACE.md`.
+
+Newly confirmed P0 gaps:
+- UsersView adds only to local dataStore; no Supabase Auth + app_users + organization_members provisioning. Its selector offers unsupported role values supervisor/manager, which can cause an undefined ROLE_LABELS access in the user table.
+- SettingsView persists locally; system_settings is neither loaded nor saved. Browser settings can persist across organization/account changes.
+- CalendarView drag/drop rescheduling only changes local dueDate; there is no server reschedule endpoint.
+- Standing-account deactivation in FundsView/SettingsView changes only local dataStore.
+- Role editor writes role_permissions, but navigation and most button gates still use hard-coded ROLE_PERMISSIONS; client/server authorization can disagree.
+- ReportsService, DashboardView, and PerformanceEvaluationView derive reports in the browser; no server-side aggregate/pagination path exists.
+- Dashboard AIService is a deterministic local rule set, not an AI model, and emits unsupported hard-coded claims such as 100% tax compliance.
+- loadUiSnapshot is capped at 500 rows per collection without pagination; ops_manager/viewer can have visible finance modules but finance collections are omitted from their snapshot.
+- Notification read-state is local; audit screen reads server audit logs while local dataStore audit writes do not become central audit records.
+- FinanceApiService generates a new idempotency key for every attempt and throws if post-commit snapshot refresh fails; this can make a successful operation look failed and a retry use a new key.
+
+Legacy service classes and unused wrappers are also catalogued in `docs/SERVICE_UI_TRACE.md`. Source tracing is complete for all discovered mounted views and paths; runtime behavior remains unverified without local browser/device tests.
