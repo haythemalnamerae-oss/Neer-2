@@ -1987,6 +1987,13 @@ export class OpsDataStore {
     return { ...this.settings };
   }
 
+  /** Apply settings loaded from the authenticated organization snapshot without caching them locally. */
+  public hydrateSettings(settings: Partial<SystemSettings>): void {
+    this.settings = { ...DEFAULT_SETTINGS, ...settings };
+    try { localStorage.removeItem(STORAGE_KEYS.SETTINGS); } catch { /* storage may be unavailable */ }
+    this.notify();
+  }
+
   public updateSettings(newSettings: Partial<SystemSettings>): void {
     if (!hasPermission(this.getCurrentUser().role, 'settings', 'edit')) throw new Error('لا تملك صلاحية تعديل إعدادات النظام.');
     if (newSettings.autoCaptureLocationWithoutApproval !== undefined && this.getCurrentUser().role !== 'admin') throw new Error('سياسة التقاط الموقع التلقائي متاحة لمدير النظام فقط.');
