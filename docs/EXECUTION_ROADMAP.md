@@ -43,3 +43,19 @@
 ## Phase exit gates
 
 A phase is complete only when code paths, authorization, data persistence and error recovery are verified with repeatable tests. A source file or visible button alone is not acceptance evidence. Final browser/mobile build and device validation remain local owner tasks; do not use cloud build/deploy as a substitute.
+
+
+## Newly confirmed blockers to address before operational acceptance
+
+1. Narrow audit-log INSERT to trusted server/trigger paths and test that ordinary members cannot forge audit events.
+2. Correct deficit coverage so the cash-box subledger and fund transaction ledger reconcile by design; add explicit cash-box movement evidence.
+3. Restrict finance_create_standing_entry to non-cash charge entries or make each cash-affecting type a complete atomic workflow.
+4. Enforce submitter/approver separation for expenses where policy requires it; derive actual actor role in every audit record and add missing audit writes.
+5. Persist and hydrate system_settings; make the server's settings the source of truth for tax, receipt, invoice, approval and limit policies.
+6. Replace hard-coded UI permission checks with the current server grant snapshot or a consistent permission service.
+7. Move user provisioning, calendar rescheduling, notification read state, standing-account activation and system settings from local dataStore to authenticated server APIs.
+8. Add pagination to loadUiSnapshot and server-side reporting queries.
+9. Reconcile all 24 remote migrations against tracked files and verify clean reproducible deployment history.
+10. Add authenticated integration tests for role matrix, cross-tenant access, direct RPC calls, storage traversal, maker-checker and finance balance invariants.
+
+These are audit findings and planned remediation, not claims that fixes have already been applied.
