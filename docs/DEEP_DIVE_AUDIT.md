@@ -8,13 +8,13 @@
 
 ## 1. Live schema inventory
 
-- 28 public application tables; all 28 have RLS and a primary key.
-- 73 public RLS policies: 28 SELECT, 17 INSERT, 15 UPDATE, 13 DELETE.
+- 30 public application tables; all 30 have RLS and a primary key.
+- 75 public RLS policies; current command distribution should be re-counted before using this historical breakdown.
 - 21 public functions and 21 private helper functions inspected.
 - 54 trigger event registrations on public tables.
 - Every table has at least one policy; no table has FORCE RLS.
 - Tenant identity is represented by organization_id; task and finance references use composite tenant-aware foreign keys.
-- 29 remote migrations; ledger range 20261107000000–20261112141004.
+- 34 remote migrations; ledger range 20261107000000–20261112144750.
 - Storage: one private task-attachments bucket; 10 MiB maximum; JPEG, PNG, WebP, GIF and PDF only; SELECT/INSERT/DELETE object policies bind the organization/task path.
 
 ## 2. Live data snapshot
@@ -123,17 +123,17 @@ All callable SECURITY DEFINER functions must remain individually reviewed for ac
 
 ## 8. Migration and documentation drift
 
-The live remote migration ledger now reports 29 applied migrations through `20261112141004`. Five additional migrations were applied during the current execution: task approval maker-checker, organization settings persistence, organization settings read, selected-organization scoping for both settings RPCs, and audited standing-account activation/deactivation.
+The live remote migration ledger now reports 34 applied migrations through `20261112144750`. Five additional task-governance migrations were applied in this execution: request/type/step workflows, composite-FK and cycle guards, type-key assignment and request resubmission, resubmission validation, and independent subtask task cards.
 
 The two earlier finance migrations and other files whose planned timestamps differed from the remote ledger were renamed to match the applied remote versions. A superseded review-only task-creation draft was moved outside `supabase/migrations` so it cannot be applied accidentally. A local `supabase migration list` comparison is still required before any `db push`; no cloud build or deploy was run.
 
 ## 9. Verification boundaries
 
-- Live catalog checks confirm 28 public application tables, RLS enabled on all 28, and 73 policies.
+- Live catalog checks confirm 30 public application tables, RLS enabled on all 30, and 75 policies.
 - Live SQL checks confirm the task approval RPC includes maker-checker and settings read/write RPCs exist.
-- The task, settings, notification and audit tables were empty at the latest check; positive business E2E cannot be demonstrated against production records.
+- The task, task-request, task-step, subtask, settings, notification and audit tables were empty at the latest check; positive business E2E cannot be demonstrated against production records.
 - No financial business rows were changed.
-- Four additive DDL migrations were applied as part of this execution; no historical finance DML was run.
+- Five additive DDL migrations were applied as part of this execution. Eight task-type catalog rows were seeded for the existing organization; no historical finance rows were changed.
 - No local lint/build/browser/mobile E2E, cloud build, or deployment was run. The owner must pull main and validate locally.
 - The UI/API changes were reviewed statically; compile/runtime behavior remains unverified until local validation.
 
