@@ -73,6 +73,19 @@ async function allowed(auth: AuthContext, module: string, action: string) {
   return rows[0]?.granted === true;
 }
 
+async function fetchAllRows(path: string, token: string, pageSize = 500) {
+  const rows: Array<Record<string, any>> = [];
+  for (let offset = 0; offset < 50000; offset += pageSize) {
+    const separator = path.includes('?') ? '&' : '?';
+    const response = await supabaseFetch(`${path}${separator}limit=${pageSize}&offset=${offset}`, token);
+    if (!response.ok) throw new Error(`Report source query failed (${response.status}) for ${path.split('?')[0]}.`);
+    const page = await response.json() as Array<Record<string, any>>;
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
+  }
+  throw new Error('Report result exceeded the 50,000-row safety cap; narrow the reporting period.');
+}
+
 function sendDbError(res: Response, status: number, body: string) {
   let details: unknown = body;
   try { details = JSON.parse(body); } catch { /* use text */ }
@@ -147,6 +160,80 @@ app.post('/api/v1/settings/save', async (req, res) => {
   } catch (error) {
     console.error('Organization settings save failed:', error);
     return res.status(503).json({ error: { code: 'SETTINGS_SAVE_FAILED', message: 'Organization settings could not be saved.' } });
+  }
+});
+
+app.get('/api/v1/reports/summary', async (req, res) => {
+  const auth = (req as AuthenticatedRequest).auth;
+  try {
+    if (!(await allowed(auth, 'reports', 'view'))) return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Missing reports.view.' } });
+    const tasks = await fetchAllRows('/rest/v1/tasks?select=id,status,priority,assignee_id,actual_start_time,actual_end_time,due_date,time_spent_minutes', auth.token);
+    const completedTasks = tasks.filter((t) => ['completed','approved'].includes(t.status)).length;
+    const inProgressTasks = tasks.filter((t) => ['started','in_progress'].includes(t.status)).length;
+    const urgentTasks = tasks.filter((t) => t.priority === 'urgent' && !['completed','approved','cancelled'].includes(t.status)).length;
+    const canReadUsers = await allowed(auth, 'users', 'view');
+    const users = canReadUsers ? await fetchAllRows('/rest/v1/app_users?select=id,name,department,active&active=eq.true', auth.token) : [];
+    const canReadFinance = ['admin','finance_officer'].includes(auth.role) &&
+      await allowed(auth, 'funds', 'view') && await allowed(auth, 'expenses', 'view');
+    let finance: Record<string, unknown> | null = null;
+    if (canReadFinance) {
+      const [funds, expenses, settlements, standingAccounts, entries] = await Promise.all([
+        fetchAllRows('/rest/v1/funds?select=id,total_allocation,current_balance,spent_balance,currency,status'),
+        fetchAllRows('/rest/v1/expenses?select=id,fund_id,total_with_tax,status,submitted_by'),
+        fetchAllRows('/rest/v1/settlements?select=id'),
+        fetchAllRows('/rest/v1/standing_accounts?select=id,direction,opening_balance,currency,active'),
+        fetchAllRows('/rest/v1/standing_account_entries?select=standing_account_id,balance_effect'),
+      ]);
+      const settingsResponse = await supabaseFetch('/rest/v1/rpc/get_organization_settings', auth.token, {
+        method: 'POST', body: JSON.stringify({ p_organization_id: auth.organizationId }),
+      });
+      let currency = 'YER';
+      if (settingsResponse.ok) {
+        const settings = await settingsResponse.json() as Record<string, any>;
+        currency = String(settings.currency || settings.general?.currency || currency);
+      }
+      const currencyFunds = funds.filter((f) => (f.currency || currency) === currency);
+      const fundIds = new Set(currencyFunds.map((f) => f.id));
+      const currencyExpenses = expenses.filter((e) => fundIds.has(e.fund_id) && e.status !== 'rejected');
+      const accounts = standingAccounts.filter((a) => (a.currency || currency) === currency && a.active !== false);
+      const balanceByAccount = new Map<string, number>();
+      for (const account of accounts) balanceByAccount.set(account.id, Number(account.opening_balance || 0));
+      for (const entry of entries) if (balanceByAccount.has(entry.standing_account_id)) {
+        balanceByAccount.set(entry.standing_account_id, (balanceByAccount.get(entry.standing_account_id) || 0) + Number(entry.balance_effect || 0));
+      }
+      finance = {
+        currency,
+        totalAllocatedFunds: currencyFunds.reduce((sum, f) => sum + Number(f.total_allocation || 0), 0),
+        totalRemainingFunds: currencyFunds.reduce((sum, f) => sum + Number(f.current_balance || 0), 0),
+        totalSpentFunds: currencyFunds.reduce((sum, f) => sum + Number(f.spent_balance || 0), 0),
+        fundsWarningCount: currencyFunds.filter((f) => ['warning','depleted'].includes(f.status)).length,
+        totalExpensesAmount: currencyExpenses.reduce((sum, e) => sum + Number(e.total_with_tax || 0), 0),
+        pendingExpensesCount: currencyExpenses.filter((e) => e.status === 'pending_approval').length,
+        pendingExpensesAmount: currencyExpenses.filter((e) => e.status === 'pending_approval').reduce((sum, e) => sum + Number(e.total_with_tax || 0), 0),
+        totalSupplierPayables: accounts.filter((a) => ['payable','payable_by_us'].includes(a.direction)).reduce((sum, a) => sum + Math.max(0,balanceByAccount.get(a.id) || 0),0),
+        totalReceivables: accounts.filter((a) => ['receivable','receivable_for_us'].includes(a.direction)).reduce((sum, a) => sum + Math.max(0,balanceByAccount.get(a.id) || 0),0),
+        activeStandingAccountsCount: accounts.length,
+        settlementsCount: settlements.length,
+      };
+    }
+    const teamPerformance = users.map((user) => {
+      const own = tasks.filter((t) => t.assignee_id === user.id);
+      const completed = own.filter((t) => ['completed','approved'].includes(t.status)).length;
+      const minutes = own.reduce((sum, t) => sum + Math.max(0, Number(t.time_spent_minutes || 0)), 0);
+      const onTime = own.filter((t) => ['completed','approved'].includes(t.status) && t.actual_end_time && t.due_date && String(t.actual_end_time).slice(0,10) <= t.due_date).length;
+      return { userId: user.id, name: user.name, department: user.department, assignedTasks: own.length, completedTasks: completed, inProgressTasks: own.filter((t) => ['started','in_progress'].includes(t.status)).length, completionRate: own.length ? Math.round(completed / own.length * 100) : 0, actualWorkHours: Number((minutes / 60).toFixed(1)), onTimeRate: completed ? Math.round(onTime / completed * 100) : 0 };
+    }).sort((a,b) => b.completedTasks-a.completedTasks || b.actualWorkHours-a.actualWorkHours);
+    return res.json({
+      source: 'supabase',
+      generatedAt: new Date().toISOString(),
+      tasks: { totalTasks: tasks.length, completedTasks, inProgressTasks, urgentTasks, taskCompletionRate: tasks.length ? Math.round(completedTasks / tasks.length * 100) : 0 },
+      finance,
+      teamPerformance,
+      pagination: { strategy: 'server-range-pages', pageSize: 500, cappedAt: 50000 },
+    });
+  } catch (error) {
+    console.error('Server report aggregation failed:', error);
+    return res.status(503).json({ error: { code: 'REPORT_AGGREGATION_FAILED', message: error instanceof Error ? error.message : 'The server report could not be generated.' } });
   }
 });
 
