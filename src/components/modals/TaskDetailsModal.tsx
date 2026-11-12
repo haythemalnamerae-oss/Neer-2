@@ -32,7 +32,7 @@ import { dataStore } from '../../lib/storage';
 import {
   addTaskComment, addTaskDailyUpdate, addTaskSubtask, configureTaskStep, reviewTaskStep, reviewTaskSubtask, deleteTaskAttachmentOnServer,
   getTaskAttachmentSignedUrl, refreshTaskSnapshot, setChecklistItem,
-  setTaskStepStatus, updateTaskLifecycle, updateTaskSubtaskStatus, uploadTaskAttachment,
+  setTaskStepStatus, updateTaskLifecycle, updateTaskSubtaskStatus, updateTaskStatusOnServer, uploadTaskAttachment,
 } from '../../services/tasks.api';
 import { captureRequiredLocation, ensureFieldVisitCanStart, recordFieldLifecycleEvent, recordTaskEvent, startFieldLocationTracking, stopFieldLocationTracking, type FieldEventType } from '../../lib/operations/fieldEvents';
 import { formatCurrency, TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG } from '../../lib/utils/format';
@@ -71,6 +71,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   const [deferringStepId, setDeferringStepId] = useState<string | null>(null);
   const [deferredDateInput, setDeferredDateInput] = useState('');
   const [isLocating, setIsLocating] = useState(false);
+  const [isReviewingTask, setIsReviewingTask] = useState(false);
 
   // Attachment states
   const [attachmentDocType, setAttachmentDocType] = useState('فاتورة شراء');
@@ -158,6 +159,22 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
       window.alert(error instanceof Error ? error.message : 'تعذر توثيق الإيقاف المؤقت.');
     } finally {
       setIsLocating(false);
+    }
+  };
+
+  const handleReviewTask = async (action: 'approve' | 'reject') => {
+    if (!task || !canApproveTask || task.creatorId === currentUser.id || task.status !== 'pending_approval' || isReviewingTask) return;
+    const reason = action === 'reject' ? window.prompt('اذكر سبب إعادة المهمة للتنفيذ:') : undefined;
+    if (action === 'reject' && !reason?.trim()) return;
+    setIsReviewingTask(true);
+    try {
+      await updateTaskStatusOnServer(task.id, action === 'approve' ? 'approved' : 'rejected', reason);
+      await refreshTaskSnapshot();
+      window.alert(action === 'approve' ? 'تم اعتماد إنجاز المهمة.' : 'أعيدت المهمة إلى التنفيذ مع حفظ سبب الرفض.');
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'تعذرت مراجعة المهمة.');
+    } finally {
+      setIsReviewingTask(false);
     }
   };
 
@@ -457,6 +474,27 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
               )}
             </div>
           </div>
+
+          {task.status === 'pending_approval' && (
+            <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <strong className="block text-sm text-amber-950">المهمة بانتظار مراجعة الإنجاز</strong>
+                <p className="text-xs text-amber-800 mt-1">لا تُعد المهمة مكتملة نهائيًا حتى يراجعها مسؤول مخوّل ويعتمدها أو يعيدها مع سبب واضح.</p>
+              </div>
+              {canApproveTask && task.creatorId !== currentUser.id ? (
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="success" disabled={isReviewingTask} onClick={() => void handleReviewTask('approve')}>
+                    {isReviewingTask ? 'جارٍ الحفظ...' : 'اعتماد الإنجاز'}
+                  </Button>
+                  <Button size="sm" variant="outline" disabled={isReviewingTask} onClick={() => void handleReviewTask('reject')}>
+                    إعادة للتنفيذ
+                  </Button>
+                </div>
+              ) : (
+                <span className="text-xs font-bold text-amber-800">بانتظار مراجعة مستخدم مخوّل غير منشئ المهمة</span>
+              )}
+            </div>
+          )}
 
           {/* Pause Reason Warning if active */}
           {task.isPaused && task.pauseReason && (
