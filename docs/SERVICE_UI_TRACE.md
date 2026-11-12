@@ -16,7 +16,7 @@
 - `ApiSessionGate` يتحقق من إعدادات Supabase، يعرض تسجيل الدخول، ينشئ جلسة من Supabase Auth، ثم يحمل لقطة المؤسسة قبل إظهار التطبيق.
 - `signIn` يختار العضوية الافتراضية، أو أول عضوية نشطة عند غياب الافتراضية. لا توجد شاشة لاختيار المؤسسة أو تبديلها بعد الدخول.
 - `authenticate` في API يعيد التحقق من JWT ومن عضوية المستخدم النشطة في المؤسسة المرسلة في `x-organization-id` في كل طلب.
-- لا يستخدم API مفتاح service-role؛ يمرر JWT المستخدم إلى Supabase.
+- يمرر API JWT المستخدم إلى PostgREST/RPC/Storage؛ endpoint دعوات المستخدمين وحده يستخدم `SUPABASE_SERVICE_ROLE_KEY` server-only لاستدعاء Supabase Auth Admin، ثم ينشئ app_users وorganization_members باستخدام JWT المدير.
 - عند غياب إعداد Supabase في بيئة التطوير يظهر وضع البيانات التجريبية. في الإنتاج يمنع `ApiSessionGate` عرض البيانات التجريبية عند غياب الإعدادات.
 - لا يوجد Router بعناوين مستقلة؛ التنقل محلي عبر قيمة `currentView` في App.
 
