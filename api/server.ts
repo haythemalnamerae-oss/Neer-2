@@ -4,6 +4,7 @@ const app = express();
 const port = Number(process.env.API_PORT ?? 8787);
 const supabaseUrl = process.env.SUPABASE_URL?.replace(/\/$/, '');
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!supabaseUrl || !supabaseAnonKey) throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY are required by the API server.');
 
 app.disable('x-powered-by');
@@ -146,6 +147,67 @@ app.post('/api/v1/settings/save', async (req, res) => {
   } catch (error) {
     console.error('Organization settings save failed:', error);
     return res.status(503).json({ error: { code: 'SETTINGS_SAVE_FAILED', message: 'Organization settings could not be saved.' } });
+  }
+});
+
+app.post('/api/v1/users/invite', async (req, res) => {
+  const auth = (req as AuthenticatedRequest).auth;
+  try {
+    if (!(await allowed(auth, 'users', 'create'))) {
+      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Missing users.create.' } });
+    }
+    if (!supabaseServiceRoleKey) {
+      return res.status(503).json({ error: { code: 'AUTH_ADMIN_NOT_CONFIGURED', message: 'Configure SUPABASE_SERVICE_ROLE_KEY as a server-only environment variable before inviting users.' } });
+    }
+    const body = req.body as Record<string, unknown> | undefined;
+    const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
+    const name = typeof body?.name === 'string' ? body.name.trim() : '';
+    const role = body?.role;
+    const phone = typeof body?.phone === 'string' ? body.phone.trim() : '';
+    const department = typeof body?.department === 'string' ? body.department.trim() : '';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !name || name.length > 160 ||
+        !['ops_manager','finance_officer','field_officer','viewer'].includes(String(role)) ||
+        phone.length > 40 || department.length > 100) {
+      return res.status(400).json({ error: { code: 'INVALID_USER_INVITE', message: 'Name, valid email and an assignable role are required.' } });
+    }
+    const inviteResponse = await fetch(`${supabaseUrl}/auth/v1/invite`, {
+      method: 'POST',
+      headers: { apikey: supabaseServiceRoleKey, Authorization: `Bearer ${supabaseServiceRoleKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, data: { name } }),
+    });
+    const inviteBody = await inviteResponse.json().catch(() => ({})) as { id?: string; user?: { id?: string }; msg?: string; message?: string };
+    const authUserId = inviteBody.id || inviteBody.user?.id;
+    if (!inviteResponse.ok || !authUserId) {
+      return res.status(inviteResponse.status || 502).json({ error: { code: 'AUTH_INVITE_FAILED', message: inviteBody.msg || inviteBody.message || 'Supabase could not send the invitation.' } });
+    }
+    const appUserId = `usr-${crypto.randomUUID()}`;
+    const profileResponse = await supabaseFetch('/rest/v1/app_users', auth.token, {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        id: appUserId, organization_id: auth.organizationId, auth_user_id: authUserId,
+        name, email, role, role_title_ar: ({ ops_manager: 'مدير عمليات', finance_officer: 'مسؤول مالي', field_officer: 'موظف ميداني', viewer: 'مشاهد' } as Record<string,string>)[String(role)],
+        phone, department, active: true,
+      }),
+    });
+    if (!profileResponse.ok) {
+      await fetch(`${supabaseUrl}/auth/v1/admin/users/${authUserId}`, { method: 'DELETE', headers: { apikey: supabaseServiceRoleKey, Authorization: `Bearer ${supabaseServiceRoleKey}` } }).catch(() => undefined);
+      return sendDbError(res, profileResponse.status, await profileResponse.text());
+    }
+    const membershipResponse = await supabaseFetch('/rest/v1/organization_members', auth.token, {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ organization_id: auth.organizationId, auth_user_id: authUserId, app_user_id: appUserId, role, active: true, is_default: true }),
+    });
+    if (!membershipResponse.ok) {
+      await supabaseFetch(`/rest/v1/app_users?organization_id=eq.${encodeURIComponent(auth.organizationId)}&id=eq.${encodeURIComponent(appUserId)}`, auth.token, { method: 'DELETE' }).catch(() => undefined);
+      await fetch(`${supabaseUrl}/auth/v1/admin/users/${authUserId}`, { method: 'DELETE', headers: { apikey: supabaseServiceRoleKey, Authorization: `Bearer ${supabaseServiceRoleKey}` } }).catch(() => undefined);
+      return sendDbError(res, membershipResponse.status, await membershipResponse.text());
+    }
+    return res.status(201).json({ appUserId, authUserId, email, invitationSent: true });
+  } catch (error) {
+    console.error('Organization user invitation failed:', error);
+    return res.status(503).json({ error: { code: 'USER_INVITE_FAILED', message: 'The user invitation could not be completed.' } });
   }
 });
 
