@@ -133,7 +133,7 @@ The two earlier finance migrations and other files whose planned timestamps diff
 - Live SQL checks confirm the task approval RPC includes maker-checker and settings read/write RPCs exist.
 - The task, task-request, task-step, subtask, settings, notification and audit tables were empty at the latest check; positive business E2E cannot be demonstrated against production records.
 - No financial business rows were changed.
-- Nine additive DDL migrations were applied as part of this execution since the 29-migration baseline. Eight task-type catalog rows were seeded for the existing organization; no historical finance rows were changed.
+- Nine additive DDL migrations were applied as part of this execution since the pre-governance migration baseline. Eight task-type catalog rows were seeded for the existing organization; no historical finance rows were changed.
 - No local lint/build/browser/mobile E2E, cloud build, or deployment was run. The owner must pull main and validate locally.
 - The UI/API changes were reviewed statically; compile/runtime behavior remains unverified until local validation.
 
