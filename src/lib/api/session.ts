@@ -1,5 +1,6 @@
 import type { Role, PettyCashFund, Expense, Settlement, CashReceipt, StandingAccount, StandingAccountEntry, TaskAssignee } from '../../types/domain';
 import { dataStore } from '../storage';
+import { setLivePermissionGrants } from '../rbac/permissions';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -74,7 +75,7 @@ export function getSession(): ApiSession | null {
 
 function saveSession(value: ApiSession) { localStorage.setItem(SESSION_KEY, JSON.stringify(value)); }
 let refreshInFlight: Promise<ApiSession> | null = null;
-export function clearSession() { localStorage.removeItem(SESSION_KEY); }
+export function clearSession() { localStorage.removeItem(SESSION_KEY); setLivePermissionGrants(null, null); }
 
 async function getMemberships(userId: string, token: string) {
   requireConfig();
@@ -182,6 +183,9 @@ const fromSnake = (row: Record<string, any>) => {
 
 /** Loads the initial server snapshot before importing the legacy synchronous UI store. */
 export async function loadUiSnapshot(session: ApiSession): Promise<void> {
+  const permissionState = await apiRequest<{ role: Role; grants: Record<string, boolean> | null }>(session, '/permissions/me');
+  if (permissionState.role !== session.role) throw new SessionError('تعذر مطابقة صلاحيات الجلسة مع عضوية المؤسسة.');
+  setLivePermissionGrants(permissionState.role, permissionState.grants);
   const common = ['tasks','task-checklist','task-steps','task-subtasks','task-updates','task-history','task-attachments','task-comments','task-events','task-assignees','follow-ups','notifications'];
   const finance = ['funds','expenses','settlements','settlement-expenses','cash-receipts','standing-accounts','fund-transactions','standing-account-entries'];
   const canReadUserDirectory = session.role === 'admin' || session.role === 'ops_manager';
