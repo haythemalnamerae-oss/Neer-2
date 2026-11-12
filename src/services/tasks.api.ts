@@ -195,6 +195,16 @@ export async function cancelTaskOnServer(taskId: string, reason = 'تم إلغا
   await refreshAfterMutation(session);
 }
 
+export async function rescheduleTaskOnServer(taskId: string, dueDate: string, reason?: string): Promise<void> {
+  const session = requireSession();
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(dueDate)) throw new Error('تاريخ الجدولة غير صالح.');
+  await apiRequest(session, `/tasks/${encodeURIComponent(taskId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ due_date: dueDate, start_date: dueDate }),
+  });
+  await refreshAfterMutation(session);
+}
+
 export async function setChecklistItem(taskId: string, itemId: string, completed: boolean): Promise<void> {
   const session = requireSession();
   await mutateTaskResource(session, 'task-checklist', 'PATCH', `id=eq.${encodeURIComponent(itemId)}&task_id=eq.${encodeURIComponent(taskId)}`, { completed });
