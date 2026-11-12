@@ -636,8 +636,8 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
   if (req.params.resource === 'task-subtasks' && (req.method === 'POST' || req.method === 'PATCH' || req.method === 'DELETE')) {
     return res.status(409).json({ error: { code: 'SUBTASK_WORKFLOW_REQUIRED', message: 'Subtasks must use their dedicated governed workflow.' } });
   }
-  if (req.params.resource === 'task-steps' && (req.method === 'PATCH' || req.method === 'DELETE')) {
-    return res.status(409).json({ error: { code: 'STEP_WORKFLOW_REQUIRED', message: 'Task steps must use their dedicated state workflow.' } });
+  if (req.params.resource === 'task-steps' && (req.method === 'POST' || req.method === 'PATCH' || req.method === 'DELETE')) {
+    return res.status(409).json({ error: { code: 'STEP_WORKFLOW_REQUIRED', message: 'Task steps are created with the atomic task bundle and changed only through their dedicated state workflow.' } });
   }
   if (req.params.resource === 'task-history' && req.method === 'POST') {
     return res.status(409).json({ error: { code: 'TASK_HISTORY_IMMUTABLE', message: 'Task history is written only by audited server workflows.' } });
