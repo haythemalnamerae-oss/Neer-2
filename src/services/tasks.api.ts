@@ -218,12 +218,33 @@ export async function setTaskStepStatus(
   nextStepDate?: string,
 ): Promise<void> {
   const session = requireSession();
-  await mutateTaskResource(session, 'task-steps', 'PATCH', `id=eq.${encodeURIComponent(stepId)}&task_id=eq.${encodeURIComponent(taskId)}`, {
-    status,
-    notes: notes || null,
-    completed_at: status === 'completed' ? new Date().toISOString() : null,
-    ...(nextStepDate ? { next_step_date: nextStepDate } : {}),
+  await apiRequest(session, '/tasks/steps/state', {
+    method: 'POST',
+    body: JSON.stringify({ taskId, stepId, action: 'update', status, notes: notes || null, nextStepDate: nextStepDate || null }),
   });
+  await refreshAfterMutation(session);
+}
+
+export async function configureTaskStep(
+  taskId: string,
+  stepId: string,
+  options: { assigneeId?: string | null; dependsOnStepId?: string | null; approvalRequired?: boolean },
+): Promise<void> {
+  const session = requireSession();
+  await apiRequest(session, '/tasks/steps/state', {
+    method: 'POST',
+    body: JSON.stringify({ taskId, stepId, action: 'configure', ...options }),
+  });
+  await refreshAfterMutation(session);
+}
+
+export async function reviewTaskStep(taskId: string, stepId: string, action: 'approve' | 'reject', notes?: string): Promise<void> {
+  const session = requireSession();
+  await apiRequest(session, '/tasks/steps/state', {
+    method: 'POST',
+    body: JSON.stringify({ taskId, stepId, action, notes: notes || null }),
+  });
+  await refreshAfterMutation(session);
 }
 
 export async function addTaskDailyUpdate(
@@ -244,26 +265,81 @@ export async function addTaskDailyUpdate(
 
 export async function addTaskSubtask(
   taskId: string,
-  subtask: { title: string; assigneeId: string; assigneeName: string; status: string; requiresApproval?: boolean; isApproved?: boolean; notes?: string },
+  subtask: { title: string; assigneeId: string; assigneeName: string; status: string; requiresApproval?: boolean; isApproved?: boolean; notes?: string; description?: string; priority?: string; dueDate?: string; location?: string; locationRequired?: boolean; proofRequired?: string; budget?: number },
 ): Promise<void> {
   const session = requireSession();
-  await mutateTaskResource(session, 'task-subtasks', 'POST', undefined, {
-    id: newId('sub'),
-    task_id: taskId,
-    title: subtask.title.trim(),
-    assignee_id: subtask.assigneeId,
-    assignee_name: subtask.assigneeName,
-    status: subtask.status,
-    requires_approval: Boolean(subtask.requiresApproval),
-    is_approved: Boolean(subtask.isApproved),
-    approved_by_manager: false,
-    notes: subtask.notes || null,
+  await apiRequest(session, '/tasks/subtasks/create', {
+    method: 'POST',
+    body: JSON.stringify({
+      taskId,
+      subtaskId: newId('sub'),
+      payload: {
+        title: subtask.title.trim(), assigneeId: subtask.assigneeId,
+        requiresApproval: subtask.requiresApproval ?? true, notes: subtask.notes || null,
+        description: subtask.description || '', priority: subtask.priority || 'medium',
+        dueDate: subtask.dueDate || null, location: subtask.location || '',
+        locationRequired: Boolean(subtask.locationRequired), proofRequired: subtask.proofRequired || null,
+        budget: subtask.budget || 0,
+      },
+    }),
   });
+  await refreshAfterMutation(session);
 }
 
 export async function updateTaskSubtaskStatus(taskId: string, subtaskId: string, status: string): Promise<void> {
   const session = requireSession();
-  await mutateTaskResource(session, 'task-subtasks', 'PATCH', `id=eq.${encodeURIComponent(subtaskId)}&task_id=eq.${encodeURIComponent(taskId)}`, { status });
+  await apiRequest(session, '/tasks/subtasks/state', {
+    method: 'POST',
+    body: JSON.stringify({ taskId, subtaskId, action: 'update', status }),
+  });
+  await refreshAfterMutation(session);
+}
+
+export async function reviewTaskSubtask(taskId: string, subtaskId: string, action: 'approve' | 'reject', notes?: string): Promise<void> {
+  const session = requireSession();
+  await apiRequest(session, '/tasks/subtasks/state', {
+    method: 'POST',
+    body: JSON.stringify({ taskId, subtaskId, action, notes: notes || null }),
+  });
+  await refreshAfterMutation(session);
+}
+
+export type TaskRequestRecord = {
+  id: string;
+  requested_by: string;
+  requested_by_name: string;
+  payload: Record<string, unknown>;
+  status: string;
+  review_notes?: string | null;
+  created_at: string;
+};
+
+export async function createTaskRequest(payload: Record<string, unknown>): Promise<void> {
+  const session = requireSession();
+  await apiRequest(session, '/tasks/requests', {
+    method: 'POST',
+    body: JSON.stringify({ requestId: newUuid(), payload }),
+  });
+  await refreshAfterMutation(session);
+}
+
+export async function listTaskRequests(): Promise<TaskRequestRecord[]> {
+  const session = requireSession();
+  return apiRequest<TaskRequestRecord[]>(session, '/task-requests?status=in.(submitted,changes_requested)&limit=100');
+}
+
+export async function reviewTaskRequest(requestId: string, action: 'approve' | 'reject' | 'changes_requested', notes?: string): Promise<void> {
+  const session = requireSession();
+  await apiRequest(session, '/tasks/requests/review', {
+    method: 'POST',
+    body: JSON.stringify({ requestId, action, notes: notes || null }),
+  });
+  await refreshAfterMutation(session);
+}
+
+export async function listTaskTypes(): Promise<Array<{ key: string; label_ar: string; category: string; location_required: boolean; proof_required: string | null; approval_required: boolean }>> {
+  const session = requireSession();
+  return apiRequest(session, '/task-types?active=true&limit=100');
 }
 
 export async function addTaskComment(
