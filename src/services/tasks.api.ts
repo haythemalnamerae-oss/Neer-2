@@ -328,6 +328,15 @@ export async function listTaskRequests(): Promise<TaskRequestRecord[]> {
   return apiRequest<TaskRequestRecord[]>(session, '/task-requests?limit=100');
 }
 
+export async function resubmitTaskRequest(requestId: string, payload: Record<string, unknown>): Promise<void> {
+  const session = requireSession();
+  await apiRequest(session, '/tasks/requests/resubmit', {
+    method: 'POST',
+    body: JSON.stringify({ requestId, payload }),
+  });
+  await refreshAfterMutation(session);
+}
+
 export async function reviewTaskRequest(requestId: string, action: 'approve' | 'reject' | 'changes_requested', notes?: string): Promise<void> {
   const session = requireSession();
   await apiRequest(session, '/tasks/requests/review', {
