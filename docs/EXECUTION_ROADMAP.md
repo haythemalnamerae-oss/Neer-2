@@ -59,3 +59,12 @@ A phase is complete only when code paths, authorization, data persistence and er
 10. Add authenticated integration tests for role matrix, cross-tenant access, direct RPC calls, storage traversal, maker-checker and finance balance invariants.
 
 These are audit findings and planned remediation, not claims that fixes have already been applied.
+
+
+## Service/UI trace priorities added 2026-11-12
+
+P0: server-side user provisioning; persist and hydrate system_settings; server-side task rescheduling; server-side standing-account active flag; make client permission state consume the same role_permissions snapshot as API; make finance snapshot pagination complete; retain finance idempotency key across retries and separate commit success from refresh failure; reconcile the standing-account/deficit finance invariants already recorded in SECURITY_AUDIT.md.
+
+P1: server-side notification read state; complete audit event coverage; server-side report aggregates; truthful deterministic-analysis labeling or real AI integration; explicit organization switcher; user-visible API/database error details; orphaned Storage cleanup and idempotent attachment registration; pagination and bounded loading states for all large collections.
+
+Do not migrate local settings or user records by silently promoting browser values to server data. Define tenant ownership and migration semantics first. Preserve current UI contracts while replacing the persistence implementation behind them.
