@@ -186,7 +186,7 @@ export async function loadUiSnapshot(session: ApiSession): Promise<void> {
   const permissionState = await apiRequest<{ role: Role; grants: Record<string, boolean> | null }>(session, '/permissions/me');
   if (permissionState.role !== session.role) throw new SessionError('تعذر مطابقة صلاحيات الجلسة مع عضوية المؤسسة.');
   setLivePermissionGrants(permissionState.role, permissionState.grants);
-  const common = ['tasks','task-checklist','task-steps','task-subtasks','task-updates','task-history','task-attachments','task-comments','task-events','task-assignees','follow-ups','notifications'];
+  const common = ['tasks','task-requests','task-types','task-checklist','task-steps','task-subtasks','task-updates','task-history','task-attachments','task-comments','task-events','task-assignees','follow-ups','notifications'];
   const finance = ['funds','expenses','settlements','settlement-expenses','cash-receipts','standing-accounts','fund-transactions','standing-account-entries'];
   const canReadUserDirectory = session.role === 'admin' || session.role === 'ops_manager';
   const canReadFinance = session.role === 'admin' || session.role === 'finance_officer';
@@ -225,8 +225,8 @@ export async function loadUiSnapshot(session: ApiSession): Promise<void> {
   const tasks = (data.tasks || []).map((raw) => {
     const task = fromSnake(raw);
     task.checklist = children(checklist, task.id).map((item) => ({ id: item.id, text: item.text, completed: item.completed }));
-    task.steps = children(steps, task.id).map((item) => ({ id: item.id, title: item.title, status: item.status, plannedTime: item.plannedTime, completedAt: item.completedAt, notes: item.notes, order: item.sortOrder }));
-    task.subTasks = children(subtasks, task.id).map((item) => ({ id: item.id, title: item.title, assigneeId: item.assigneeId || '', assigneeName: item.assigneeName, status: item.status, requiresApproval: item.requiresApproval, isApproved: item.isApproved, approvedByManager: item.approvedByManager, dueDate: item.dueDate, notes: item.notes }));
+    task.steps = children(steps, task.id).map((item) => ({ id: item.id, title: item.title, status: item.status, plannedTime: item.plannedTime, completedAt: item.completedAt, notes: item.notes, order: item.sortOrder, assignedTo: item.assignedTo, approvalRequired: item.approvalRequired, approvalStatus: item.approvalStatus, approvedBy: item.approvedBy, approvedAt: item.approvedAt, rejectionReason: item.rejectionReason, dependsOnStepId: item.dependsOnStepId }));
+    task.subTasks = children(subtasks, task.id).map((item) => ({ id: item.id, title: item.title, assigneeId: item.assigneeId || '', assigneeName: item.assigneeName, status: item.status, requiresApproval: item.requiresApproval, isApproved: item.isApproved, approvedByManager: item.approvedByManager, dueDate: item.dueDate, notes: item.notes, approvalStatus: item.approvalStatus, approvedBy: item.approvedBy, approvedAt: item.approvedAt, rejectionReason: item.rejectionReason, priority: item.priority, description: item.description, location: item.location, locationRequired: item.locationRequired, proofRequired: item.proofRequired, budget: Number(item.budget || 0), startedAt: item.startedAt, completedAt: item.completedAt }));
     task.dailyUpdates = children(updates, task.id).map((item) => ({ id: item.id, authorId: item.authorId || '', authorName: item.authorName, date: item.updateDate, text: item.text, createdAt: item.createdAt }));
     const storedHistory = children(histories, task.id).map((item) => ({ id: item.id, action: item.action, performedBy: item.performedBy, timestamp: item.createdAt, notes: item.notes }));
     const auditedEventIds = new Set(storedHistory
