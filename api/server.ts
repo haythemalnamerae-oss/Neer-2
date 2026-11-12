@@ -227,7 +227,7 @@ app.get('/api/v1/reports/summary', async (req, res) => {
     }
     const teamPerformance = users.map((user) => {
       const assignedIds = assigneeTaskIds.get(user.id) || new Set<string>();
-      const own = tasks.filter((t) => assignedIds.size ? assignedIds.has(String(t.id)) : t.assignee_id === user.id);
+      const own = tasks.filter((t) => t.assignee_id === user.id || assignedIds.has(String(t.id)));
       const completed = own.filter((t) => ['completed','approved'].includes(t.status)).length;
       const minutes = own.reduce((sum, t) => sum + Math.max(0, Number(t.time_spent_minutes || 0)), 0);
       const onTime = own.filter((t) => ['completed','approved'].includes(t.status) && t.actual_end_time && t.due_date && String(t.actual_end_time).slice(0,10) <= t.due_date).length;
