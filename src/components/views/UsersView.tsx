@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Users,
   UserPlus,
@@ -7,13 +7,32 @@ import {
 import { dataStore } from '../../lib/storage';
 import { ROLE_LABELS } from '../../lib/rbac/permissions';
 import { Button } from '../ui/button';
+import { hasPermission } from '../../lib/rbac/permissions';
+import { inviteOrganizationUser } from '../../services/users.api';
 
 export const UsersView: React.FC = () => {
-
   const users = dataStore.getUsers();
+  const currentUser = dataStore.getCurrentUser();
+  const canInvite = hasPermission(currentUser.role, 'users', 'create');
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState<'ops_manager' | 'finance_officer' | 'field_officer' | 'viewer'>('field_officer');
+  const [phone, setPhone] = useState('');
+  const [department, setDepartment] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  const handleAddUser = () => {
-    window.alert('لإنشاء مستخدم فعلي، أنشئ دعوة له من Supabase Auth ثم اربط حسابه بعضوية المؤسسة وملف app_users. تم تعطيل الإضافة المحلية لأنها لا تنشئ حساب دخول أو عضوية حقيقية.');
+  const handleAddUser = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!name.trim() || !email.trim() || saving) return;
+    setSaving(true);
+    try {
+      await inviteOrganizationUser({ name: name.trim(), email: email.trim(), role, phone, department });
+      setInviteOpen(false); setName(''); setEmail(''); setPhone(''); setDepartment('');
+      window.alert('تم إرسال دعوة الدخول وربط ملف المستخدم بعضوية المؤسسة. سيكمل المستخدم إنشاء كلمة مروره من رسالة الدعوة.');
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'تعذر إرسال الدعوة. تحقق من إعداد خدمة دعوات Supabase.');
+    } finally { setSaving(false); }
   };
 
   return (
@@ -30,16 +49,42 @@ export const UsersView: React.FC = () => {
           </p>
         </div>
 
-        <Button
+        {canInvite && <Button
           variant="primary"
           size="md"
-          onClick={handleAddUser}
+          onClick={() => setInviteOpen(true)}
           icon={<UserPlus className="w-5 h-5 stroke-[2.5]" />}
           className="text-xs sm:text-sm font-bold min-h-[44px]"
         >
-          إضافة مستخدم جديد
-        </Button>
+          دعوة مستخدم جديد
+        </Button>}
       </div>
+
+      {inviteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <form onSubmit={handleAddUser} className="w-full max-w-lg rounded-3xl bg-[#EAF0EC] p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 className="font-black text-lg text-slate-800">دعوة مستخدم إلى المؤسسة</h3>
+              <button type="button" onClick={() => setInviteOpen(false)} className="text-slate-500">إغلاق</button>
+            </div>
+            <p className="text-xs text-slate-600">سيتم إرسال رابط دعوة عبر البريد، ولا يتم إنشاء كلمة مرور أو تخزينها في النظام.</p>
+            <input required maxLength={160} value={name} onChange={(e) => setName(e.target.value)} placeholder="الاسم الكامل" className="w-full rounded-xl p-3"/>
+            <input required type="email" maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="البريد الإلكتروني" className="w-full rounded-xl p-3"/>
+            <select value={role} onChange={(e) => setRole(e.target.value as typeof role)} className="w-full rounded-xl p-3">
+              <option value="field_officer">موظف ميداني</option>
+              <option value="ops_manager">مدير عمليات</option>
+              <option value="finance_officer">مسؤول مالي</option>
+              <option value="viewer">مشاهد</option>
+            </select>
+            <input maxLength={40} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="الهاتف (اختياري)" className="w-full rounded-xl p-3"/>
+            <input maxLength={100} value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="القسم (اختياري)" className="w-full rounded-xl p-3"/>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setInviteOpen(false)}>إلغاء</Button>
+              <Button type="submit" variant="primary" disabled={saving}>{saving ? 'جارٍ إرسال الدعوة...' : 'إرسال الدعوة'}</Button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* Users Table */}
       <div className="neu-raised-lg rounded-3xl p-5 sm:p-6 overflow-hidden">
