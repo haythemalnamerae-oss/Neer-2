@@ -3,7 +3,7 @@
 **Audit date:** 2026-11-12  
 **Supabase project:** `xtfuvxomfhlfjtpljofh` (Neer2 linked project)  
 **Database:** PostgreSQL 17.11, project status `ACTIVE_HEALTHY`  
-**Method:** catalog and read-only SQL inspection; no DDL or DML executed.
+**Method:** baseline catalog and read-only SQL inspection before the five additive migrations documented below; no financial/business DML was executed during the subsequent fixes.
 
 ## Schema inventory
 
