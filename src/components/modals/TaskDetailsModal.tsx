@@ -1011,7 +1011,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                             {st.approvalStatus === 'approved' || st.isApproved ? 'معتمد' : st.approvalStatus === 'rejected' ? 'مرفوض' : 'بانتظار الاعتماد'}
                           </span>
                         )}
-                        {st.approvalStatus === 'pending' && currentUser.role !== 'field_officer' && (
+                        {st.approvalStatus === 'pending' && canApproveTask && (
                           <div className="flex gap-1">
                             <Button size="sm" variant="primary" onClick={() => void reviewTaskSubtask(task.id, st.id, 'approve').catch((error) => window.alert(error instanceof Error ? error.message : 'تعذر اعتماد المهمة الفرعية.'))}>اعتماد</Button>
                             <Button size="sm" variant="outline" onClick={() => { const reason = window.prompt('سبب رفض المهمة الفرعية:'); if (reason?.trim()) void reviewTaskSubtask(task.id, st.id, 'reject', reason).catch((error) => window.alert(error instanceof Error ? error.message : 'تعذر رفض المهمة الفرعية.')); }}>رفض</Button>
