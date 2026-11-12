@@ -123,15 +123,19 @@ All callable SECURITY DEFINER functions must remain individually reviewed for ac
 
 ## 8. Migration and documentation drift
 
-The remote migration ledger reports 24 applied migrations. The latest ledger entries were not found as matching files during targeted GitHub path/search checks. The previous supabase/README.md also incorrectly said no live Supabase connection existed and described an obsolete setup flow. The README was corrected to reflect the live project and current security boundaries.
+The live remote migration ledger now reports 28 applied migrations through `20261112140138`. Four additional migrations were applied during the current execution: task approval maker-checker, organization settings persistence, organization settings read, and selected-organization scoping for both settings RPCs.
+
+Two earlier applied migrations (`20261112123426` and `20261112123539`) were not found as matching files during targeted repository path/search checks. Do not run `supabase db push` until those source files are restored or the migration history is reconciled from an authoritative backup. The current applied database state is live and verified; repository migration reproducibility is not yet 100%.
 
 ## 9. Verification boundaries
 
-- Read-only schema/catalog/policy/function/trigger/grant/storage/data queries were used.
-- Transaction-scoped negative authorization tests were rolled back.
-- No DDL, business DML, migration, role grant change, Auth setting change, branch creation/deletion, cloud build, or deployment was performed.
-- No local lint/build/browser/mobile E2E was run; those remain owner-local validation.
-- Zero-row finance data prevents meaningful live reconciliation or positive workflow E2E.
+- Live catalog checks confirm 28 public application tables, RLS enabled on all 28, and 73 policies.
+- Live SQL checks confirm the task approval RPC includes maker-checker and settings read/write RPCs exist.
+- The task, settings, notification and audit tables were empty at the latest check; positive business E2E cannot be demonstrated against production records.
+- No financial business rows were changed.
+- Four additive DDL migrations were applied as part of this execution; no historical finance DML was run.
+- No local lint/build/browser/mobile E2E, cloud build, or deployment was run. The owner must pull main and validate locally.
+- The UI/API changes were reviewed statically; compile/runtime behavior remains unverified until local validation.
 
 ## 10. Acceptance assessment
 
