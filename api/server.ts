@@ -169,6 +169,26 @@ app.post('/api/v1/tasks/requests', async (req, res) => {
   }
 });
 
+app.post('/api/v1/tasks/requests/resubmit', async (req, res) => {
+  const auth = (req as AuthenticatedRequest).auth;
+  try {
+    const body = req.body as Record<string, unknown> | undefined;
+    if (!body || typeof body.requestId !== 'string' || !uuidPattern.test(body.requestId) ||
+        !body.payload || typeof body.payload !== 'object' || Array.isArray(body.payload)) {
+      return res.status(400).json({ error: { code: 'INVALID_TASK_REQUEST_RESUBMISSION', message: 'Request UUID and updated task payload are required.' } });
+    }
+    const response = await supabaseFetch('/rest/v1/rpc/resubmit_task_request', auth.token, {
+      method: 'POST',
+      body: JSON.stringify({ p_organization_id: auth.organizationId, p_request_id: body.requestId, p_payload: body.payload }),
+    });
+    if (!response.ok) return sendDbError(res, response.status, await response.text());
+    return res.status(200).json(await response.json());
+  } catch (error) {
+    console.error('Task request resubmission failed:', error);
+    return res.status(503).json({ error: { code: 'TASK_REQUEST_RESUBMISSION_FAILED', message: 'The task request could not be resubmitted.' } });
+  }
+});
+
 app.post('/api/v1/tasks/requests/review', async (req, res) => {
   const auth = (req as AuthenticatedRequest).auth;
   try {
