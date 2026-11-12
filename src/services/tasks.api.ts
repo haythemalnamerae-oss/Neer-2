@@ -55,11 +55,10 @@ async function mutateTaskResource<T = unknown>(
     method,
     ...(payload ? { body: JSON.stringify(payload) } : {}),
   });
-  try {
-    await refreshAfterMutation(session);
-  } catch (error) {
-    console.error('Task mutation was committed but the view refresh failed; reload to see the latest state:', error);
-  }
+  // The server mutation is already committed at this point. Surface a distinct
+  // saved-but-refresh-failed error so the UI never silently shows stale data or
+  // invites the user to repeat a mutation that may already have succeeded.
+  await refreshAfterMutation(session);
   return result;
 }
 
