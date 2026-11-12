@@ -91,9 +91,26 @@ export const ReportsView: React.FC = () => {
                 <div className="rounded-xl neu-inset-sm p-3"><span className="text-[11px] text-slate-500">الرصيد المتبقي</span><strong className="block text-lg">{serverSummary.finance.totalRemainingFunds.toLocaleString('en')} {serverSummary.finance.currency}</strong></div>
                 <div className="rounded-xl neu-inset-sm p-3"><span className="text-[11px] text-slate-500">المصروفات</span><strong className="block text-lg">{serverSummary.finance.totalExpensesAmount.toLocaleString('en')} {serverSummary.finance.currency}</strong></div>
                 <div className="rounded-xl neu-inset-sm p-3"><span className="text-[11px] text-slate-500">مصروفات بانتظار الاعتماد</span><strong className="block text-lg">{serverSummary.finance.pendingExpensesCount}</strong></div>
+                <div className="rounded-xl neu-inset-sm p-3"><span className="text-[11px] text-slate-500">مبلغ قيد الاعتماد</span><strong className="block text-lg">{serverSummary.finance.pendingExpensesAmount.toLocaleString('en')} {serverSummary.finance.currency}</strong></div>
+                <div className="rounded-xl neu-inset-sm p-3"><span className="text-[11px] text-slate-500">مستحقات الموردين</span><strong className="block text-lg">{serverSummary.finance.totalSupplierPayables.toLocaleString('en')} {serverSummary.finance.currency}</strong></div>
+                <div className="rounded-xl neu-inset-sm p-3"><span className="text-[11px] text-slate-500">المستحقات لنا</span><strong className="block text-lg">{serverSummary.finance.totalReceivables.toLocaleString('en')} {serverSummary.finance.currency}</strong></div>
               </div>
             )}
-            {serverSummary.teamPerformance.length > 0 && <p className="text-xs text-slate-600">تم تجميع أداء {serverSummary.teamPerformance.length} مستخدمًا من سجلات المهام الفعلية.</p>}
+            {serverSummary.teamPerformance.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-slate-600">أداء الفريق من سجلات المهام ({serverSummary.teamPerformance.length})</p>
+                {serverSummary.teamPerformance.slice(0,5).map((person) => (
+                  <div key={person.userId} className="grid grid-cols-2 md:grid-cols-5 gap-2 rounded-xl neu-inset-sm p-3 text-xs">
+                    <strong>{person.name}</strong>
+                    <span>المكتمل: {person.completedTasks}/{person.assignedTasks}</span>
+                    <span>الإنجاز: {person.completionRate}%</span>
+                    <span>العمل الفعلي: {person.actualWorkHours} س</span>
+                    <span>في الموعد: {person.onTimeRate}%</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-[10px] text-slate-500">تنبيه: الرسوم والتفاصيل التحليلية أدناه ما زالت تستخدم ReportsService وبيانات الجلسة؛ الملخص أعلاه هو المؤشر الخادمي المباشر.</p>
           </>
         ) : !serverSummaryError ? <p className="text-xs text-slate-500">جارٍ تحميل البيانات الخادمية…</p> : null}
       </section>
