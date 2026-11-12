@@ -97,6 +97,21 @@ app.get('/api/v1/me', async (req, res) => {
   return res.json(rows[0]);
 });
 
+app.get('/api/v1/permissions/me', async (req, res) => {
+  const auth = (req as AuthenticatedRequest).auth;
+  if (auth.role === 'admin') return res.json({ role: auth.role, grants: null });
+  const query = new URLSearchParams({
+    select: 'permission_key,granted',
+    organization_id: `eq.${auth.organizationId}`,
+    role_key: `eq.${auth.role}`,
+    limit: '500',
+  });
+  const response = await supabaseFetch(`/rest/v1/role_permissions?${query}`, auth.token);
+  if (!response.ok) return sendDbError(res, response.status, await response.text());
+  const rows = await response.json() as Array<{ permission_key: string; granted: boolean }>;
+  return res.json({ role: auth.role, grants: Object.fromEntries(rows.map((row) => [row.permission_key, row.granted])) });
+});
+
 app.post('/api/v1/tasks/create-bundle', async (req, res) => {
   const auth = (req as AuthenticatedRequest).auth;
   try {
@@ -449,9 +464,23 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
     return res.status(409).json({ error: { code: 'TASK_BUNDLE_REQUIRED', message: 'Create tasks through the atomic create-bundle workflow.' } });
   }
   if (req.params.resource === 'tasks' && req.method === 'PATCH') {
-    return res.status(409).json({ error: { code: 'TASK_WORKFLOW_REQUIRED', message: 'Use dedicated lifecycle, outcome, and review workflows for task state changes.' } });
+    const patch = req.body as Record<string, unknown> | undefined;
+    const keys = Object.keys(patch || {});
+    const schedulableFields = new Set(['due_date', 'start_date', 'due_time']);
+    if (!patch || keys.length === 0 || keys.some((key) => !schedulableFields.has(key)) ||
+        (patch.due_date !== undefined && (typeof patch.due_date !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(patch.due_date))) ||
+        (patch.start_date !== undefined && (typeof patch.start_date !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(patch.start_date))) ||
+        (patch.due_time !== undefined && patch.due_time !== null && (typeof patch.due_time !== 'string' || !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(patch.due_time)))) {
+      return res.status(409).json({ error: { code: 'TASK_WORKFLOW_REQUIRED', message: 'Only due date, start date and due time may be changed through scheduling. Lifecycle, outcome and approval require dedicated workflows.' } });
+    }
   }
-  const action = (req.method === 'POST' && (taskChildResources.has(req.params.resource) || req.params.resource === 'task-events')) || (['task-attachments','task-assignees'].includes(req.params.resource) && req.method === 'DELETE') ? 'edit' : req.method === 'GET' ? 'view' : req.method === 'POST' ? 'create' : req.method === 'PATCH' ? 'edit' : req.method === 'DELETE' ? 'delete' : '';
+  if (req.params.resource === 'notifications' && req.method === 'PATCH') {
+    const patch = req.body as Record<string, unknown> | undefined;
+    if (!auth.appUserId || !req.params.id || !patch || Object.keys(patch).length !== 1 || patch.is_read !== true) {
+      return res.status(409).json({ error: { code: 'NOTIFICATION_READ_ONLY', message: 'Only marking your own notification as read is allowed.' } });
+    }
+  }
+  const action = (req.method === 'POST' && (taskChildResources.has(req.params.resource) || req.params.resource === 'task-events')) || (['task-attachments','task-assignees'].includes(req.params.resource) && req.method === 'DELETE') || (req.params.resource === 'notifications' && req.method === 'PATCH') ? 'view' : req.method === 'GET' ? 'view' : req.method === 'POST' ? 'create' : req.method === 'PATCH' ? 'edit' : req.method === 'DELETE' ? 'delete' : '';
   if (action !== 'view' && transactionOnlyResources.has(req.params.resource)) {
     return res.status(409).json({ error: { code: 'FINANCIAL_TRANSACTION_REQUIRED', message: 'Financial records are read-only through generic CRUD. Use a dedicated transactional workflow so balances, approvals, and audit records remain atomic.' } });
   }
@@ -472,6 +501,9 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
 
   const query = new URLSearchParams({ select: '*', organization_id: `eq.${auth.organizationId}` });
   if (req.params.id) query.set('id', `eq.${req.params.id}`);
+  if (req.params.resource === 'notifications' && req.method === 'PATCH') {
+    query.set('user_id', `eq.${auth.appUserId}`);
+  }
 
   // Enforce field-officer row scope at the API boundary as defense in depth.
   // The database RLS policies remain authoritative; this prevents broad snapshot
