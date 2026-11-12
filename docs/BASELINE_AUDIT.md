@@ -49,3 +49,11 @@ The project is a modular web monolith with a live Supabase backend. The backend 
 - The expanded UI trace identified local-only user creation, settings persistence, calendar rescheduling, notification read-state changes, and standing-account activation/deactivation.
 - The Supabase setup README contained stale claims that no live project connection existed; the follow-up documentation corrects that operational record.
 - No source behavior, schema, policy, role grant, or business record was changed during the follow-up audit.
+
+
+## Complete source-level UI/service trace (2026-11-12)
+
+- All 18 views mounted by src/App.tsx were enumerated and traced to their data sources, service calls and server workflows.
+- Shared shell, auth gate, global modals, task detail/outcome, GPS, storage, finance, RBAC and generic resource API paths were reviewed.
+- The full route-to-service matrix and confirmed persistence gaps are in docs/SERVICE_UI_TRACE.md.
+- Static trace coverage is complete for the discovered mounted views and API paths; runtime/browser/mobile behavior is not claimed complete without local tests.
