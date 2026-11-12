@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Plus,
   Search,
@@ -13,7 +13,7 @@ import { dataStore } from '../../lib/storage';
 import { hasPermission } from '../../lib/rbac/permissions';
 import { TASK_PRIORITY_CONFIG, TASK_STATUS_CONFIG, formatCurrency } from '../../lib/utils/format';
 import { Button } from '../ui/button';
-import { cancelTaskOnServer } from '../../services/tasks.api';
+import { cancelTaskOnServer, listTaskRequests, reviewTaskRequest, type TaskRequestRecord } from '../../services/tasks.api';
 
 interface TasksViewProps {
   onOpenNewTask: () => void;
@@ -33,9 +33,29 @@ export const TasksView: React.FC<TasksViewProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
+  const [taskRequests, setTaskRequests] = useState<TaskRequestRecord[]>([]);
+  const [requestError, setRequestError] = useState('');
+  const canSubmitRequest = currentUser.role === 'field_officer';
+  const canReviewRequests = hasPermission(currentUser.role, 'tasks', 'approve');
+
+  useEffect(() => {
+    let active = true;
+    void listTaskRequests().then((rows) => { if (active) setTaskRequests(rows.filter((row) => ['submitted','changes_requested'].includes(row.status))); })
+      .catch((error) => { if (active) setRequestError(error instanceof Error ? error.message : 'تعذر تحميل طلبات المهام.'); });
+    return () => { active = false; };
+  }, []);
+
+  const handleRequestReview = async (requestId: string, action: 'approve' | 'reject' | 'changes_requested') => {
+    const notes = action === 'approve' ? undefined : window.prompt(action === 'reject' ? 'سبب الرفض:' : 'ما التعديلات المطلوبة؟');
+    if (action !== 'approve' && !notes?.trim()) return;
+    try {
+      await reviewTaskRequest(requestId, action, notes || undefined);
+      setTaskRequests((items) => items.filter((item) => item.id !== requestId));
+    } catch (error) { window.alert(error instanceof Error ? error.message : 'تعذر مراجعة الطلب.'); }
+  };
 
   const currentUser = dataStore.getCurrentUser();
-  const canCreateTask = hasPermission(currentUser.role, 'tasks', 'create');
+  const canCreateTask = hasPermission(currentUser.role, 'tasks', 'create') || canSubmitRequest;
   const canDeleteTask = hasPermission(currentUser.role, 'tasks', 'delete');
   const canRecordOutcome = hasPermission(currentUser.role, 'tasks', 'edit');
   const allTasks = dataStore.getTasks();
@@ -119,10 +139,38 @@ export const TasksView: React.FC<TasksViewProps> = ({
             icon={<Plus className="w-5 h-5 stroke-[2.5]" />}
             className="text-xs sm:text-sm font-bold min-h-[44px]"
           >
-            مهمة جديدة
+            {canSubmitRequest ? 'طلب مهمة جديدة' : 'مهمة جديدة'}
           </Button>}
         </div>
       </div>
+
+      {(canReviewRequests || canSubmitRequest) && (
+        <section className="neu-raised-lg rounded-3xl p-5 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="font-black text-sm text-[#142B1D]">طلبات إنشاء المهام</h3>
+            <span className="text-xs font-bold text-slate-500">{taskRequests.length} طلبات بانتظار المراجعة</span>
+          </div>
+          {requestError && <p className="text-xs text-rose-700">{requestError}</p>}
+          {taskRequests.length === 0 ? <p className="text-xs text-slate-500">لا توجد طلبات ظاهرة لهذا الحساب.</p> :
+            taskRequests.map((request) => (
+              <div key={request.id} className="rounded-2xl neu-inset-sm p-3 space-y-2">
+                <div className="flex items-start justify-between gap-3">
+                  <strong className="text-sm">{String(request.payload.title || 'طلب مهمة')}</strong>
+                  <span className="text-[11px] text-slate-500">{request.status === 'submitted' ? 'جديد' : 'مطلوب تعديل'}</span>
+                </div>
+                <p className="text-xs text-slate-600">مقدم الطلب: {request.requested_by_name} · الموعد: {String(request.payload.dueDate || 'غير محدد')}</p>
+                {request.review_notes && <p className="text-xs text-amber-800">ملاحظة المراجعة: {request.review_notes}</p>}
+                {canReviewRequests && (
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="primary" onClick={() => void handleRequestReview(request.id, 'approve')}>اعتماد وتحويل إلى مهمة</Button>
+                    <Button size="sm" variant="outline" onClick={() => void handleRequestReview(request.id, 'changes_requested')}>طلب تعديل</Button>
+                    <Button size="sm" variant="outline" onClick={() => void handleRequestReview(request.id, 'reject')}>رفض</Button>
+                  </div>
+                )}
+              </div>
+            ))}
+        </section>
+      )}
 
       {/* Filter Toolbar */}
       <div className="neu-raised rounded-3xl p-5 sm:p-6 space-y-4">
