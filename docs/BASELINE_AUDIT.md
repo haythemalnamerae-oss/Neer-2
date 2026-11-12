@@ -38,3 +38,14 @@ The main-only guard workflow has write permission to repository contents and run
 ## Baseline disposition
 
 The project is a modular web monolith with a live Supabase backend. The backend has materially advanced beyond some existing architecture documentation: dedicated transactional task and finance workflows exist, while legacy synchronous store services still remain. The next phase must migrate remaining UI mutation paths without replacing current view contracts or weakening RLS.
+
+
+## Follow-up deep-dive audit (2026-11-12)
+
+- Expanded catalog review enumerated 28 public application tables, their columns, primary/foreign/check/unique constraints, indexes, RLS flags, 73 RLS policies, 21 public functions, 21 private functions, and 54 public-table trigger events.
+- Confirmed all 28 public application tables have RLS and at least one policy; none has FORCE ROW LEVEL SECURITY enabled. Authenticated table grants are broader than policy access on several operational tables, so policy correctness remains the effective boundary.
+- Read-only finance reconciliation queries returned zero current exceptions, but all operational and finance tables are empty. This is a zero-row structural check, not a live-data reconciliation proof.
+- Transaction-scoped negative authorization checks for a non-member were completed against finance fund creation, finance expense creation, and task lifecycle RPCs; the paths rejected the request. No business rows were committed.
+- The expanded UI trace identified local-only user creation, settings persistence, calendar rescheduling, notification read-state changes, and standing-account activation/deactivation.
+- The Supabase setup README contained stale claims that no live project connection existed; the follow-up documentation corrects that operational record.
+- No source behavior, schema, policy, role grant, or business record was changed during the follow-up audit.
