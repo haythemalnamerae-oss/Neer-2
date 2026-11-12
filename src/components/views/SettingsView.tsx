@@ -18,6 +18,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { NewStandingAccountModal } from '../modals/NewStandingAccountModal';
 import { saveOrganizationSettings } from '../../services/settings.api';
+import { FinanceApiService } from '../../services/finance-api.service';
 
 export const SettingsView: React.FC = () => {
   const initialSettings = dataStore.getSettings();
@@ -132,7 +133,12 @@ export const SettingsView: React.FC = () => {
               <div key={account.id} className="neu-inset-sm rounded-2xl p-3 flex items-center gap-3 min-w-0">
                 {account.imageUrl ? <img src={account.imageUrl} alt="" className="w-11 h-11 rounded-xl object-cover shrink-0" /> : <div className="w-11 h-11 rounded-xl neu-raised flex items-center justify-center shrink-0"><Store className="w-5 h-5 text-emerald-700" /></div>}
                 <div className="min-w-0 flex-1"><p className="font-extrabold text-xs text-slate-800 truncate">{account.name}</p><p className="text-[11px] text-slate-500 truncate">{account.vendorName || account.category}</p>{account.active === false && <span className="text-[10px] text-rose-700 font-bold">موقوف</span>}{account.referenceImageUrl && <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-bold mt-1"><FileImage className="w-3 h-3" /> مستند مرجعي محفوظ</span>}</div>
-                {canManageStandingAccounts && account.active !== false && <button type="button" aria-label={`إيقاف ${account.name}`} onClick={() => { if (window.confirm(`سيتم إيقاف الحساب ${account.name} مع الاحتفاظ بسجله المالي. هل تريد المتابعة؟`)) { dataStore.deleteStandingAccount(account.id); setAccountsVersion((version) => version + 1); } }} className="p-2 text-rose-600 rounded-xl neu-button"><Trash2 className="w-4 h-4" /></button>}
+                {canManageStandingAccounts && account.active !== false && <button type="button" aria-label={`إيقاف ${account.name}`} onClick={() => {
+                  if (!window.confirm(`سيتم إيقاف الحساب ${account.name} مع الاحتفاظ بسجله المالي. هل تريد المتابعة؟`)) return;
+                  void FinanceApiService.setStandingAccountActive(account.id, false, 'إيقاف الحساب من إعدادات المنشأة')
+                    .then(() => setAccountsVersion((version) => version + 1))
+                    .catch((error) => window.alert(error instanceof Error ? error.message : 'تعذر إيقاف الحساب.'));
+                }} className="p-2 text-rose-600 rounded-xl neu-button"><Trash2 className="w-4 h-4" /></button>}
               </div>
             ))}
           </div>
