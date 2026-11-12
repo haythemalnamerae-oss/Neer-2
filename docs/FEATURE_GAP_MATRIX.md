@@ -25,7 +25,7 @@
 
 ## Important frontend persistence boundary
 
-The app loads an authenticated server snapshot into the legacy synchronous `dataStore`. The store still imports demo initial data and retains local-storage helpers and synchronous mutation methods. The latest changes reduce persistence of sensitive user identity/finance snapshots, but the existence of an API service does not prove every legacy screen uses it. Treat unverified `dataStore` mutations as local-only until call-site tracing confirms a server request and successful snapshot refresh.
+The app loads an authenticated server snapshot into the legacy synchronous `dataStore`. The store still imports demo initial data and retains local-storage helpers and synchronous mutation methods. Task request, step, subtask, user invitation and report-summary paths now use dedicated server APIs/RPCs; unverified legacy `dataStore` mutations remain local-only until call-site tracing confirms a server request and successful snapshot refresh.
 
 ## Role mapping target
 
@@ -54,7 +54,7 @@ Current persisted roles: `admin`, `ops_manager`, `finance_officer`, `field_offic
 | Calendar reschedule | CalendarView → `rescheduleTaskOnServer` → `PATCH /tasks/:id` | Server-backed; API allows only due_date/start_date/due_time on generic task PATCH |
 | Notification read state | Header → `notifications.api.ts` → scoped `PATCH /notifications/:id` | Server-backed; API filters by authenticated app user and permits only `is_read=true` |
 | Standing-account activation/deactivation | FundsView / SettingsView → FinanceApiService → `set_standing_account_active` RPC | Server-backed; audited status change, ledger history retained |
-| Dashboard and reports | ReportsService aggregates hydrated dataStore collections | Client-derived; no server-side reporting engine |
+| Dashboard and reports | `/reports/summary` aggregates paged server records; legacy ReportsService still powers detailed charts/exports | Summary server-backed; detailed views partly client-derived |
 | Audit display | AuditLogsView reads the loaded snapshot | Server read exists; write policy requires narrowing and complete audit coverage |
 
 ### Snapshot limits
@@ -65,7 +65,7 @@ loadUiSnapshot fetches each collection with limit=500 and no pagination loop. La
 
 - dataStore still initializes from mockData and legacy localStorage. Authenticated hydration replaces selected operational/finance collections, but Settings are not hydrated from the server.
 - PeerSyncEngine and sourceRegistry contain legacy/offline/demo material; the targeted code search found no active import of PeerSyncEngine. Treat embedded legacy schema/source snippets as documentation/demo, not the live Supabase schema.
-- The authenticated UI is not proof that every visible action is server-backed. The local-only rows above must be migrated before operational acceptance.
+- The authenticated UI is not proof that every visible action is server-backed. The remaining detailed reporting, some legacy follow-up paths and unverified local store actions must be migrated/tested before operational acceptance.
 
 
 ## Complete UI and service trace (2026-11-12)
