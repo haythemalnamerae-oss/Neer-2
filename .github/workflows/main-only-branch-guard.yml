@@ -19,7 +19,7 @@ jobs:
     if: github.ref != 'refs/heads/main' || github.event_name == 'create' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - name: Remove every non-main branch
+      - name: Reset reserved branches and remove all others
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
@@ -30,30 +30,50 @@ jobs:
         run: |
           set -euo pipefail
 
-          delete_branch() {
+          MAIN_SHA="$(gh api "repos/$REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+
+          reset_reserved_branch() {
+            local branch="$1"
+            echo "Resetting reserved branch to main: $branch"
+            gh api --method PATCH "repos/$REPOSITORY/git/refs/heads/$branch" \
+              -f sha="$MAIN_SHA" -F force=true
+          }
+
+          delete_forbidden_branch() {
             local branch="$1"
             [ "$branch" = "main" ] && return 0
-            echo "Removing forbidden branch: $branch"
-            gh api --method DELETE "repos/$REPOSITORY/git/refs/heads/$branch" || {
-              echo "::error::Could not delete forbidden branch: $branch"
-              return 1
-            }
+            echo "Deleting unapproved branch: $branch"
+            gh api --method DELETE "repos/$REPOSITORY/git/refs/heads/$branch"
+          }
+
+          enforce_branch() {
+            local branch="$1"
+            case "$branch" in
+              "fix/vercel-routing-performance"|"v0/mobile-responsive-fix")
+                reset_reserved_branch "$branch"
+                ;;
+              "main")
+                ;;
+              *)
+                delete_forbidden_branch "$branch"
+                ;;
+            esac
           }
 
           if [ "$EVENT_NAME" = "create" ]; then
             if [ "$REF_TYPE" = "branch" ]; then
-              delete_branch "$EVENT_REF"
+              enforce_branch "$EVENT_REF"
             fi
             exit 0
           fi
 
           if [ "$EVENT_NAME" = "push" ]; then
-            delete_branch "$REF_NAME"
+            enforce_branch "$REF_NAME"
             exit 0
           fi
 
-          # Manual recovery/sweep: retain main and delete every other branch.
+          # Manual recovery: keep main, reset the two reserved branches, delete all others.
           gh api --paginate "repos/$REPOSITORY/branches?per_page=100" --jq '.[].name' |
             while IFS= read -r branch; do
-              [ -n "$branch" ] && delete_branch "$branch"
+              [ -n "$branch" ] && enforce_branch "$branch"
             done
