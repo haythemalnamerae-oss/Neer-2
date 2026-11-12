@@ -133,6 +133,7 @@
 - GET `/api/v1/permissions/me`
 - GET `/api/v1/settings/me`
 - POST `/api/v1/settings/save`
+- POST `/api/v1/finance/standing-account-status`
 - POST `/api/v1/tasks/create-bundle`
 - POST `/api/v1/tasks/record-outcome`
 - POST `/api/v1/tasks/review`
@@ -165,7 +166,7 @@ tasks, task-events, task-assignees, task-checklist, task-steps, task-subtasks, t
 1. **Provisioning المستخدمين غير متاح داخل الواجهة:** تم تعطيل الإضافة المحلية الوهمية وإزالة الأدوار غير المدعومة. يلزم بناء دعوة Supabase Auth موثوقة وربط app_users وorganization_members قبل تمكين إنشاء المستخدم من الواجهة.
 2. **إعدادات المؤسسة:** تم ربط القراءة والحفظ بـ`get_organization_settings` و`save_organization_settings` مع التحقق من العضوية النشطة للمؤسسة المحددة والصلاحيات. جدول `system_settings` لا يزال بلا صفوف حتى يحفظ المدير القيم الفعلية من الشاشة.
 3. **تم إصلاح التقويم:** `CalendarView` يستدعي `rescheduleTaskOnServer`، وAPI يسمح فقط بتعديل due_date/start_date/due_time ويترك تغييرات الحالة لمسارات lifecycle/outcome/review.
-4. **إيقاف الحساب الدائم محلي:** أزرار الإيقاف في FundsView وSettingsView تستدعي `dataStore.deleteStandingAccount` الذي يغير active في الذاكرة/localStorage فقط. المورد المالي لا يسمح CRUD عام للتعديل ولا يوجد workflow مخصص للتفعيل/الإيقاف.
+4. **تفعيل/إيقاف الحساب الدائم:** تم ربط FundsView وSettingsView بـ`FinanceApiService.setStandingAccountActive` وRPC `set_standing_account_active`؛ يحفظ active ويكتب audit log دون المساس بحركات الحساب أو رصيده.
 5. **مزامنة الصلاحيات:** تمت إضافة `/permissions/me` وربط `hasPermission` بمنح المؤسسة المحملة للجلسة. يتطلب تغيير grants إعادة تحميل snapshot/الجلسة؛ واختبارات كل دور لا تزال مطلوبة.
 6. **التقارير غير مكتملة خادميًا:** ReportsService وDashboard وPerformanceEvaluation تحسب في المتصفح من dataStore. لا توجد استعلامات تجميع server-side أو pagination للتقارير؛ النتائج قد تكون ناقصة فوق حد 500 سجل لكل collection.
 
