@@ -53,3 +53,15 @@ The finance tables were empty: 0 funds, 0 fund transactions, 0 expenses, 0 recei
 - Approvals are represented through workflow status/approval fields and transactional RPCs rather than a separately normalized approval-case table.
 - Location history is represented in task fields and `task_events`, not a standalone location entity/table.
 - Schema coverage is strong for the current operations scope, but the live business data is almost entirely unpopulated.
+
+
+## Follow-up catalog and integrity detail (2026-11-12)
+
+- Public application catalog: 28 tables, 73 RLS policies (28 SELECT, 17 INSERT, 15 UPDATE, 13 DELETE), 21 public functions, 21 private helper functions, and 54 trigger event registrations. Every public table has a primary key and RLS enabled. No table is FORCE-RLS.
+- Finance structure contains tenant-scoped composite foreign keys for funds, expenses, settlements, receipts, standing accounts and their ledgers. Finance append-only triggers protect fund_transactions and standing_account_entries from UPDATE/DELETE.
+- Current row counts remain zero for funds, fund transactions, expenses, cash receipts, settlements, settlement links, standing accounts and standing entries. Organizations=1, active memberships=1, app users=1, permission catalog=70, role grants=350, system settings=0, roles table=0, migrations=24.
+- Read-only anomaly queries returned zero negative fund balances, orphaned finance references, invalid amount/tax totals, duplicate active vendor invoices, settlement-link mismatches, closed settlements with unsettled expenses, rejected settlements retaining links, or current-balance/ledger differences. These checks are vacuous over empty operational tables.
+- No DB CHECK constraint enforces expenses.total_with_tax = amount + tax_amount; the current creation RPC computes it server-side. funds.holder_id also lacks a composite FK to an active app user; the fund-creation RPC validates the holder.
+- The system_settings table is empty and is not loaded by loadUiSnapshot; the Settings UI writes to browser dataStore only. Server finance logic therefore uses fallback settings (including default tax/limits/receipt rules) rather than the settings currently shown in that UI.
+- The latest remote migration ledger version is 20261112123539; the two latest ledger names were not located as matching migration files in the targeted repository file lookup. Reconcile the complete remote ledger with tracked migration filenames before the next schema deployment.
+- Full double-entry accounting and bank-account models remain absent.
