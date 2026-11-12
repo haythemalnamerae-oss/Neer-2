@@ -26,7 +26,7 @@ The `public` schema contains 28 application tables. All 28 have RLS enabled and 
 
 ## Migration ledger
 
-The remote `supabase_migrations.schema_migrations` ledger contains 29 application migrations, from `20261107000000` through `20261112141004`. The latest recorded migrations are:
+The remote `supabase_migrations.schema_migrations` ledger contains 34 application migrations, from `20261107000000` through `20261112144750`. The latest recorded migrations are:
 
 - `consolidate_finance_rls_and_fk_indexes`
 - `enforce_finance_rpc_only_writes`
