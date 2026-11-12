@@ -425,7 +425,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
 
             {/* Execution Lifecycle Buttons */}
             <div className="flex items-center gap-2.5 shrink-0">
-              {task.status !== 'in_progress' && task.status !== 'completed' && task.status !== 'approved' && (
+              {task.status !== 'in_progress' && task.status !== 'completed' && task.status !== 'approved' && task.status !== 'pending_approval' && (
                 <Button
                   variant="primary"
                   size="sm"
@@ -459,7 +459,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                 </Button>
               )}
 
-              {task.status !== 'completed' && task.status !== 'approved' && (
+              {task.status !== 'completed' && task.status !== 'approved' && task.status !== 'pending_approval' && (
                 <Button
                   variant="success"
                   size="sm"
