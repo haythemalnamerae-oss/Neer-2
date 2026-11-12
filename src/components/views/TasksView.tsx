@@ -13,7 +13,7 @@ import { dataStore } from '../../lib/storage';
 import { hasPermission } from '../../lib/rbac/permissions';
 import { TASK_PRIORITY_CONFIG, TASK_STATUS_CONFIG, formatCurrency } from '../../lib/utils/format';
 import { Button } from '../ui/button';
-import { cancelTaskOnServer, listTaskRequests, reviewTaskRequest, type TaskRequestRecord } from '../../services/tasks.api';
+import { cancelTaskOnServer, listTaskRequests, reviewTaskRequest, resubmitTaskRequest, type TaskRequestRecord } from '../../services/tasks.api';
 
 interface TasksViewProps {
   onOpenNewTask: () => void;
@@ -45,6 +45,16 @@ export const TasksView: React.FC<TasksViewProps> = ({
       .catch((error) => { if (active) setRequestError(error instanceof Error ? error.message : 'تعذر تحميل طلبات المهام.'); });
     return () => { active = false; };
   }, []);
+
+  const handleRequestResubmit = async (request: TaskRequestRecord) => {
+    const title = window.prompt('تعديل عنوان الطلب:', String(request.payload.title || ''));
+    if (!title?.trim()) return;
+    const description = window.prompt('تعديل وصف الطلب:', String(request.payload.description || ''));
+    try {
+      await resubmitTaskRequest(request.id, { ...request.payload, title: title.trim(), description: description ?? request.payload.description });
+      setTaskRequests((items) => items.map((item) => item.id === request.id ? { ...item, status: 'submitted', payload: { ...item.payload, title: title.trim(), description: description ?? item.payload.description } } : item));
+    } catch (error) { window.alert(error instanceof Error ? error.message : 'تعذر إعادة إرسال الطلب.'); }
+  };
 
   const handleRequestReview = async (requestId: string, action: 'approve' | 'reject' | 'changes_requested') => {
     const notes = action === 'approve' ? undefined : window.prompt(action === 'reject' ? 'سبب الرفض:' : 'ما التعديلات المطلوبة؟');
@@ -159,6 +169,9 @@ export const TasksView: React.FC<TasksViewProps> = ({
                 </div>
                 <p className="text-xs text-slate-600">مقدم الطلب: {request.requested_by_name} · الموعد: {String(request.payload.dueDate || 'غير محدد')}</p>
                 {request.review_notes && <p className="text-xs text-amber-800">ملاحظة المراجعة: {request.review_notes}</p>}
+                {canSubmitRequest && request.requested_by === currentUser.id && request.status === 'changes_requested' && (
+                  <Button size="sm" variant="outline" onClick={() => void handleRequestResubmit(request)}>تعديل وإعادة الإرسال</Button>
+                )}
                 {canReviewRequests && (
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant="primary" onClick={() => void handleRequestReview(request.id, 'approve')}>اعتماد وتحويل إلى مهمة</Button>
