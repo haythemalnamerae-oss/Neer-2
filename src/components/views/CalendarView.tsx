@@ -12,6 +12,7 @@ import { Task } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
 import { hasPermission } from '../../lib/rbac/permissions';
 import { Button } from '../ui/button';
+import { rescheduleTaskOnServer } from '../../services/tasks.api';
 
 interface CalendarViewProps {
   onSelectTask: (task: Task) => void;
@@ -73,13 +74,16 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onSelectTask, onOpen
     if (canReschedule) event.preventDefault();
   };
 
-  const handleDrop = (event: React.DragEvent, targetDate: string) => {
+  const handleDrop = async (event: React.DragEvent, targetDate: string) => {
     if (!canReschedule) return;
     event.preventDefault();
     const taskId = event.dataTransfer.getData('text/plain');
     const task = tasks.find((item) => item.id === taskId);
-    if (task && task.dueDate?.slice(0, 10) !== targetDate) {
-      dataStore.rescheduleTask(taskId, targetDate, 'تمت إعادة الجدولة عبر التقويم');
+    if (!task || task.dueDate?.slice(0, 10) === targetDate) return;
+    try {
+      await rescheduleTaskOnServer(taskId, targetDate, 'تمت إعادة الجدولة عبر التقويم');
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'تعذر حفظ الموعد الجديد على الخادم.');
     }
   };
 
@@ -133,7 +137,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onSelectTask, onOpen
                   type="button"
                   onClick={() => setSelectedDate(day.key)}
                   onDragOver={handleDragOver}
-                  onDrop={(event) => handleDrop(event, day.key)}
+                  onDrop={(event) => { void handleDrop(event, day.key); }}
                   className={`min-h-[76px] sm:min-h-[105px] min-w-0 rounded-xl sm:rounded-2xl border p-1.5 sm:p-2 text-right flex flex-col transition ${selected ? 'border-emerald-700 bg-emerald-50 ring-2 ring-emerald-700/15' : 'border-slate-100 bg-white hover:border-emerald-200'} ${day.inMonth ? '' : 'opacity-40'}`}
                 >
                   <span className={`text-xs font-black ${isToday ? 'text-emerald-800' : 'text-slate-700'}`}>{day.dayNumber}</span>
