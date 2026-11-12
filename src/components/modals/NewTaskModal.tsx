@@ -187,7 +187,7 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
       taskFundAmount: numFundAmount > 0 ? numFundAmount : undefined,
       taskFundSpent: 0,
       taskFundRemaining: numFundAmount > 0 ? numFundAmount : undefined,
-      parentTaskId: isSubTask && parentTaskId ? parentTaskId : undefined,
+      parentTaskId: currentUser.role !== 'field_officer' && isSubTask && parentTaskId ? parentTaskId : undefined,
       };
       if (currentUser.role === 'field_officer') {
         await createTaskRequest({
