@@ -325,7 +325,7 @@ export async function createTaskRequest(payload: Record<string, unknown>): Promi
 
 export async function listTaskRequests(): Promise<TaskRequestRecord[]> {
   const session = requireSession();
-  return apiRequest<TaskRequestRecord[]>(session, '/task-requests?status=in.(submitted,changes_requested)&limit=100');
+  return apiRequest<TaskRequestRecord[]>(session, '/task-requests?limit=100');
 }
 
 export async function reviewTaskRequest(requestId: string, action: 'approve' | 'reject' | 'changes_requested', notes?: string): Promise<void> {
