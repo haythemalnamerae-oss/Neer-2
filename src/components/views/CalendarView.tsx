@@ -81,7 +81,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onSelectTask, onOpen
     const task = tasks.find((item) => item.id === taskId);
     if (!task || task.dueDate?.slice(0, 10) === targetDate) return;
     try {
-      await rescheduleTaskOnServer(taskId, targetDate, 'تمت إعادة الجدولة عبر التقويم');
+      await rescheduleTaskOnServer(taskId, targetDate);
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'تعذر حفظ الموعد الجديد على الخادم.');
     }
