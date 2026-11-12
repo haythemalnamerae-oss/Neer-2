@@ -75,13 +75,15 @@ async function allowed(auth: AuthContext, module: string, action: string) {
 
 async function fetchAllRows(path: string, token: string, pageSize = 500) {
   const rows: Array<Record<string, any>> = [];
-  for (let offset = 0; offset < 50000; offset += pageSize) {
+  for (let offset = 0; offset <= 50000; offset += pageSize) {
+    const limit = offset === 50000 ? 1 : pageSize;
     const separator = path.includes('?') ? '&' : '?';
-    const response = await supabaseFetch(`${path}${separator}limit=${pageSize}&offset=${offset}`, token);
+    const response = await supabaseFetch(`${path}${separator}limit=${limit}&offset=${offset}`, token);
     if (!response.ok) throw new Error(`Report source query failed (${response.status}) for ${path.split('?')[0]}.`);
     const page = await response.json() as Array<Record<string, any>>;
+    if (offset === 50000 && page.length) throw new Error('Report result exceeded the 50,000-row safety cap; narrow the reporting period.');
     rows.push(...page);
-    if (page.length < pageSize) return rows;
+    if (page.length < limit) return rows;
   }
   throw new Error('Report result exceeded the 50,000-row safety cap; narrow the reporting period.');
 }
