@@ -37,9 +37,9 @@
 | المصروفات والفواتير | ExpensesView | snapshot مالي | اعتماد ورفض عبر RPC؛ الإنشاء عبر NewExpenseModal |
 | التسويات | SettlementsView | snapshot مالي | مراجعة واعتماد ورفض عبر RPC؛ الطباعة محلية |
 | التقويم | CalendarView | snapshot المهام | إعادة الجدولة عبر `rescheduleTaskOnServer` وPATCH محدود لحقول التاريخ/الوقت |
-| التقارير | ReportsView | ReportsService من dataStore | تصدير CSV محلي |
+| التقارير | ReportsView | ملخص خادمي عبر `/reports/summary` + تفاصيل محلية قديمة | تجميع مهام/مالية/فريق خادمي بصفحات 500، مع بقاء الرسوم والتصدير التفصيلي محليًا |
 | الفريق الميداني | TeamView | بيانات users/tasks/funds المحملة | عرض وبحث وتصفية محلية |
-| المستخدمون | UsersView | dataStore snapshot | إنشاء المستخدم المحلي الوهمي معطل؛ provisioning الفعلي يتطلب دعوة Supabase Auth وربط العضوية والملف |
+| المستخدمون | UsersView | dataStore snapshot | نموذج دعوة عبر `/users/invite`؛ Supabase Auth invite ثم app_users وorganization_members؛ يتطلب `SUPABASE_SERVICE_ROLE_KEY` في الخادم |
 | الأدوار والصلاحيات | RolesView | permission_catalog وrole_permissions | قراءة وحفظ مصفوفة RBAC عبر API |
 | سجل التدقيق | AuditLogsView | audit_logs من snapshot | قراءة وبحث محلي؛ لا توجد كتابة من الشاشة |
 | إعدادات المنشأة | SettingsView | `system_settings` عبر RPC | القراءة والحفظ عبر RPCs بصلاحيات المؤسسة؛ لا يوجد زر لإعادة تهيئة بيانات الإنتاج |
@@ -163,7 +163,7 @@ tasks, task-events, task-assignees, task-checklist, task-steps, task-subtasks, t
 
 ### P0 — تؤثر على صحة البيانات/التشغيل
 
-1. **Provisioning المستخدمين غير متاح داخل الواجهة:** تم تعطيل الإضافة المحلية الوهمية وإزالة الأدوار غير المدعومة. يلزم بناء دعوة Supabase Auth موثوقة وربط app_users وorganization_members قبل تمكين إنشاء المستخدم من الواجهة.
+1. **Provisioning المستخدمين:** تمت إضافة مسار دعوة Supabase Auth وربط الملف والعضوية مع تعويض حذف حساب Auth عند فشل الربط. لا يمكن إكمال الدعوة حتى يتم ضبط `SUPABASE_SERVICE_ROLE_KEY` في بيئة الخادم واختبار البريد.
 2. **إعدادات المؤسسة:** تم ربط القراءة والحفظ بـ`get_organization_settings` و`save_organization_settings` مع التحقق من العضوية النشطة للمؤسسة المحددة والصلاحيات. جدول `system_settings` لا يزال بلا صفوف حتى يحفظ المدير القيم الفعلية من الشاشة.
 3. **تم إصلاح التقويم:** `CalendarView` يستدعي `rescheduleTaskOnServer`، وAPI يسمح فقط بتعديل due_date/start_date/due_time ويترك تغييرات الحالة لمسارات lifecycle/outcome/review.
 4. **تفعيل/إيقاف الحساب الدائم:** تم ربط FundsView وSettingsView بـ`FinanceApiService.setStandingAccountActive` وRPC `set_standing_account_active`؛ يحفظ active ويكتب audit log دون المساس بحركات الحساب أو رصيده.
@@ -200,6 +200,8 @@ tasks, task-events, task-assignees, task-checklist, task-steps, task-subtasks, t
 - تتبع workflows المالية الـ11: مكتمل على مستوى ربط client → API → RPC.
 - تتبع مسارات المهام والملفات وGPS: مكتمل على مستوى ربط client → API → RPC/REST/Storage.
 - جرد مسارات API المخصصة وموارد CRUD: مكتمل على مستوى المصدر.
+- أضيفت مسارات API/RPC لطلبات المهام ومراجعتها وإعادة إرسالها، ودليل أنواع المهام، وحالات الخطوات والمهام الفرعية؛ والمهام الفرعية المعتمدة تُنشأ كبطاقات مستقلة.
+- أضيف ملخص تقارير خادمي، لكن الرسوم والتقارير التفصيلية القديمة ما زالت تعتمد على dataStore.
 - التحقق من أن كل زر يعمل فعليًا في المتصفح، وأن كل حالة خطأ تظهر بشكل صحيح: غير مثبت دون تشغيل محلي واختبارات متصفح.
 - التحقق من صلاحيات كل دور بمستخدم حقيقي، والـcross-tenant، وGPS على جهاز، وStorage upload/delete، وسيناريوهات timeout/retry: غير مكتمل دون حسابات اختبار وتشغيل تكاملي.
 - لم يتم تشغيل lint/build أو نشر سحابي أو تعديل business data في هذه الجولة.
