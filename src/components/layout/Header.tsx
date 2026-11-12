@@ -4,6 +4,7 @@ import { dataStore } from '../../lib/storage';
 import { User } from '../../types/domain';
 import { ROLE_LABELS } from '../../lib/rbac/permissions';
 import { clearSession } from '../../lib/api/session';
+import { markAllNotificationsReadOnServer, markNotificationReadOnServer } from '../../services/notifications.api';
 
 const OFFICIAL_FONTS = [
   { id: 'almarai', label: 'المراعي', fullName: 'خط المراعي (الرسمي المعتمد)', family: "'Almarai', sans-serif" },
@@ -190,7 +191,10 @@ export const Header: React.FC<HeaderProps> = ({
                   {unreadCount > 0 && (
                     <button
                       className="text-[11px] font-bold text-emerald-800 hover:underline cursor-pointer"
-                      onClick={() => dataStore.markAllNotificationsRead()}
+                      onClick={() => {
+                        void markAllNotificationsReadOnServer(notifications.filter((item) => !item.isRead).map((item) => item.id))
+                          .catch((error) => window.alert(error instanceof Error ? error.message : 'تعذر تحديث الإشعارات.'));
+                      }}
                     >
                       تحديد الكل كمقروء
                     </button>
@@ -205,9 +209,10 @@ export const Header: React.FC<HeaderProps> = ({
                       <button
                         key={item.id}
                         onClick={() => {
-                          dataStore.markNotificationRead(item.id);
-                          if (item.targetView) onSelectView(item.targetView);
-                          setShowNotifDropdown(false);
+                          void markNotificationReadOnServer(item.id).then(() => {
+                            if (item.targetView) onSelectView(item.targetView);
+                            setShowNotifDropdown(false);
+                          }).catch((error) => window.alert(error instanceof Error ? error.message : 'تعذر تحديث الإشعار.'));
                         }}
                         className={`flex w-full gap-2.5 rounded-xl p-2.5 text-right transition-colors cursor-pointer ${
                           item.isRead ? 'hover:bg-slate-100/70 text-slate-600' : 'bg-white shadow-2xs font-medium text-slate-900 border border-emerald-950/5'
