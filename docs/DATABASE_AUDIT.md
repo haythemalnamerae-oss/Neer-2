@@ -26,7 +26,7 @@ The `public` schema contains 28 application tables. All 28 have RLS enabled and 
 
 ## Migration ledger
 
-The remote `supabase_migrations.schema_migrations` ledger contains 28 application migrations, from `20261107000000` through `20261112140138`. The latest recorded migrations are:
+The remote `supabase_migrations.schema_migrations` ledger contains 29 application migrations, from `20261107000000` through `20261112141004`. The latest recorded migrations are:
 
 - `consolidate_finance_rls_and_fk_indexes`
 - `enforce_finance_rpc_only_writes`
@@ -34,6 +34,7 @@ The remote `supabase_migrations.schema_migrations` ledger contains 28 applicatio
 - `persist_organization_settings`
 - `read_organization_settings`
 - `scope_settings_rpcs_to_selected_org`
+- `standing_account_activation_workflow`
 
 The database therefore has applied schema changes beyond the older setup notes in `supabase/README.md`. The README was found to contain obsolete statements that the database was not connected and the initial migration had not been applied; the audit records that discrepancy for correction.
 
