@@ -195,7 +195,7 @@ export async function cancelTaskOnServer(taskId: string, reason = 'تم إلغا
   await refreshAfterMutation(session);
 }
 
-export async function rescheduleTaskOnServer(taskId: string, dueDate: string, reason?: string): Promise<void> {
+export async function rescheduleTaskOnServer(taskId: string, dueDate: string): Promise<void> {
   const session = requireSession();
   if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(dueDate)) throw new Error('تاريخ الجدولة غير صالح.');
   await apiRequest(session, `/tasks/${encodeURIComponent(taskId)}`, {
