@@ -80,11 +80,11 @@ export interface SystemSettings {
 
 const DEFAULT_SETTINGS: SystemSettings = {
   appName: 'منصة إدارة العمليات والعهد النقدية',
-  organizationName: 'مجموعة الصقر لإدارة المنشآت والمشاريع الميدانية',
-  taxRegistrationNumber: '100234567800003',
-  headquarters: 'أبوظبي، مصفح الصناعية، مجمع الصقر للأعمال',
-  supportEmail: 'ops-support@al-saqr.ae',
-  supportPhone: '+971 2 600 5000',
+  organizationName: '',
+  taxRegistrationNumber: '',
+  headquarters: '',
+  supportEmail: '',
+  supportPhone: '',
   currency: 'AED',
   taxRate: 5,
   singleExpenseLimit: 5000,
