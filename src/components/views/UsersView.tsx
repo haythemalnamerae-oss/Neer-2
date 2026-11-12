@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Users,
   UserPlus,
+  CheckCircle2,
 } from 'lucide-react';
 import { dataStore } from '../../lib/storage';
 import { Button } from '../ui/button';
