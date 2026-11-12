@@ -438,6 +438,35 @@ app.post('/api/v1/task-events/lifecycle', async (req, res) => {
 });
 
 
+app.post('/api/v1/finance/standing-account-status', async (req, res) => {
+  const auth = (req as AuthenticatedRequest).auth;
+  try {
+    if (!(await allowed(auth, 'funds', 'edit'))) {
+      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Missing permission funds.edit.' } });
+    }
+    const body = req.body as Record<string, unknown> | undefined;
+    if (!body || typeof body.accountId !== 'string' || !idPattern.test(body.accountId) ||
+        typeof body.active !== 'boolean' ||
+        (body.reason !== undefined && (typeof body.reason !== 'string' || body.reason.length > 1000))) {
+      return res.status(400).json({ error: { code: 'INVALID_STANDING_ACCOUNT_STATUS', message: 'Account id, active state and optional reason are required.' } });
+    }
+    const response = await supabaseFetch('/rest/v1/rpc/set_standing_account_active', auth.token, {
+      method: 'POST',
+      body: JSON.stringify({
+        p_organization_id: auth.organizationId,
+        p_account_id: body.accountId,
+        p_active: body.active,
+        p_reason: body.reason || null,
+      }),
+    });
+    if (!response.ok) return sendDbError(res, response.status, await response.text());
+    return res.status(200).json(await response.json());
+  } catch (error) {
+    console.error('Standing account status change failed:', error);
+    return res.status(503).json({ error: { code: 'STANDING_ACCOUNT_STATUS_FAILED', message: 'Standing account status could not be changed.' } });
+  }
+});
+
 app.post('/api/v1/finance/:workflow', async (req, res) => {
   const auth = (req as AuthenticatedRequest).auth;
   if (!['admin','finance_officer'].includes(auth.role) && req.params.workflow !== 'create-expense') {
