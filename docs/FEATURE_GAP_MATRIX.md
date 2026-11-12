@@ -37,3 +37,32 @@ Current persisted roles: `admin`, `ops_manager`, `finance_officer`, `field_offic
 2. Prove finance RPC authorization and transaction invariants using non-production test records.
 3. Remove or isolate legacy local-only mutation call sites without breaking existing screens.
 4. Implement server-side reports and formal accounting/bank domains only after requirements and data migration are designed.
+
+
+## Follow-up UI-to-server trace (2026-11-12)
+
+| UI action / domain | Observed path | Persistence finding |
+|---|---|---|
+| Create task bundle | NewTaskModal → createTaskBundle → API/RPC | Server-backed |
+| Task outcome / follow-up chain | TaskOutcomeModal → recordTaskOutcomeOnServer → atomic RPC | Server-backed; stable request UUID retained in modal state |
+| Field visit start/pause/resume | Native GPS bridge → task-events/lifecycle → record_field_task_event | Server-backed atomic event/state RPC |
+| Task checklist, steps, subtasks, comments, daily updates | tasks.api.ts → generic task-child API resources | Server-backed, subject to RLS |
+| Attachment upload | Private Storage object → registration RPC → signed URL | Server-backed; object cleanup/retry edges need testing |
+| Finance fund/expense/receipt/settlement/standing-account actions | FinanceApiService → finance workflow API → transactional RPC | Server-backed for mapped workflows; identified RPC integrity gaps are in SECURITY_AUDIT.md |
+| User creation | UsersView → dataStore.addUser | Local-only; does not create Supabase Auth user or membership |
+| Settings save/reset | SettingsView → dataStore.updateSettings / resetToDefault | Local-only; does not update system_settings |
+| Calendar reschedule | CalendarView → dataStore.rescheduleTask | Local-only; server task due date is not changed |
+| Notification read state | Header / NotificationsService → dataStore.markNotificationRead | Local-only; database notification remains unchanged |
+| Standing-account activation/deactivation | FundsView / SettingsView → dataStore | Local-only |
+| Dashboard and reports | ReportsService aggregates hydrated dataStore collections | Client-derived; no server-side reporting engine |
+| Audit display | AuditLogsView reads the loaded snapshot | Server read exists; write policy requires narrowing and complete audit coverage |
+
+### Snapshot limits
+
+loadUiSnapshot fetches each collection with limit=500 and no pagination loop. Larger organizations can receive incomplete task, event, finance, notification or audit snapshots. Reports based on that snapshot may be understated. Implement stable cursor/range pagination before production data grows beyond this limit.
+
+### Additional client-side persistence observations
+
+- dataStore still initializes from mockData and legacy localStorage. Authenticated hydration replaces selected operational/finance collections, but Settings are not hydrated from the server.
+- PeerSyncEngine and sourceRegistry contain legacy/offline/demo material; the targeted code search found no active import of PeerSyncEngine. Treat embedded legacy schema/source snippets as documentation/demo, not the live Supabase schema.
+- The authenticated UI is not proof that every visible action is server-backed. The local-only rows above must be migrated before operational acceptance.
