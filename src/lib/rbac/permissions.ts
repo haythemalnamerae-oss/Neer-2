@@ -126,7 +126,20 @@ export const ROLE_LABELS: Record<Role, { ar: string; en: string; label: string; 
   },
 };
 
-export function hasPermission(role: Role, module: string, action: 'view' | 'create' | 'edit' | 'delete' | 'approve'): boolean {
+type PermissionAction = 'view' | 'create' | 'edit' | 'delete' | 'approve';
+let livePermissionRole: Role | null = null;
+let livePermissionGrants: Record<string, boolean> | null = null;
+
+/** Replaces cached UI permissions with grants loaded for the authenticated organization. */
+export function setLivePermissionGrants(role: Role | null, grants: Record<string, boolean> | null): void {
+  livePermissionRole = role;
+  livePermissionGrants = grants;
+}
+
+export function hasPermission(role: Role, module: string, action: PermissionAction): boolean {
+  if (livePermissionRole === role && livePermissionGrants) {
+    return livePermissionGrants[`${module}.${action}`] === true;
+  }
   const roleRules = ROLE_PERMISSIONS[role];
   if (!roleRules || !roleRules[module]) return false;
   return roleRules[module][action] ?? false;
