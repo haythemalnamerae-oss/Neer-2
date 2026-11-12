@@ -26,7 +26,7 @@ The `public` schema contains 28 application tables. All 28 have RLS enabled and 
 
 ## Migration ledger
 
-The remote `supabase_migrations.schema_migrations` ledger contains 35 application migrations, from `20261107000000` through `20261112144750`. The latest recorded migrations are:
+The remote `supabase_migrations.schema_migrations` ledger contains 39 application migrations, from `20261107000000` through `20261112150730`. The latest recorded migrations are:
 
 - `consolidate_finance_rls_and_fk_indexes`
 - `enforce_finance_rpc_only_writes`
@@ -64,7 +64,7 @@ The finance tables were empty: 0 funds, 0 fund transactions, 0 expenses, 0 recei
 
 - Public application catalog: 30 tables, 75 RLS policies (28 SELECT, 17 INSERT, 15 UPDATE, 13 DELETE), 21 public functions, 21 private helper functions, and 54 trigger event registrations. Every public table has a primary key and RLS enabled. No table is FORCE-RLS.
 - Finance structure contains tenant-scoped composite foreign keys for funds, expenses, settlements, receipts, standing accounts and their ledgers. Finance append-only triggers protect fund_transactions and standing_account_entries from UPDATE/DELETE.
-- Current row counts remain zero for funds, fund transactions, expenses, cash receipts, settlements, settlement links, standing accounts and standing entries. Organizations=1, active memberships=1, app users=1, permission catalog=70, role grants=350, system settings=0, roles table=0, task types=8, tasks/task requests/task steps/subtasks=0, migrations=35.
+- Current row counts remain zero for funds, fund transactions, expenses, cash receipts, settlements, settlement links, standing accounts and standing entries. Organizations=1, active memberships=1, app users=1, permission catalog=70, role grants=350, system settings=0, roles table=0, task types=8, tasks/task requests/task steps/subtasks=0, migrations=39.
 - Read-only anomaly queries returned zero negative fund balances, orphaned finance references, invalid amount/tax totals, duplicate active vendor invoices, settlement-link mismatches, closed settlements with unsettled expenses, rejected settlements retaining links, or current-balance/ledger differences. These checks are vacuous over empty operational tables.
 - No DB CHECK constraint enforces expenses.total_with_tax = amount + tax_amount; the current creation RPC computes it server-side. funds.holder_id also lacks a composite FK to an active app user; the fund-creation RPC validates the holder.
 - The system_settings table is still empty; Settings now reads and writes through organization-scoped RPCs, but actual organization values must be entered in the UI.
