@@ -193,7 +193,8 @@ export async function loadUiSnapshot(session: ApiSession): Promise<void> {
   const canReadFieldFinance = session.role === 'field_officer';
   const canReadAudit = session.role === 'admin' || session.role === 'ops_manager' || session.role === 'finance_officer';
   const financeCollections = canReadFinance ? finance : canReadFieldFinance ? ['funds','expenses','standing-accounts'] : [];
-  const collections = [...common, ...financeCollections, ...(canReadUserDirectory ? ['users'] : []), ...(canReadAudit ? ['audit-logs'] : [])];
+  const settingsCollections = session.role === 'admin' ? ['settings'] : [];
+  const collections = [...common, ...financeCollections, ...settingsCollections, ...(canReadUserDirectory ? ['users'] : []), ...(canReadAudit ? ['audit-logs'] : [])];
   const values = await Promise.all(collections.map(async (name) => [name, await apiRequest<Record<string, any>[]>(session, `/${name}?limit=500`)] as const));
   const data = Object.fromEntries(values);
 
@@ -286,5 +287,9 @@ export async function loadUiSnapshot(session: ApiSession): Promise<void> {
   // records to localStorage: that cache is not authoritative and can resurrect stale data.
   const auditLogs = (data['audit-logs'] || []).map(fromSnake);
   dataStore.hydrateOperationalData({ tasks, followUps, notifications, auditLogs });
+  const savedSettings = (data.settings || [])[0]?.settings;
+  if (session.role === 'admin' && savedSettings && typeof savedSettings === 'object' && !Array.isArray(savedSettings)) {
+    dataStore.hydrateSettings(savedSettings);
+  }
   dataStore.hydrateFinanceData({ funds: canReadFinance || canReadFieldFinance ? funds : [], expenses: canReadFinance || canReadFieldFinance ? expenses : [], settlements: canReadFinance ? settlements : [], cashReceipts: canReadFinance ? cashReceipts : [], standingAccounts: canReadFinance || canReadFieldFinance ? standingAccounts : [], users, currentUserId: session.appUserId || currentProfileId });
 }
