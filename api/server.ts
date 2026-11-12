@@ -112,6 +112,21 @@ app.get('/api/v1/permissions/me', async (req, res) => {
   return res.json({ role: auth.role, grants: Object.fromEntries(rows.map((row) => [row.permission_key, row.granted])) });
 });
 
+app.get('/api/v1/settings/me', async (req, res) => {
+  const auth = (req as AuthenticatedRequest).auth;
+  try {
+    if (!(await allowed(auth, 'settings', 'view'))) {
+      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Missing permission settings.view.' } });
+    }
+    const response = await supabaseFetch('/rest/v1/rpc/get_organization_settings', auth.token, { method: 'POST', body: '{}' });
+    if (!response.ok) return sendDbError(res, response.status, await response.text());
+    return res.status(200).json({ settings: await response.json() });
+  } catch (error) {
+    console.error('Organization settings read failed:', error);
+    return res.status(503).json({ error: { code: 'SETTINGS_READ_FAILED', message: 'Organization settings could not be loaded.' } });
+  }
+});
+
 app.post('/api/v1/settings/save', async (req, res) => {
   const auth = (req as AuthenticatedRequest).auth;
   try {
