@@ -53,7 +53,7 @@ Current persisted roles: `admin`, `ops_manager`, `finance_officer`, `field_offic
 | Settings save | SettingsView → settings.api → `save_organization_settings` RPC | Server-backed; tenant derived from authenticated API membership; local demo reset removed |
 | Calendar reschedule | CalendarView → `rescheduleTaskOnServer` → `PATCH /tasks/:id` | Server-backed; API allows only due_date/start_date/due_time on generic task PATCH |
 | Notification read state | Header → `notifications.api.ts` → scoped `PATCH /notifications/:id` | Server-backed; API filters by authenticated app user and permits only `is_read=true` |
-| Standing-account activation/deactivation | FundsView / SettingsView → dataStore | Local-only |
+| Standing-account activation/deactivation | FundsView / SettingsView → FinanceApiService → `set_standing_account_active` RPC | Server-backed; audited status change, ledger history retained |
 | Dashboard and reports | ReportsService aggregates hydrated dataStore collections | Client-derived; no server-side reporting engine |
 | Audit display | AuditLogsView reads the loaded snapshot | Server read exists; write policy requires narrowing and complete audit coverage |
 
@@ -76,7 +76,7 @@ Newly confirmed P0 gaps:
 - UsersView adds only to local dataStore; no Supabase Auth + app_users + organization_members provisioning. Its selector offers unsupported role values supervisor/manager, which can cause an undefined ROLE_LABELS access in the user table.
 - SettingsView persists locally; system_settings is neither loaded nor saved. Browser settings can persist across organization/account changes.
 - CalendarView drag/drop rescheduling only changes local dueDate; there is no server reschedule endpoint.
-- Standing-account deactivation in FundsView/SettingsView changes only local dataStore.
+- Standing-account activation/deactivation now uses a dedicated permission-checked RPC and writes an audit record without changing balances or ledger entries.
 - Role editor writes role_permissions, but navigation and most button gates still use hard-coded ROLE_PERMISSIONS; client/server authorization can disagree.
 - ReportsService, DashboardView, and PerformanceEvaluationView derive reports in the browser; no server-side aggregate/pagination path exists.
 - Dashboard AIService is a deterministic local rule set, not an AI model, and emits unsupported hard-coded claims such as 100% tax compliance.
