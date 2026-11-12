@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   BarChart3,
   Download,
@@ -13,6 +13,7 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { ReportsService } from '../../services/reports.service';
+import { getServerReportSummary, type ServerReportSummary } from '../../services/reports.api';
 import { dataStore } from '../../lib/storage';
 import { hasPermission } from '../../lib/rbac/permissions';
 import { formatCurrency } from '../../lib/utils/format';
@@ -29,6 +30,15 @@ export const ReportsView: React.FC = () => {
   const custodyReports = ReportsService.getCustodyTrackingReport();
 
   const [expandedFundId, setExpandedFundId] = useState<string | null>(null);
+  const [serverSummary, setServerSummary] = useState<ServerReportSummary | null>(null);
+  const [serverSummaryError, setServerSummaryError] = useState('');
+  useEffect(() => {
+    let active = true;
+    void getServerReportSummary().then((summary) => { if (active) setServerSummary(summary); })
+      .catch((error) => { if (active) setServerSummaryError(error instanceof Error ? error.message : 'تعذر تحميل التقرير الخادمي.'); });
+    return () => { active = false; };
+  }, []);
+
 
   const handleExportStandingAccountsCSV = () => {
     const csvData = ReportsService.exportStandingAccountsToCSV();
@@ -58,6 +68,35 @@ export const ReportsView: React.FC = () => {
   return (
     <div className="space-y-7 animate-in fade-in duration-200">
       {/* Header Banner */}
+      <section className="neu-raised-lg rounded-3xl p-5 space-y-4 mb-6">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h3 className="font-black text-base text-slate-800">ملخص التقارير من قاعدة البيانات</h3>
+            <p className="text-[11px] text-slate-500">المصدر: Supabase · تجميع خادمي مع جلب صفحات متتابعة</p>
+          </div>
+          {serverSummary && <span className="text-[10px] text-emerald-800 font-bold">آخر تحديث: {new Date(serverSummary.generatedAt).toLocaleString('ar')}</span>}
+        </div>
+        {serverSummaryError && <p className="text-xs text-rose-700">{serverSummaryError}</p>}
+        {serverSummary ? (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="rounded-xl neu-inset-sm p-3"><span className="text-[11px] text-slate-500">إجمالي المهام</span><strong className="block text-xl">{serverSummary.tasks.totalTasks}</strong></div>
+              <div className="rounded-xl neu-inset-sm p-3"><span className="text-[11px] text-slate-500">المهام المكتملة</span><strong className="block text-xl">{serverSummary.tasks.completedTasks}</strong></div>
+              <div className="rounded-xl neu-inset-sm p-3"><span className="text-[11px] text-slate-500">قيد التنفيذ</span><strong className="block text-xl">{serverSummary.tasks.inProgressTasks}</strong></div>
+              <div className="rounded-xl neu-inset-sm p-3"><span className="text-[11px] text-slate-500">إنجاز المهام</span><strong className="block text-xl">{serverSummary.tasks.taskCompletionRate}%</strong></div>
+            </div>
+            {serverSummary.finance && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="rounded-xl neu-inset-sm p-3"><span className="text-[11px] text-slate-500">المخصصات</span><strong className="block text-lg">{serverSummary.finance.totalAllocatedFunds.toLocaleString('en')} {serverSummary.finance.currency}</strong></div>
+                <div className="rounded-xl neu-inset-sm p-3"><span className="text-[11px] text-slate-500">الرصيد المتبقي</span><strong className="block text-lg">{serverSummary.finance.totalRemainingFunds.toLocaleString('en')} {serverSummary.finance.currency}</strong></div>
+                <div className="rounded-xl neu-inset-sm p-3"><span className="text-[11px] text-slate-500">المصروفات</span><strong className="block text-lg">{serverSummary.finance.totalExpensesAmount.toLocaleString('en')} {serverSummary.finance.currency}</strong></div>
+                <div className="rounded-xl neu-inset-sm p-3"><span className="text-[11px] text-slate-500">مصروفات بانتظار الاعتماد</span><strong className="block text-lg">{serverSummary.finance.pendingExpensesCount}</strong></div>
+              </div>
+            )}
+            {serverSummary.teamPerformance.length > 0 && <p className="text-xs text-slate-600">تم تجميع أداء {serverSummary.teamPerformance.length} مستخدمًا من سجلات المهام الفعلية.</p>}
+          </>
+        ) : !serverSummaryError ? <p className="text-xs text-slate-500">جارٍ تحميل البيانات الخادمية…</p> : null}
+      </section>
       <div className="neu-raised-lg rounded-3xl p-6 sm:p-7 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
         <div>
           <div className="flex items-center gap-2 text-[#325A41] font-bold text-xs uppercase mb-1">
