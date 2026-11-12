@@ -49,10 +49,10 @@ Current persisted roles: `admin`, `ops_manager`, `finance_officer`, `field_offic
 | Task checklist, steps, subtasks, comments, daily updates | tasks.api.ts → generic task-child API resources | Server-backed, subject to RLS |
 | Attachment upload | Private Storage object → registration RPC → signed URL | Server-backed; object cleanup/retry edges need testing |
 | Finance fund/expense/receipt/settlement/standing-account actions | FinanceApiService → finance workflow API → transactional RPC | Server-backed for mapped workflows; identified RPC integrity gaps are in SECURITY_AUDIT.md |
-| User creation | UsersView → dataStore.addUser | Local-only; does not create Supabase Auth user or membership |
-| Settings save/reset | SettingsView → dataStore.updateSettings / resetToDefault | Local-only; does not update system_settings |
-| Calendar reschedule | CalendarView → dataStore.rescheduleTask | Local-only; server task due date is not changed |
-| Notification read state | Header / NotificationsService → dataStore.markNotificationRead | Local-only; database notification remains unchanged |
+| User creation | UsersView | Local-only creation disabled; UI now explains that real provisioning requires Supabase Auth invitation and organization membership |
+| Settings save | SettingsView → settings.api → `save_organization_settings` RPC | Server-backed; tenant derived from authenticated API membership; local demo reset removed |
+| Calendar reschedule | CalendarView → `rescheduleTaskOnServer` → `PATCH /tasks/:id` | Server-backed; API allows only due_date/start_date/due_time on generic task PATCH |
+| Notification read state | Header → `notifications.api.ts` → scoped `PATCH /notifications/:id` | Server-backed; API filters by authenticated app user and permits only `is_read=true` |
 | Standing-account activation/deactivation | FundsView / SettingsView → dataStore | Local-only |
 | Dashboard and reports | ReportsService aggregates hydrated dataStore collections | Client-derived; no server-side reporting engine |
 | Audit display | AuditLogsView reads the loaded snapshot | Server read exists; write policy requires narrowing and complete audit coverage |
