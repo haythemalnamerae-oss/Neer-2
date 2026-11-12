@@ -8,10 +8,10 @@
 | Login / session | Supabase email/password gate, refresh-token flow, membership resolution, JWT API gateway | Implemented, not E2E-tested | Test expiry, refresh, logout, account switching and multiple memberships locally |
 | Organizations / membership | Tenant tables, composite keys, membership RLS | Implemented | Verify multiple-organization selection and isolation with test accounts |
 | Users / roles | Five persisted role keys, permission catalog, 350 seeded grants, role management UI/API | Partial | Map required business roles; test every module/action and deny-by-default behavior |
-| Task creation | `create_task_bundle` RPC and `/tasks/create-bundle` | Server transaction exists | Verify UI call sites, duplicate requests and failure recovery |
+| Task creation / request approval | `create_task_bundle`, `create_task_request`, `review_task_request`, `resubmit_task_request`; employee request queue and manager review UI | Server-backed source paths; E2E pending | Test requester/reviewer separation, retries, notifications and approved conversion |
 | Task lifecycle / GPS | `task_events`, `record_field_task_event`, location validation and immutable events | Server transaction exists | Test GPS accuracy, denied permissions, stale fixes, duplicate events and mobile background limits |
 | Task outcomes / approval | `record_task_outcome_bundle`, `review_task_approval`, history/events | Server transaction exists | Verify every outcome, proof attachment, follow-up and reviewer role |
-| Task children | Checklist, steps, subtasks, updates, comments, attachments, assignees, RLS and audit triggers | Partial | Legacy synchronous `TasksService` and `dataStore` methods still exist; inventory and migrate remaining UI mutation call sites |
+| Task children | Dedicated step/subtask RPCs; step owner/dependency/approval fields; cycle guard; approved subtasks materialize as independent `tasks` cards; direct step/subtask DML revoked | Server-backed governance paths | Verify independent card visibility, completion review, rejection/rework and mobile behavior with real users |
 | Follow-ups | Table, API resource and RLS | Partial | Verify create/update flows use server persistence and field-user assignment scope |
 | Attachments | Private bucket, object policies, attachment registration RPC | Partial | Test upload, registration, signed/download access and unauthorized path attempts |
 | Funds / expenses | Transactional RPC service and dedicated API workflows; generic CRUD blocked | Core server workflows exist | End-to-end test all create/approve/replenish/deficit workflows; validate ledger/balance equations once populated |
@@ -19,7 +19,7 @@
 | Standing accounts | Account and entry tables, immutable ledger, dedicated create/entry/settlement APIs | Partial | Verify all charge/payment/advance/collection paths and balance calculation |
 | Notifications | Table, snapshot loading and RLS | Partial | Verify generation, delivery/read state and user targeting |
 | Audit | Audit table, task-child triggers and finance RPC audit writes | Partial | Verify coverage for every sensitive mutation; audit table currently has no rows |
-| Reports | `ReportsService` and views calculate from the loaded store | Partial | Build server-side, permission-scoped reporting queries; do not treat browser-derived totals as accounting source of truth |
+| Reports | `/reports/summary` uses server-side page aggregation (500 rows/page, 50,000 cap); ReportsView shows server summary | Partial | Legacy detailed charts, exports and some KPIs still use ReportsService/dataStore; move remaining detail queries server-side and test role scoping |
 | Accounting / bank accounts | No chart-of-accounts, journal headers/lines or bank-account table found | Missing for full accounting scope | Separate future accounting-engine design from current petty-cash operations |
 | Android client | No Android module or manifest found in this repository search | Not audited / not present in inspected repo | Identify separate Android repository and validate API contract compatibility there |
 
@@ -49,7 +49,7 @@ Current persisted roles: `admin`, `ops_manager`, `finance_officer`, `field_offic
 | Task checklist, steps, subtasks, comments, daily updates | tasks.api.ts → generic task-child API resources | Server-backed, subject to RLS |
 | Attachment upload | Private Storage object → registration RPC → signed URL | Server-backed; object cleanup/retry edges need testing |
 | Finance fund/expense/receipt/settlement/standing-account actions | FinanceApiService → finance workflow API → transactional RPC | Server-backed for mapped workflows; identified RPC integrity gaps are in SECURITY_AUDIT.md |
-| User creation | UsersView | Local-only creation disabled; UI now explains that real provisioning requires Supabase Auth invitation and organization membership |
+| User creation | UsersView → `/users/invite` → Supabase Auth invite + app_users + organization_members | Server workflow implemented; requires server-only `SUPABASE_SERVICE_ROLE_KEY` and live invite test | Configure secret in server environment and test invite/rollback/email redemption |
 | Settings save | SettingsView → settings.api → `save_organization_settings` RPC | Server-backed; tenant derived from authenticated API membership; local demo reset removed |
 | Calendar reschedule | CalendarView → `rescheduleTaskOnServer` → `PATCH /tasks/:id` | Server-backed; API allows only due_date/start_date/due_time on generic task PATCH |
 | Notification read state | Header → `notifications.api.ts` → scoped `PATCH /notifications/:id` | Server-backed; API filters by authenticated app user and permits only `is_read=true` |
@@ -73,14 +73,14 @@ loadUiSnapshot fetches each collection with limit=500 and no pagination loop. La
 The full static source trace of all 18 views mounted by App and the custom API/finance/task paths is documented in `docs/SERVICE_UI_TRACE.md`.
 
 Newly confirmed P0 gaps:
-- UsersView adds only to local dataStore; no Supabase Auth + app_users + organization_members provisioning. Its selector offers unsupported role values supervisor/manager, which can cause an undefined ROLE_LABELS access in the user table.
+- User invitations now have a server endpoint and UI, but require `SUPABASE_SERVICE_ROLE_KEY` in the server environment; a live email invite was not executed.
 - SettingsView persists locally; system_settings is neither loaded nor saved. Browser settings can persist across organization/account changes.
 - CalendarView drag/drop rescheduling only changes local dueDate; there is no server reschedule endpoint.
 - Standing-account activation/deactivation now uses a dedicated permission-checked RPC and writes an audit record without changing balances or ledger entries.
-- Role editor writes role_permissions, but navigation and most button gates still use hard-coded ROLE_PERMISSIONS; client/server authorization can disagree.
-- ReportsService, DashboardView, and PerformanceEvaluationView derive reports in the browser; no server-side aggregate/pagination path exists.
+- Role editor writes role_permissions; session grants are loaded from `/permissions/me`. Runtime role-by-role authorization tests are still pending.
+- A server-side summary endpoint now aggregates task, finance and team metrics using paged reads; detailed charts/exports and some dashboard/performance views remain browser-derived.
 - Dashboard AIService is a deterministic local rule set, not an AI model, and emits unsupported hard-coded claims such as 100% tax compliance.
-- loadUiSnapshot is capped at 500 rows per collection without pagination; ops_manager/viewer can have visible finance modules but finance collections are omitted from their snapshot.
+- loadUiSnapshot is still capped at 500 rows per collection without pagination; the new report endpoint pages up to 50,000 rows, but that does not change the UI snapshot cap.
 - Notification read-state is local; audit screen reads server audit logs while local dataStore audit writes do not become central audit records.
 - FinanceApiService generates a new idempotency key for every attempt and throws if post-commit snapshot refresh fails; this can make a successful operation look failed and a retry use a new key.
 
