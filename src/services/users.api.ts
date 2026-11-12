@@ -1,6 +1,10 @@
 import { apiRequest, getSession, loadUiSnapshot } from '../lib/api/session';
 import type { Role } from '../types/domain';
 
+export class UserInviteSavedRefreshError extends Error {
+  constructor(message: string) { super(message); this.name = 'UserInviteSavedRefreshError'; }
+}
+
 export async function inviteOrganizationUser(input: {
   name: string; email: string; role: Exclude<Role, 'admin'>; phone?: string; department?: string;
 }): Promise<void> {
@@ -10,5 +14,10 @@ export async function inviteOrganizationUser(input: {
     method: 'POST',
     body: JSON.stringify(input),
   });
-  await loadUiSnapshot(getSession() || session);
+  try {
+    await loadUiSnapshot(getSession() || session);
+  } catch (error) {
+    console.error('User invitation succeeded but snapshot refresh failed:', error);
+    throw new UserInviteSavedRefreshError('تم إرسال الدعوة وربط العضوية، لكن تعذر تحديث القائمة. أعد تحميل الصفحة ولا تكرر الدعوة.');
+  }
 }
