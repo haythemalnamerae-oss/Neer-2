@@ -3,9 +3,7 @@ import {
   Users,
   UserPlus,
 } from 'lucide-react';
-import { Role } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
-import { ROLE_LABELS } from '../../lib/rbac/permissions';
 import { Button } from '../ui/button';
 
 export const UsersView: React.FC = () => {
