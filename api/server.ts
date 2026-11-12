@@ -118,7 +118,7 @@ app.get('/api/v1/settings/me', async (req, res) => {
     if (!(await allowed(auth, 'settings', 'view'))) {
       return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Missing permission settings.view.' } });
     }
-    const response = await supabaseFetch('/rest/v1/rpc/get_organization_settings', auth.token, { method: 'POST', body: '{}' });
+    const response = await supabaseFetch('/rest/v1/rpc/get_organization_settings', auth.token, { method: 'POST', body: JSON.stringify({ p_organization_id: auth.organizationId }) });
     if (!response.ok) return sendDbError(res, response.status, await response.text());
     return res.status(200).json({ settings: await response.json() });
   } catch (error) {
@@ -139,7 +139,7 @@ app.post('/api/v1/settings/save', async (req, res) => {
     }
     const response = await supabaseFetch('/rest/v1/rpc/save_organization_settings', auth.token, {
       method: 'POST',
-      body: JSON.stringify({ p_settings: body.settings }),
+      body: JSON.stringify({ p_organization_id: auth.organizationId, p_settings: body.settings }),
     });
     if (!response.ok) return sendDbError(res, response.status, await response.text());
     return res.status(200).json({ settings: await response.json() });
