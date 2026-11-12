@@ -36,6 +36,7 @@ import {
 } from '../../services/tasks.api';
 import { captureRequiredLocation, ensureFieldVisitCanStart, recordFieldLifecycleEvent, recordTaskEvent, startFieldLocationTracking, stopFieldLocationTracking, type FieldEventType } from '../../lib/operations/fieldEvents';
 import { formatCurrency, TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG } from '../../lib/utils/format';
+import { hasPermission } from '../../lib/rbac/permissions';
 import { FinanceApiService } from '../../services/finance-api.service';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -78,6 +79,8 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   if (!isOpen || !task) return null;
 
   const currentUser = dataStore.getCurrentUser();
+  const canEditTask = hasPermission(currentUser.role, 'tasks', 'edit');
+  const canApproveTask = hasPermission(currentUser.role, 'tasks', 'approve');
   const requiresFieldLocation = task.taskTypeCategory === 'field' || task.taskTypeCategory === 'visit';
   const users = dataStore.getUsers();
   const allExpenses = dataStore.getExpenses();
@@ -866,12 +869,13 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                         {step.approvalStatus === 'pending' && (
                           <div className="flex items-center gap-2 rounded-xl bg-amber-50 p-3">
                             <span className="text-xs font-bold text-amber-900">المرحلة تنتظر الاعتماد</span>
-                            {currentUser.role !== 'field_officer' && <>
+                            {canApproveTask && <>
                               <Button size="sm" variant="primary" onClick={() => void reviewTaskStep(task.id, step.id, 'approve').catch((error) => window.alert(error instanceof Error ? error.message : 'تعذر اعتماد المرحلة.'))}>اعتماد</Button>
                               <Button size="sm" variant="outline" onClick={() => { const reason = window.prompt('سبب رفض المرحلة:'); if (reason?.trim()) void reviewTaskStep(task.id, step.id, 'reject', reason).catch((error) => window.alert(error instanceof Error ? error.message : 'تعذر رفض المرحلة.')); }}>إعادة للتنفيذ</Button>
                             </>}
                           </div>
                         )}
+{canEditTask && canApproveTask && (
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 rounded-xl neu-inset-sm p-3">
                           <label className="text-[11px] font-bold text-slate-600">المسؤول عن المرحلة
                             <select className="mt-1 w-full" value={step.assignedTo || task.assigneeId} onChange={(e) => void configureTaskStep(task.id, step.id, { assigneeId: e.target.value || null, dependsOnStepId: step.dependsOnStepId || null, approvalRequired: Boolean(step.approvalRequired) }).catch((error) => window.alert(error instanceof Error ? error.message : 'تعذر تعيين المرحلة.'))}>
@@ -889,6 +893,9 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                             تتطلب اعتمادًا بعد الإنجاز
                           </label>
                         </div>
+                        )}
+
+
 
                         {/* Step Details & Notes */}
                         <div className="flex items-center justify-between text-xs text-slate-600 pt-2 border-t border-black/[0.04] flex-wrap gap-2">
