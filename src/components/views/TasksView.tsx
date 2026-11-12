@@ -33,6 +33,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
+  const currentUser = dataStore.getCurrentUser();
   const [taskRequests, setTaskRequests] = useState<TaskRequestRecord[]>([]);
   const [requestError, setRequestError] = useState('');
   const canSubmitRequest = currentUser.role === 'field_officer';
@@ -53,8 +54,6 @@ export const TasksView: React.FC<TasksViewProps> = ({
       setTaskRequests((items) => items.filter((item) => item.id !== requestId));
     } catch (error) { window.alert(error instanceof Error ? error.message : 'تعذر مراجعة الطلب.'); }
   };
-
-  const currentUser = dataStore.getCurrentUser();
   const canCreateTask = hasPermission(currentUser.role, 'tasks', 'create') || canSubmitRequest;
   const canDeleteTask = hasPermission(currentUser.role, 'tasks', 'delete');
   const canRecordOutcome = hasPermission(currentUser.role, 'tasks', 'edit');
