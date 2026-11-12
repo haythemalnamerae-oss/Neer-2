@@ -77,4 +77,7 @@ export const FinanceApiService = {
       accountId, amount, fundId, entryDate: date, reference, idempotencyKey: idempotencyKey(),
     });
   },
+  setStandingAccountActive(accountId: string, active: boolean, reason?: string) {
+    return workflow<StandingAccount>('standing-account-status', { accountId, active, reason: reason || null });
+  },
 };
