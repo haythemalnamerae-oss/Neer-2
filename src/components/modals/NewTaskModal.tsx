@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { createTaskBundle, createTaskRequest, TaskSavedRefreshError } from '../../services/tasks.api';
+import React, { useEffect, useState } from 'react';
+import { createTaskBundle, createTaskRequest, listTaskTypes, TaskSavedRefreshError } from '../../services/tasks.api';
 import { dataStore } from '../../lib/storage';
 import { TaskPriority, TaskTypeClassification, TaskStep } from '../../types/domain';
 import { Modal } from '../ui/modal';
@@ -23,6 +23,8 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
   const [description, setDescription] = useState('');
   const [taskTypeCategory, setTaskTypeCategory] = useState<TaskTypeClassification>('field');
   const [taskType, setTaskType] = useState('صيانة ميدانية');
+  const [taskTypeCatalog, setTaskTypeCatalog] = useState<Array<{ key: string; label_ar: string; category: string; location_required: boolean; proof_required: string | null; approval_required: boolean }>>([]);
+  useEffect(() => { if (!isOpen) return; let active = true; void listTaskTypes().then((items) => { if (active) setTaskTypeCatalog(items); }).catch((error) => console.error('Task type catalog unavailable:', error)); return () => { active = false; }; }, [isOpen]);
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
   const standingAccounts = dataStore.getStandingAccounts();
@@ -68,7 +70,7 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
     'فحص سلامة وجودة HSE',
     'مهمة عاجلة وطارئة',
   ];
-  const allSuggestedTypes = Array.from(new Set([...recentTaskTypes, ...commonTaskTypes]));
+  const allSuggestedTypes = taskTypeCatalog.length ? taskTypeCatalog.map((item) => item.label_ar) : commonTaskTypes;
 
   const pastLocations = Array.from(
     new Set([
@@ -95,7 +97,11 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !dueDate || (locationRequired && !location.trim())) {
+    const selectedCatalogType = taskTypeCatalog.find((item) => item.label_ar === taskType);
+    const effectiveTaskTypeCategory = (selectedCatalogType?.category || taskTypeCategory) as TaskTypeClassification;
+    const effectiveLocationRequired = selectedCatalogType?.location_required ?? locationRequired;
+    const effectiveProofRequired = proofRequired || selectedCatalogType?.proof_required || undefined;
+    if (!title.trim() || !dueDate || (effectiveLocationRequired && !location.trim())) {
       alert('يرجى ملء جميع الحقول الإلزامية');
       return;
     }
@@ -149,21 +155,21 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
       description,
       priority,
       status: 'scheduled',
-      taskTypeCategory,
+      taskTypeCategory: effectiveTaskTypeCategory,
       taskType,
       clientName: clientName || undefined,
       clientPhone: clientPhone || undefined,
       standingAccountId: standingAccountId || undefined,
       standingAccountName: standingAccounts.find((account) => account.id === standingAccountId)?.name,
       dueTime: dueTime || undefined,
-      proofRequired: proofRequired || undefined,
+      proofRequired: effectiveProofRequired,
       assigneeId: assignedUser.id,
       assigneeName: assignedUser.name,
       assigneeAvatar: assignedUser.avatar,
       creatorId: currentUser.id,
       creatorName: currentUser.name,
       supervisors: supervisorUsers.map((u) => ({ id: u.id, name: u.name, role: u.roleTitleAr || u.role })),
-      locationRequired,
+      locationRequired: effectiveLocationRequired,
       dueDate,
       startDate: startDate || new Date().toISOString().split('T')[0],
       location: location || 'المكتب الرئيسي / عن بعد',
@@ -186,10 +192,10 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
       if (currentUser.role === 'field_officer') {
         await createTaskRequest({
           ...taskPayload,
-          taskTypeKey: taskTypeCategory === 'visit' ? 'customer_visit'
-            : taskTypeCategory === 'financial' ? 'financial_collection'
-            : taskTypeCategory === 'administrative' ? 'procurement'
-            : 'field_maintenance',
+          taskTypeKey: selectedCatalogType?.key || (effectiveTaskTypeCategory === 'visit' ? 'customer_visit'
+            : effectiveTaskTypeCategory === 'financial' ? 'financial_collection'
+            : effectiveTaskTypeCategory === 'administrative' ? 'procurement'
+            : 'field_maintenance'),
           requestedAssigneeIds: [currentUser.id],
           approvalRequired: true,
         });
@@ -284,9 +290,9 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
               options={allSuggestedTypes}
               value={taskType}
               onChange={(val) => setTaskType(val)}
-              creatable={true}
+              creatable={false}
               required
-              helperText="يمكنك اختيار نوع معتاد أو كتابة نوع جديد فوراً"
+              helperText="الأنواع من دليل المهام المعتمد في المؤسسة"
             />
           </div>
         </div>
