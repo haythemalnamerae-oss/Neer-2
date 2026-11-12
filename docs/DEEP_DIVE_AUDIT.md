@@ -125,7 +125,7 @@ All callable SECURITY DEFINER functions must remain individually reviewed for ac
 
 The live remote migration ledger now reports 29 applied migrations through `20261112141004`. Five additional migrations were applied during the current execution: task approval maker-checker, organization settings persistence, organization settings read, selected-organization scoping for both settings RPCs, and audited standing-account activation/deactivation.
 
-Two earlier applied migrations (`20261112123426` and `20261112123539`) were not found as matching files during targeted repository path/search checks. Do not run `supabase db push` until those source files are restored or the migration history is reconciled from an authoritative backup. The current applied database state is live and verified; repository migration reproducibility is not yet 100%.
+The two earlier finance migrations and other files whose planned timestamps differed from the remote ledger were renamed to match the applied remote versions. A superseded review-only task-creation draft was moved outside `supabase/migrations` so it cannot be applied accidentally. A local `supabase migration list` comparison is still required before any `db push`; no cloud build or deploy was run.
 
 ## 9. Verification boundaries
 
