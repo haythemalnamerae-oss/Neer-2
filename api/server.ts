@@ -11,7 +11,7 @@ app.use(express.json({ limit: '1mb' }));
 
 const resources = {
   tasks: { table: 'tasks', module: 'tasks' }, 'task-events': { table: 'task_events', module: 'tasks' }, 'task-assignees': { table: 'task_assignees', module: 'tasks' }, 'task-checklist': { table: 'task_checklist_items', module: 'tasks' },
-  'task-steps': { table: 'task_steps', module: 'tasks' }, 'task-subtasks': { table: 'task_subtasks', module: 'tasks' },
+  'task-steps': { table: 'task_steps', module: 'tasks' }, 'task-subtasks': { table: 'task_subtasks', module: 'tasks' }, 'task-requests': { table: 'task_requests', module: 'tasks' }, 'task-types': { table: 'task_types', module: 'tasks' },
   'task-updates': { table: 'task_daily_updates', module: 'tasks' }, 'task-history': { table: 'task_history', module: 'tasks' },
   'task-attachments': { table: 'task_attachments', module: 'tasks' }, 'task-comments': { table: 'task_comments', module: 'tasks' },
   funds: { table: 'funds', module: 'funds' }, expenses: { table: 'expenses', module: 'expenses' },
@@ -146,6 +146,116 @@ app.post('/api/v1/settings/save', async (req, res) => {
   } catch (error) {
     console.error('Organization settings save failed:', error);
     return res.status(503).json({ error: { code: 'SETTINGS_SAVE_FAILED', message: 'Organization settings could not be saved.' } });
+  }
+});
+
+app.post('/api/v1/tasks/requests', async (req, res) => {
+  const auth = (req as AuthenticatedRequest).auth;
+  try {
+    const body = req.body as Record<string, unknown> | undefined;
+    if (!body || !body.payload || typeof body.payload !== 'object' || Array.isArray(body.payload) ||
+        typeof body.requestId !== 'string' || !uuidPattern.test(body.requestId)) {
+      return res.status(400).json({ error: { code: 'INVALID_TASK_REQUEST', message: 'A request UUID and task payload are required.' } });
+    }
+    const response = await supabaseFetch('/rest/v1/rpc/create_task_request', auth.token, {
+      method: 'POST',
+      body: JSON.stringify({ p_organization_id: auth.organizationId, p_request_id: body.requestId, p_payload: body.payload }),
+    });
+    if (!response.ok) return sendDbError(res, response.status, await response.text());
+    return res.status(201).json(await response.json());
+  } catch (error) {
+    console.error('Task request submission failed:', error);
+    return res.status(503).json({ error: { code: 'TASK_REQUEST_FAILED', message: 'The task request could not be submitted.' } });
+  }
+});
+
+app.post('/api/v1/tasks/requests/review', async (req, res) => {
+  const auth = (req as AuthenticatedRequest).auth;
+  try {
+    if (!(await allowed(auth, 'tasks', 'approve'))) return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Missing tasks.approve.' } });
+    const body = req.body as Record<string, unknown> | undefined;
+    if (!body || typeof body.requestId !== 'string' || !uuidPattern.test(body.requestId) ||
+        !['approve','reject','changes_requested'].includes(String(body.action)) ||
+        (body.action !== 'approve' && (typeof body.notes !== 'string' || !body.notes.trim()))) {
+      return res.status(400).json({ error: { code: 'INVALID_TASK_REQUEST_REVIEW', message: 'Request id, action and required review note are invalid.' } });
+    }
+    const response = await supabaseFetch('/rest/v1/rpc/review_task_request', auth.token, {
+      method: 'POST',
+      body: JSON.stringify({ p_organization_id: auth.organizationId, p_request_id: body.requestId, p_action: body.action, p_notes: body.notes || null }),
+    });
+    if (!response.ok) return sendDbError(res, response.status, await response.text());
+    return res.status(200).json(await response.json());
+  } catch (error) {
+    console.error('Task request review failed:', error);
+    return res.status(503).json({ error: { code: 'TASK_REQUEST_REVIEW_FAILED', message: 'The task request review could not be saved.' } });
+  }
+});
+
+app.post('/api/v1/tasks/subtasks/create', async (req, res) => {
+  const auth = (req as AuthenticatedRequest).auth;
+  try {
+    const body = req.body as Record<string, any> | undefined;
+    if (!body || typeof body.taskId !== 'string' || !idPattern.test(body.taskId) ||
+        typeof body.subtaskId !== 'string' || !idPattern.test(body.subtaskId) ||
+        !body.payload || typeof body.payload !== 'object' || Array.isArray(body.payload)) {
+      return res.status(400).json({ error: { code: 'INVALID_SUBTASK', message: 'Task, subtask and payload are required.' } });
+    }
+    const response = await supabaseFetch('/rest/v1/rpc/create_task_subtask', auth.token, {
+      method: 'POST',
+      body: JSON.stringify({ p_organization_id: auth.organizationId, p_task_id: body.taskId, p_subtask_id: body.subtaskId, p_payload: body.payload }),
+    });
+    if (!response.ok) return sendDbError(res, response.status, await response.text());
+    return res.status(201).json(await response.json());
+  } catch (error) {
+    console.error('Subtask creation failed:', error);
+    return res.status(503).json({ error: { code: 'SUBTASK_CREATE_FAILED', message: 'The subtask could not be created.' } });
+  }
+});
+
+app.post('/api/v1/tasks/subtasks/state', async (req, res) => {
+  const auth = (req as AuthenticatedRequest).auth;
+  try {
+    const body = req.body as Record<string, any> | undefined;
+    if (!body || typeof body.taskId !== 'string' || !idPattern.test(body.taskId) ||
+        typeof body.subtaskId !== 'string' || !idPattern.test(body.subtaskId) ||
+        !['update','approve','reject'].includes(body.action)) {
+      return res.status(400).json({ error: { code: 'INVALID_SUBTASK_STATE', message: 'Subtask state request is invalid.' } });
+    }
+    const response = await supabaseFetch('/rest/v1/rpc/set_task_subtask_state', auth.token, {
+      method: 'POST',
+      body: JSON.stringify({ p_organization_id: auth.organizationId, p_task_id: body.taskId, p_subtask_id: body.subtaskId, p_action: body.action, p_status: body.status || null, p_notes: body.notes || null }),
+    });
+    if (!response.ok) return sendDbError(res, response.status, await response.text());
+    return res.status(200).json(await response.json());
+  } catch (error) {
+    console.error('Subtask state update failed:', error);
+    return res.status(503).json({ error: { code: 'SUBTASK_STATE_FAILED', message: 'The subtask state could not be saved.' } });
+  }
+});
+
+app.post('/api/v1/tasks/steps/state', async (req, res) => {
+  const auth = (req as AuthenticatedRequest).auth;
+  try {
+    const body = req.body as Record<string, any> | undefined;
+    if (!body || typeof body.taskId !== 'string' || !idPattern.test(body.taskId) ||
+        typeof body.stepId !== 'string' || !idPattern.test(body.stepId) ||
+        !['update','configure','approve','reject'].includes(body.action)) {
+      return res.status(400).json({ error: { code: 'INVALID_STEP_STATE', message: 'Step state request is invalid.' } });
+    }
+    const response = await supabaseFetch('/rest/v1/rpc/set_task_step_state', auth.token, {
+      method: 'POST',
+      body: JSON.stringify({
+        p_organization_id: auth.organizationId, p_task_id: body.taskId, p_step_id: body.stepId,
+        p_action: body.action, p_status: body.status || null, p_notes: body.notes || null,
+        p_next_step_date: body.nextStepDate || null, p_assignee_id: body.assigneeId || null,
+        p_depends_on_step_id: body.dependsOnStepId || null, p_approval_required: body.approvalRequired ?? null,
+      }),
+    });
+    if (!response.ok) return sendDbError(res, response.status, await response.text());
+    return res.status(200).json(await response.json());
+  } catch (error) {
+    console.error('Task step state update failed:', error);
+    return res.status(503).json({ error: { code: 'STEP_STATE_FAILED', message: 'The task step could not be saved.' } });
   }
 });
 
@@ -517,6 +627,18 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
   const resource = resources[req.params.resource as keyof typeof resources];
   if (!resource) return res.status(404).json({ error: { code: 'RESOURCE_NOT_FOUND', message: 'Unknown API resource.' } });
   if (req.params.id && !idPattern.test(req.params.id)) return res.status(400).json({ error: { code: 'INVALID_ID', message: 'Invalid record id.' } });
+  if (req.params.resource === 'task-requests' && req.method !== 'GET') {
+    return res.status(409).json({ error: { code: 'TASK_REQUEST_WORKFLOW_REQUIRED', message: 'Task requests must use the audited request/review workflows.' } });
+  }
+  if (req.params.resource === 'task-types' && req.method !== 'GET') {
+    return res.status(405).json({ error: { code: 'TASK_TYPES_READ_ONLY', message: 'Task types are managed through reviewed catalog migrations.' } });
+  }
+  if (req.params.resource === 'task-subtasks' && (req.method === 'POST' || req.method === 'PATCH' || req.method === 'DELETE')) {
+    return res.status(409).json({ error: { code: 'SUBTASK_WORKFLOW_REQUIRED', message: 'Subtasks must use their dedicated governed workflow.' } });
+  }
+  if (req.params.resource === 'task-steps' && (req.method === 'PATCH' || req.method === 'DELETE')) {
+    return res.status(409).json({ error: { code: 'STEP_WORKFLOW_REQUIRED', message: 'Task steps must use their dedicated state workflow.' } });
+  }
   if (req.params.resource === 'task-history' && req.method === 'POST') {
     return res.status(409).json({ error: { code: 'TASK_HISTORY_IMMUTABLE', message: 'Task history is written only by audited server workflows.' } });
   }
