@@ -130,6 +130,9 @@
 - GET `/health`
 - GET `/api/v1`
 - GET `/api/v1/me`
+- GET `/api/v1/permissions/me`
+- GET `/api/v1/settings/me`
+- POST `/api/v1/settings/save`
 - POST `/api/v1/tasks/create-bundle`
 - POST `/api/v1/tasks/record-outcome`
 - POST `/api/v1/tasks/review`
@@ -159,16 +162,16 @@ tasks, task-events, task-assignees, task-checklist, task-steps, task-subtasks, t
 
 ### P0 — تؤثر على صحة البيانات/التشغيل
 
-1. **Provisioning المستخدمين غير متاح داخل الواجهة:** تم تعطيل الإضافة المحلية الوهمية وإزالة الأدوار غير المدعومة. يلزم بناء دعوة Supabase Auth موثوقة وربط app_users وorganization_members قبل تمكين إنشاء المستخدم من الواجهة. معروف وقد يؤدي إلى قراءة `ROLE_LABELS[u.role].badgeColor` من قيمة غير موجودة.
-2. **إعدادات محلية:** `SettingsView` يحفظ عبر `dataStore.updateSettings` إلى localStorage؛ لا يستدعي مورد settings أو system_settings. لقطة الخادم لا تحمل الإعدادات ولا تستبدلها، ولذلك قد تبقى إعدادات متصفح قديمة من مؤسسة أخرى. قيم الخادم الافتراضية للمالية قد تختلف عن المعروض في الواجهة.
+1. **Provisioning المستخدمين غير متاح داخل الواجهة:** تم تعطيل الإضافة المحلية الوهمية وإزالة الأدوار غير المدعومة. يلزم بناء دعوة Supabase Auth موثوقة وربط app_users وorganization_members قبل تمكين إنشاء المستخدم من الواجهة.
+2. **إعدادات المؤسسة:** تم ربط القراءة والحفظ بـ`get_organization_settings` و`save_organization_settings` مع التحقق من العضوية النشطة للمؤسسة المحددة والصلاحيات. جدول `system_settings` لا يزال بلا صفوف حتى يحفظ المدير القيم الفعلية من الشاشة.
 3. **تم إصلاح التقويم:** `CalendarView` يستدعي `rescheduleTaskOnServer`، وAPI يسمح فقط بتعديل due_date/start_date/due_time ويترك تغييرات الحالة لمسارات lifecycle/outcome/review.
 4. **إيقاف الحساب الدائم محلي:** أزرار الإيقاف في FundsView وSettingsView تستدعي `dataStore.deleteStandingAccount` الذي يغير active في الذاكرة/localStorage فقط. المورد المالي لا يسمح CRUD عام للتعديل ولا يوجد workflow مخصص للتفعيل/الإيقاف.
-5. **تضارب الصلاحيات:** `RolesView` يقرأ ويكتب grants من Supabase، لكن `hasPermission` في `src/lib/rbac/permissions.ts` يقرأ `ROLE_PERMISSIONS` ثابتة. Sidebar وMobileBottomNav ومعظم أزرار العرض تستخدم هذه المصفوفة، بينما API يفحص role_permissions الفعلية. قد تظهر شاشة أو تختفي على خلاف صلاحية الخادم. لا تتحدث واجهة المستخدم فور تغيير grants.
+5. **مزامنة الصلاحيات:** تمت إضافة `/permissions/me` وربط `hasPermission` بمنح المؤسسة المحملة للجلسة. يتطلب تغيير grants إعادة تحميل snapshot/الجلسة؛ واختبارات كل دور لا تزال مطلوبة.
 6. **التقارير غير مكتملة خادميًا:** ReportsService وDashboard وPerformanceEvaluation تحسب في المتصفح من dataStore. لا توجد استعلامات تجميع server-side أو pagination للتقارير؛ النتائج قد تكون ناقصة فوق حد 500 سجل لكل collection.
 
 ### P1 — اتساق وتوثيق وتجربة
 
-7. **الإشعارات:** تُحمّل من Supabase، لكن Header يحدّث isRead محليًا فقط عبر dataStore؛ لا يوجد طلب PATCH أو endpoint مخصص لتثبيت حالة القراءة في قاعدة البيانات.
+7. **الإشعارات:** Header يستخدم `notifications.api.ts` لتحديث `is_read` على الخادم، مع تقييد التحديث على الإشعار الخاص بالمستخدم الحالي.
 8. **سجل التدقيق:** AuditLogsView يقرأ snapshot الخادمي، لكن عمليات dataStore.logAudit المحلية لا تتحول تلقائيًا إلى audit_logs. يجب عدم عرض سجل محلي على أنه سجل تدقيق مركزي.
 9. **Dashboard metrics:** `DashboardView` يحمّل metrics وAI analysis داخل useEffect بلا dependencies؛ لا يعيد حساب هذه الحالات بعد تغير dataStore ما دام المكون mounted.
 10. **AIService ليس نموذج AI:** هو قواعد if/else محلية بقيم ثابتة، ويتضمن عبارة توافق ضريبي 100% ونصائح توفير وأرقامًا افتراضية لا تستند إلى بيانات مقيّمة. يجب إعادة تسميته كمحلل قواعد أو ربطه بمصدر AI حقيقي مع إظهار المصدر والقيود.
@@ -176,10 +179,10 @@ tasks, task-events, task-assignees, task-checklist, task-steps, task-subtasks, t
 12. **قائمة المستخدمين والفريق:** تحميل دليل المستخدمين مقتصر على admin وops_manager؛ الأدوار الأخرى تتلقى ملف المستخدم الحالي فقط. يجب جعل نطاق الواجهة مقصودًا وواضحًا بدل عرض فريق ناقص كأنه القائمة الكاملة.
 13. **تبديل المؤسسة:** اختيار المؤسسة تلقائيًا عند الدخول ولا يوجد switcher. تغيير العضوية أو الدور في قاعدة البيانات لا يحدث role في session المخزنة حتى إعادة الدخول، مع أن API يعيد التحقق من العضوية الفعلية في كل طلب.
 14. **رسائل أخطاء API:** sendDbError يرسل تفاصيل PostgREST داخل error.details، لكن apiRequest يعرض error.message فقط؛ غالبًا يفقد المستخدم تفاصيل سبب الرفض.
-15. **تحديث task child:** بعد نجاح mutation قد يفشل snapshot refresh ويُبتلع الخطأ؛ يجب إظهار حالة "حُفظ على الخادم، فشل تحديث العرض" بدل إظهار شاشة قديمة بصمت.
+15. **تحديث task child:** لم يعد فشل تحديث snapshot يُبتلع بصمت؛ تُرفع رسالة تميز نجاح الحفظ على الخادم عن فشل تحديث العرض. lifecycle والإلغاء يستخدمان السلوك نفسه.
 16. **GPS والخرائط:** FieldMapView يحتاج `VITE_GOOGLE_MAPS_API_KEY`، كما يتطلب GPS إذن المتصفح واتصالًا ملائمًا. لم يتم اختبار سلوك الرفض أو فقد الإشارة على جهاز فعلي.
 17. **البيانات التجريبية:** dataStore يبدأ من mockData/localStorage. بوابة الإنتاج تمنع العرض قبل الدخول عند وجود إعدادات Supabase، لكن يجب استمرار فصل وضع العرض التجريبي عن مسارات الإنتاج.
-18. **Reset:** زر Settings يستدعي resetToDefault ويمسح localStorage ويعيد mock data محليًا؛ لا يحذف قاعدة Supabase. النصوص يجب أن تفرق صراحة بين إعادة ضبط العرض المحلي وإجراء إداري على بيانات المؤسسة.
+18. **Reset:** أزيل زر إعادة تهيئة البيانات التجريبية من Settings لتجنب الخلط بين بيانات العرض وبيانات المؤسسة الفعلية.
 
 ## 9. الخدمات القديمة أو غير المستخدمة في مسار الواجهة
 
