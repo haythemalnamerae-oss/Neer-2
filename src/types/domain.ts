@@ -65,6 +65,13 @@ export interface TaskStep {
   nextStepDate?: string;
   notes?: string;
   order: number;
+  assignedTo?: string;
+  approvalRequired?: boolean;
+  approvalStatus?: 'not_required' | 'pending' | 'approved' | 'rejected';
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectionReason?: string;
+  dependsOnStepId?: string;
 }
 
 export interface SubTask {
@@ -78,6 +85,18 @@ export interface SubTask {
   approvedByManager?: boolean;
   dueDate?: string;
   notes?: string;
+  approvalStatus?: 'not_required' | 'pending' | 'approved' | 'rejected';
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectionReason?: string;
+  priority?: TaskPriority;
+  description?: string;
+  location?: string;
+  locationRequired?: boolean;
+  proofRequired?: string;
+  budget?: number;
+  startedAt?: string;
+  completedAt?: string;
 }
 
 export interface TaskDailyUpdate {
@@ -158,6 +177,11 @@ export interface Task {
   description: string;
   priority: TaskPriority;
   status: TaskStatus;
+  approvalStatus?: 'not_required' | 'pending' | 'approved' | 'rejected';
+  executionStatus?: string;
+  taskTypeKey?: string;
+  taskRequestId?: string;
+  requestedBy?: string;
   assigneeId: string;
   assigneeName: string;
   assignees?: TaskAssignee[];
