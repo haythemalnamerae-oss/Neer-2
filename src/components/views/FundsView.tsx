@@ -732,13 +732,16 @@ export const FundsView: React.FC<FundsViewProps> = ({
                           <button type="button" onClick={() => setSelectedStandingAccount(acc)} className="px-3 py-2 rounded-xl neu-raised text-emerald-800 font-bold whitespace-nowrap" title="فتح كشف الحساب">كشف الحساب</button>
                           {canEditFund && acc.active !== false && <button type="button" onClick={() => {
                             if (window.confirm(`سيتم إيقاف حساب ${acc.name} مع الاحتفاظ بجميع حركاته. هل تريد المتابعة؟`)) {
-                              try { dataStore.deleteStandingAccount(acc.id); } catch (error) { window.alert(error instanceof Error ? error.message : 'تعذر إيقاف الحساب.'); }
+                              void FinanceApiService.setStandingAccountActive(acc.id, false, 'إيقاف الحساب من شاشة العهد')
+                                .catch((error) => window.alert(error instanceof Error ? error.message : 'تعذر إيقاف الحساب.'));
                             }
                           }} className="w-8 h-8 rounded-xl neu-raised text-rose-600 hover:text-rose-800 active:neu-inset inline-flex items-center justify-center transition cursor-pointer" title="إيقاف الحساب">
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>}
                           {canEditFund && acc.active === false && <button type="button" onClick={() => {
-                            if (window.confirm(`إعادة تفعيل حساب ${acc.name}؟`)) dataStore.updateStandingAccount(acc.id, { active: true });
+                            if (!window.confirm(`إعادة تفعيل حساب ${acc.name}؟`)) return;
+                            void FinanceApiService.setStandingAccountActive(acc.id, true, 'إعادة تفعيل الحساب من شاشة العهد')
+                              .catch((error) => window.alert(error instanceof Error ? error.message : 'تعذر إعادة تفعيل الحساب.'));
                           }} className="px-3 py-2 rounded-xl neu-raised text-emerald-800 font-bold" title="إعادة تفعيل الحساب">تفعيل</button>}
                         </div>
                       </td>
