@@ -1,54 +1,65 @@
-# قاعدة بيانات Neer على Supabase
+# قاعدة بيانات Neer-2 على Supabase
 
-## ما الذي يضيفه هذا المخطط؟
+## الحالة الحية
 
-تُنشئ الهجرة `migrations/20261107000000_neer_unified_operations.sql` مخطط PostgreSQL مترابطاً لواجهة Neer: المؤسسات والعضويات والمستخدمون والأدوار والإعدادات، المهام وقوائم التحقق والمراحل والتعليقات والمرفقات وسجل التنفيذ، العهد والمصروفات والتسويات والمقبوضات والحسابات الدائمة، المتابعات والإشعارات وسجل التدقيق.
+قاعدة Supabase المرتبطة بمشروع Neer-2 متصلة ونشطة. فحص 2026-11-12 أكد PostgreSQL 17.11، و28 جدول تطبيق في public، وRLS على جميعها، و73 سياسة، و24 ترحيلاً مطبقاً حتى 20261112123539.
 
-تستخدم الجداول مفاتيح نصية لسجلات التطبيق مثل `tsk-1` و`fund-1`، مع فصل بيانات كل مؤسسة بواسطة `organization_id`. تفعّل الهجرة RLS؛ ويقتصر الوصول المالي على المدير ومسؤول المالية. يرتبط تسجيل الدخول بمستخدمي Supabase Auth عبر `organization_members.auth_user_id`.
+قاعدة البيانات هي مصدر الحقيقة للمؤسسة والمهام والعمليات المالية. لا تعتمد على mockData.ts أو localStorage كسجلات إنتاجية. بعض شاشات المستخدمين والإعدادات والتقويم والإشعارات ما زالت محلية، كما هو موثق في docs/FEATURE_GAP_MATRIX.md.
 
-## تطبيق المخطط على مشروع Supabase المرتبط
+## بنية البيانات
 
-لم يُتح في جلسة العمل اتصال إداري بمشروع Supabase أو بيانات اعتماده، لذلك لم أتمكن من تنفيذ الهجرة داخل المشروع نفسه. بعد ربط Supabase CLI بالمشروع الصحيح شغّل من جذر المستودع:
+تشمل الجداول المؤسسات والعضويات والمستخدمين والأدوار والصلاحيات، والمهام ومكلفيها وخطواتها وتعليقاتها ومرفقاتها وأحداثها، والعهد والمصروفات والمقبوضات والتسويات والحسابات الدائمة، والمتابعات والإشعارات والتدقيق.
 
-```bash
-supabase login
-supabase link --project-ref YOUR_PROJECT_REF
-supabase db push
-```
+جميع جداول التطبيق الـ28 تستخدم organization_id وعزل RLS. تغييرات المالية تمر عبر RPCs ذرية؛ لا تستخدم REST CRUD العام لتغيير أرصدة أو قيود مالية. سجلات fund_transactions وstanding_account_entries وtask_events محمية من UPDATE/DELETE.
 
-راجع اسم المشروع ومعرّفه قبل `db push`؛ فهذا الأمر يطبّق التغييرات على قاعدة البيانات البعيدة.
+## مشروع Supabase المرتبط
 
-يمكن أيضاً فتح ملف الهجرة وتشغيل SQL في Supabase Dashboard → SQL Editor، بعد التأكد من اختيار المشروع الصحيح.
+معرّف المشروع المرتبط: xtfuvxomfhlfjtpljofh.
 
-## تهيئة أول مؤسسة ومدير
+قبل أي ترحيل جديد:
+1. تأكد أن المشروع المرتبط هو Neer-2.
+2. قارن supabase_migrations.schema_migrations مع ملفات supabase/migrations؛ سجل الخادم يحتوي 24 ترحيلاً، ويجب معالجة أي اختلاف قبل db push.
+3. خذ نسخة احتياطية قابلة للاستعادة.
+4. راجع SQL وخطة التراجع، خصوصاً أي تغيير يمس RLS أو المالية.
+5. لا تعدل أو تعيد كتابة البيانات المالية التاريخية.
+6. لا تشغّل بناءً أو نشراً سحابياً ضمن سير العمل؛ البناء النهائي محلي.
 
-1. أنشئ حساب المدير من Supabase Authentication، ثم انسخ UUID الخاص به.
-2. شغّل التالي من SQL Editor بعد تعديل القيم. أنشئ المؤسسة أولاً، ثم أضف العضوية والمستخدم:
+أوامر CLI للاستخدام المحلي بعد مراجعة المشروع:
+- supabase login
+- supabase link --project-ref xtfuvxomfhlfjtpljofh
+- supabase migration list
+- supabase db push
 
-```sql
-with new_org as (
-  insert into public.organizations (name)
-  values ('اسم المؤسسة')
-  returning id
-)
-insert into public.organization_members (organization_id, auth_user_id, role, active, is_default)
-select id, 'AUTH_USER_UUID'::uuid, 'admin', true, true from new_org;
+لا تنفذ db push قبل مطابقة سجل الترحيلات وأخذ نسخة احتياطية ومراجعة التغييرات المقترحة.
 
--- كرر باستخدام UUID المؤسسة الذي أُنشئ في الخطوة السابقة:
-insert into public.app_users (id, organization_id, auth_user_id, name, email, role)
-values ('usr-admin', 'ORGANIZATION_UUID'::uuid, 'AUTH_USER_UUID'::uuid,
-        'اسم المدير', 'admin@example.com', 'admin');
-```
+## تهيئة المستخدمين والأدوار
 
-أضف بقية أعضاء المؤسسة من حساب مدير؛ لا تضع `service_role` أو مفاتيح إدارية في الواجهة الأمامية.
+إنشاء حساب الدخول يتم عبر Supabase Auth أو إجراء provisioning موثوق من الخادم. بعد ذلك يُربط UUID الخاص بـAuth بمؤسسة موجودة في organizations عبر organization_members وملف app_users. يجب أن يتطابق organization_id وauth_user_id في السجلين. أنشئ ملف app_users أولاً ثم العضوية إذا كان app_user_id مطلوباً كمفتاح أجنبي.
+
+الأدوار الحالية فقط:
+- admin
+- ops_manager
+- finance_officer
+- field_officer
+- viewer
+
+الأذونات التفصيلية في permission_catalog وrole_permissions. لا تمنح مفاتيح service-role للمتصفح أو تخزن كلمات مرور ومفاتيح في Git.
 
 ## متغيرات التطبيق
 
-أضف إلى `.env.local` قيم مشروعك (لا ترفع القيم السرية إلى GitHub):
+للتطوير المحلي فقط، أضف إلى .env.local القيم الخاصة بالمشروع ولا ترفعها إلى Git:
+- VITE_SUPABASE_URL=https://xtfuvxomfhlfjtpljofh.supabase.co
+- VITE_SUPABASE_ANON_KEY=YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY
+- VITE_API_URL=/api/v1
+- SUPABASE_URL=https://xtfuvxomfhlfjtpljofh.supabase.co
+- SUPABASE_ANON_KEY=YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY
 
-```dotenv
-VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
-VITE_SUPABASE_ANON_KEY=YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY
-```
+لا تستخدم service-role key في المتصفح. خادم API يمرر JWT المستخدم إلى PostgREST وتعتمد RLS كحد عزل نهائي.
 
-**مهم:** هذه الهجرة تنشئ قاعدة البيانات وسياسات الحماية، لكنها لا تستبدل بعدُ مخزن `localStorage` الحالي في الواجهة ولا تنقل بيانات `mockData.ts` تلقائياً. يلزم تنفيذ طبقة Supabase في التطبيق وربط تسجيل الدخول والمخزن بهذه الجداول قبل أن تقرأ الواجهة البيانات منها. لا تستخدم بيانات `mockData.ts` كبيانات إنتاجية.
+## حدود معروفة
+
+- system_settings فارغ حالياً، وواجهة Settings لا تحفظ إلى الخادم بعد؛ تستخدم وظائف المالية إعدادات افتراضية حتى ربط الإعدادات.
+- loadUiSnapshot يجلب 500 سجل كحد لكل مجموعة ولا يطبق pagination حالياً.
+- لا يوجد دفتر أستاذ عام مزدوج القيد أو جدول حسابات بنكية في المخطط الحالي.
+- قاعدة البيانات التشغيلية والمالية كانت فارغة عند تدقيق 2026-11-12؛ لا تعتبر نجاح فحوص الصفر دليلاً على صحة كل سيناريو مالي.
+- راجع docs/DEEP_DIVE_AUDIT.md وdocs/SECURITY_AUDIT.md قبل تغيير المخطط أو الصلاحيات.
