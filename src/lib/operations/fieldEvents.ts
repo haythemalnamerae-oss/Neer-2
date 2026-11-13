@@ -112,10 +112,15 @@ export async function captureRequiredLocation(): Promise<CapturedLocation> {
   }
 }
 
+type NonLifecycleFieldEventType = Exclude<FieldEventType,
+  | 'visit_started' | 'visit_paused' | 'visit_resumed' | 'visit_completed'
+  | 'task_started' | 'task_paused' | 'task_resumed' | 'task_completed'
+>;
+
 export async function recordTaskEvent(input: {
   taskId: string;
   standingAccountId?: string;
-  eventType: FieldEventType;
+  eventType: NonLifecycleFieldEventType;
   eventLabel: string;
   location: CapturedLocation;
   details?: Record<string, unknown>;
