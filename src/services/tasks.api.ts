@@ -1,6 +1,7 @@
 import type { Task, TaskOutcome, TaskStepStatus, TaskAttachment } from '../types/domain';
 import { apiRequest, getSession, loadUiSnapshot, refreshSession, SessionError, type ApiSession } from '../lib/api/session';
 import { dataStore } from '../lib/storage';
+import { enqueueTaskEvent } from '../lib/operations/taskEventOutbox';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -164,10 +165,25 @@ export async function recordTaskOutcomeOnServer(
 
 export async function updateTaskLifecycle(taskId: string, action: 'start' | 'pause' | 'resume', reason?: string): Promise<void> {
   const session = requireSession();
-  await apiRequest(session, '/tasks/lifecycle', {
-    method: 'POST',
-    body: JSON.stringify({ taskId, action, reason: reason || null }),
+  const clientEventId = newUuid();
+  const status = await enqueueTaskEvent({
+    taskId,
+    path: '/tasks/lifecycle',
+    clientEventId,
+    body: {
+      taskId,
+      action,
+      reason: reason || null,
+      clientEventId,
+      clientOccurredAt: new Date().toISOString(),
+      deviceTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    },
   });
+  if (status !== 'synced') {
+    throw new Error(status === 'blocked'
+      ? 'حُفظ طلب تغيير حالة المهمة محلياً لكن رفضه الخادم؛ راجع الصلاحيات أو حالة المهمة.'
+      : 'حُفظ طلب تغيير حالة المهمة على الجهاز وينتظر المزامنة. ستُرسل الأحداث بالترتيب عند عودة الاتصال.');
+  }
   await refreshAfterMutation(session);
 }
 
