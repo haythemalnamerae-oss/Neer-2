@@ -15,6 +15,7 @@ import { TASK_PRIORITY_CONFIG, TASK_STATUS_CONFIG, formatCurrency } from '../../
 import { Button } from '../ui/button';
 import { cancelTaskOnServer, listTaskRequests, reviewTaskRequest, resubmitTaskRequest, type TaskRequestRecord } from '../../services/tasks.api';
 
+import { TaskSyncStatus } from '../tasks/TaskSyncStatus';
 interface TasksViewProps {
   onOpenNewTask: () => void;
   onSelectTask: (task: Task) => void;
@@ -162,6 +163,8 @@ export const TasksView: React.FC<TasksViewProps> = ({
           </Button>}
         </div>
       </div>
+
+      <TaskSyncStatus />
 
       {(canReviewRequests || canSubmitRequest) && (
         <section className="neu-raised-lg rounded-3xl p-5 space-y-3">
