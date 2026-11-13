@@ -2,6 +2,7 @@
 -- Existing event history is preserved; only row visibility and insert authorization change.
 
 drop policy if exists task_events_member_read on public.task_events;
+drop policy if exists task_events_scoped_read on public.task_events;
 create policy task_events_scoped_read
   on public.task_events
   for select
@@ -9,6 +10,7 @@ create policy task_events_scoped_read
   using (private.can_access_task(organization_id,task_id,'view'));
 
 drop policy if exists task_events_actor_insert on public.task_events;
+drop policy if exists task_events_scoped_actor_insert on public.task_events;
 create policy task_events_scoped_actor_insert
   on public.task_events
   for insert
