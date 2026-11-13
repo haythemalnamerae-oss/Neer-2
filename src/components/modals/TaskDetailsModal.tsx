@@ -41,6 +41,7 @@ import { FinanceApiService } from '../../services/finance-api.service';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 
+import { TaskSyncStatus } from '../tasks/TaskSyncStatus';
 interface TaskDetailsModalProps {
   task: Task | null;
   isOpen: boolean;
@@ -339,6 +340,8 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
       <div className="neu-raised-lg bg-[#EAF0EC] rounded-3xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         
+        <div className="px-5 pt-3"><TaskSyncStatus /></div>
+
         {/* Modal Header */}
         <div className="px-6 py-5 border-b border-black/[0.04] flex items-center justify-between">
           <div className="flex items-center gap-2.5 flex-wrap">
