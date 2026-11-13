@@ -5,6 +5,7 @@ import {
   retryBlockedTaskEvents,
   type TaskEventOutboxSummary,
 } from '../../lib/operations/taskEventOutbox';
+import { refreshTaskSnapshot } from '../../services/tasks.api';
 
 const EMPTY: TaskEventOutboxSummary = { pending: 0, blocked: 0 };
 
@@ -33,7 +34,15 @@ export const TaskSyncStatus: React.FC = () => {
       }
     };
     void sync();
-    const onChange = () => { void sync(); };
+    const onChange = () => {
+      void (async () => {
+        await sync();
+        try {
+          const next = await getTaskEventOutboxSummary();
+          if (next.pending === 0 && next.blocked === 0) await refreshTaskSnapshot();
+        } catch { /* Keep the durable local outbox state visible; refresh can be retried online. */ }
+      })();
+    };
     window.addEventListener('neer-task-outbox-change', onChange);
     window.addEventListener('online', onChange);
     return () => {
