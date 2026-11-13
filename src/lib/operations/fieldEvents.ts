@@ -149,6 +149,47 @@ export async function recordTaskEvent(input: {
 }
 
 
+export type LocationUnavailableStatus = 'permission_denied' | 'services_disabled' | 'unavailable' | 'timeout';
+
+/**
+ * Persist a truthful audit event when GPS cannot be captured.
+ * No coordinates are fabricated; the server stores NULL coordinates and the explicit reason.
+ */
+export async function recordLocationUnavailable(input: {
+  taskId: string;
+  eventLabel: string;
+  status: LocationUnavailableStatus;
+  details?: Record<string, unknown>;
+}): Promise<void> {
+  if (!getSession()) throw new Error('انتهت جلسة الدخول. سجّل الدخول مجدداً قبل توثيق تعذر الموقع.');
+  if (!input.taskId || !input.eventLabel.trim() || input.eventLabel.length > 200) {
+    throw new FieldLocationError('المهمة ووصف تعذر الموقع مطلوبان، ويجب ألا يتجاوز الوصف 200 حرف.', 'unavailable');
+  }
+  if (!['permission_denied','services_disabled','unavailable','timeout'].includes(input.status)) {
+    throw new FieldLocationError('حالة تعذر الموقع غير معروفة.', 'unavailable');
+  }
+  if (input.details && JSON.stringify(input.details).length > 20000) {
+    throw new FieldLocationError('تفاصيل الحدث أكبر من الحد المسموح.', 'unavailable');
+  }
+  const clientEventId = createClientEventId();
+  const status = await enqueueTaskEvent({
+    taskId: input.taskId,
+    path: '/task-events',
+    clientEventId,
+    body: {
+      task_id: input.taskId,
+      event_type: 'location_unavailable',
+      event_label: input.eventLabel,
+      location_status: input.status,
+      client_event_id: clientEventId,
+      details: input.details || {},
+    },
+  });
+  if (status !== 'synced') throw new Error(status === 'blocked'
+    ? 'تم حفظ تعذر الموقع محلياً لكن الخادم رفض الحدث؛ راجع صلاحية المهمة.'
+    : 'تم حفظ تعذر الموقع محلياً وينتظر المزامنة عند عودة الاتصال.');
+}
+
 export async function recordFieldLifecycleEvent(input: {
   taskId: string;
   eventType: Extract<FieldEventType, 'visit_started' | 'visit_paused' | 'visit_resumed' | 'visit_completed' | 'task_started' | 'task_paused' | 'task_resumed' | 'task_completed'>;
