@@ -71,3 +71,11 @@
 
 - [ ] WebView/متصفح لا يدعم `crypto.randomUUID` لكنه يدعم `crypto.getRandomValues`: يجب إنشاء UUID v4 صالح وإرسال الحدث.
 - [ ] eventLabel فارغ/أطول من 200، أو GPS accuracy أكبر من 100000m: يرفضه العميل قبل إدخاله إلى IndexedDB.
+
+
+## اختبارات إضافية بعد مراجعة الواجهة
+- [ ] عند رفض GPS أو تعطيل الموقع أو انتهاء المهلة أو غياب جسر Android، يسجل `location_unavailable` بإحداثيات NULL وحالة صحيحة؛ لا يُسجل موقع مزيف.
+- [ ] يرفض API وصف lifecycle الفارغ وتفاصيل JSON الأكبر من 20KB.
+- [ ] عند وجود حدث blocked لمهمة A، تتم مزامنة أحداث مهمة B للمستخدم نفسه؛ لا يسمح بانتقال lifecycle ثانٍ للمهمة A قبل معالجة الحدث المحظور.
+- [ ] إعادة إرسال outcome بنفس requestId لا تنشئ follow-up أو حدثاً أو موافقة مكررة.
+- [ ] UUID fallback يستخدم crypto.getRandomValues ولا يستخدم Math.random.
