@@ -30,14 +30,36 @@ function openDb(): Promise<IDBDatabase> {
   if (!dbPromise) {
     dbPromise = new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, 2);
+      let settled = false;
       request.onupgradeneeded = () => {
         const db = request.result;
         if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME, { keyPath: 'id' });
         if (!db.objectStoreNames.contains(META_STORE_NAME)) db.createObjectStore(META_STORE_NAME, { keyPath: 'key' });
       };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error || new Error('تعذر فتح طابور الأحداث المحلي.'));
-      request.onblocked = () => reject(new Error('تحديث مخزن الأحداث المحلي محجوب بواسطة تبويب آخر.'));
+      request.onsuccess = () => {
+        const db = request.result;
+        // Close stale connections when another tab upgrades the outbox schema.
+        db.onversionchange = () => {
+          db.close();
+          dbPromise = null;
+        };
+        if (settled) {
+          db.close();
+          return;
+        }
+        settled = true;
+        resolve(db);
+      };
+      request.onerror = () => {
+        if (settled) return;
+        settled = true;
+        reject(request.error || new Error('تعذر فتح طابور الأحداث المحلي.'));
+      };
+      request.onblocked = () => {
+        if (settled) return;
+        settled = true;
+        reject(new Error('تحديث مخزن الأحداث المحلي محجوب بواسطة تبويب آخر. أغلق التبويبات القديمة ثم أعد المحاولة.'));
+      };
     }).catch((error) => {
       dbPromise = null;
       throw error;
