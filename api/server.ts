@@ -635,7 +635,10 @@ app.post('/api/v1/tasks/lifecycle', async (req, res) => {
     const body = req.body as Record<string, any> | undefined;
     if (!body || typeof body.taskId !== 'string' || !idPattern.test(body.taskId) ||
         !['start','pause','resume'].includes(body.action) ||
-        (body.action === 'pause' && (typeof body.reason !== 'string' || !body.reason.trim()))) {
+        (body.action === 'pause' && (typeof body.reason !== 'string' || !body.reason.trim())) ||
+        (body.clientEventId !== undefined && (typeof body.clientEventId !== 'string' || !uuid.test(body.clientEventId))) ||
+        (body.clientOccurredAt !== undefined && body.clientOccurredAt !== null && (typeof body.clientOccurredAt !== 'string' || !Number.isFinite(Date.parse(body.clientOccurredAt)))) ||
+        (body.deviceTimezone !== undefined && (typeof body.deviceTimezone !== 'string' || body.deviceTimezone.length > 80))) {
       return res.status(400).json({ error: { code: 'INVALID_TASK_LIFECYCLE', message: 'Task lifecycle payload is invalid.' } });
     }
     const response = await supabaseFetch('/rest/v1/rpc/update_task_lifecycle', auth.token, {
@@ -645,6 +648,9 @@ app.post('/api/v1/tasks/lifecycle', async (req, res) => {
         p_task_id: body.taskId,
         p_action: body.action,
         p_reason: body.reason || null,
+        p_client_event_id: body.clientEventId || null,
+        p_client_occurred_at: body.clientOccurredAt || null,
+        p_device_timezone: body.deviceTimezone || null,
       }),
     });
     if (!response.ok) return sendDbError(res, response.status, await response.text());
