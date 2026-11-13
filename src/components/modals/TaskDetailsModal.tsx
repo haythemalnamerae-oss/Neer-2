@@ -272,6 +272,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
         }
       }
     } catch (error) {
+      if (requiresFieldLocation) await recordFieldLocationFailure(task.id, 'تعذر إضافة مهمة فرعية بسبب الموقع', error).catch(() => undefined);
       window.alert(error instanceof Error ? error.message : 'تعذر حفظ المهمة الفرعية.');
     }
   };
