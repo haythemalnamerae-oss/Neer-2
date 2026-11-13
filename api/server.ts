@@ -704,9 +704,12 @@ app.post('/api/v1/task-events/lifecycle', async (req, res) => {
     const body = req.body as Record<string, unknown> | undefined;
     const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     if (!body || typeof body.task_id !== 'string' || !idPattern.test(body.task_id) ||
-        typeof body.event_type !== 'string' || typeof body.event_label !== 'string' ||
-        typeof body.latitude !== 'number' || typeof body.longitude !== 'number' ||
-        typeof body.accuracy_meters !== 'number' || typeof body.client_event_id !== 'string' ||
+        typeof body.event_type !== 'string' || !['visit_started','visit_paused','visit_resumed','visit_completed','task_started','task_paused','task_resumed','task_completed'].includes(body.event_type) ||
+        typeof body.event_label !== 'string' || body.event_label.length > 200 ||
+        typeof body.latitude !== 'number' || !Number.isFinite(body.latitude) || body.latitude < -90 || body.latitude > 90 ||
+        typeof body.longitude !== 'number' || !Number.isFinite(body.longitude) || body.longitude < -180 || body.longitude > 180 ||
+        typeof body.accuracy_meters !== 'number' || !Number.isFinite(body.accuracy_meters) || body.accuracy_meters < 0 || body.accuracy_meters > 100000 ||
+        typeof body.client_event_id !== 'string' ||
         !uuid.test(body.client_event_id) || !body.details || typeof body.details !== 'object' || Array.isArray(body.details)) {
       return res.status(400).json({ error: { code: 'INVALID_FIELD_EVENT', message: 'A task, lifecycle event, valid GPS fix, idempotency key and JSON details are required.' } });
     }
