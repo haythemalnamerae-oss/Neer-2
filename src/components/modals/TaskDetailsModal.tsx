@@ -34,7 +34,7 @@ import {
   getTaskAttachmentSignedUrl, refreshTaskSnapshot, setChecklistItem,
   setTaskStepStatus, updateTaskLifecycle, updateTaskSubtaskStatus, updateTaskStatusOnServer, uploadTaskAttachment,
 } from '../../services/tasks.api';
-import { captureRequiredLocation, ensureFieldVisitCanStart, recordFieldLifecycleEvent, recordTaskEvent, startFieldLocationTracking, stopFieldLocationTracking, type FieldEventType } from '../../lib/operations/fieldEvents';
+import { captureRequiredLocation, ensureFieldVisitCanStart, recordFieldLifecycleEvent, recordFieldLocationFailure, recordTaskEvent, startFieldLocationTracking, stopFieldLocationTracking, type FieldEventType } from '../../lib/operations/fieldEvents';
 import { formatCurrency, TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG } from '../../lib/utils/format';
 import { hasPermission } from '../../lib/rbac/permissions';
 import { FinanceApiService } from '../../services/finance-api.service';
@@ -127,6 +127,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
         startFieldLocationTracking(task.id);
       }
     } catch (error) {
+      if (requiresFieldLocation) await recordFieldLocationFailure(task.id, 'تعذر بدء المهمة بسبب الموقع', error).catch(() => undefined);
       window.alert(error instanceof Error ? error.message : 'تعذر توثيق الموقع والبدء.');
     } finally {
       setIsLocating(false);
@@ -157,6 +158,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
       setIsPausePromptOpen(false);
       setPauseReasonInput('');
     } catch (error) {
+      if (requiresFieldLocation) await recordFieldLocationFailure(task.id, 'تعذر إيقاف المهمة بسبب الموقع', error).catch(() => undefined);
       window.alert(error instanceof Error ? error.message : 'تعذر توثيق الإيقاف المؤقت.');
     } finally {
       setIsLocating(false);
@@ -197,6 +199,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
         startFieldLocationTracking(task.id);
       }
     } catch (error) {
+      if (requiresFieldLocation) await recordFieldLocationFailure(task.id, 'تعذر استئناف المهمة بسبب الموقع', error).catch(() => undefined);
       window.alert(error instanceof Error ? error.message : 'تعذر توثيق الاستئناف.');
     } finally {
       setIsLocating(false);
