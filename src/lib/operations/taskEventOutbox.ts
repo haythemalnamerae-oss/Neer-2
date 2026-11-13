@@ -131,6 +131,10 @@ export async function enqueueTaskEvent(input: {
   const session = getSession();
   if (!session) throw new Error('انتهت جلسة الدخول. سجّل الدخول لحفظ الحدث وربطه بحسابك.');
   const existing = (await allEvents()).filter((item) => sameIdentity(item, session));
+  const isLifecycleEvent = input.path.endsWith('/lifecycle');
+  if (isLifecycleEvent && existing.some((item) => item.taskId === input.taskId && item.path.endsWith('/lifecycle'))) {
+    throw new Error('يوجد حدث بدء أو إيقاف أو استئناف لهذه المهمة لم تتم مزامنته بعد. انتظر المزامنة قبل تسجيل انتقال آخر حتى لا تتعارض حالة المهمة.');
+  }
   const lastCreatedAt = existing.reduce((latest, item) => Math.max(latest, Date.parse(item.createdAt) || 0), 0);
   const event: QueuedTaskEvent = {
     id: input.clientEventId,
