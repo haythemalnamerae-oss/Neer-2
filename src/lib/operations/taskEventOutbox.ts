@@ -19,6 +19,7 @@ const DB_NAME = 'neer-task-event-outbox-v1';
 const STORE_NAME = 'events';
 let dbPromise: Promise<IDBDatabase> | null = null;
 let flushInFlight: Promise<void> | null = null;
+let flushRequested = false;
 
 function openDb(): Promise<IDBDatabase> {
   if (typeof indexedDB === 'undefined') {
@@ -78,7 +79,10 @@ function sameIdentity(event: QueuedTaskEvent, session: ApiSession): boolean {
 
 /** Flushes events in FIFO order for the exact identity that created them. */
 export async function flushTaskEventOutbox(): Promise<void> {
-  if (flushInFlight) return flushInFlight;
+  if (flushInFlight) {
+    flushRequested = true;
+    return flushInFlight;
+  }
   if (typeof navigator !== 'undefined' && !navigator.onLine) return;
   const session = getSession();
   if (!session) return;
@@ -97,7 +101,7 @@ export async function flushTaskEventOutbox(): Promise<void> {
         const message = error instanceof Error ? error.message : 'تعذرت مزامنة الحدث.';
         const statusMatch = message.match(/API \((\d{3})\)|HTTP (\d{3})/i);
         const status = statusMatch ? Number(statusMatch[1] || statusMatch[2]) : 0;
-        const blocked = status >= 400 && status < 500 && status !== 408 && status !== 409 && status !== 429;
+        const blocked = status >= 400 && status < 500 && status !== 408 && status !== 429;
         await putEvent({
           ...event,
           attempts: event.attempts + 1,
@@ -108,7 +112,13 @@ export async function flushTaskEventOutbox(): Promise<void> {
         break;
       }
     }
-  })().finally(() => { flushInFlight = null; });
+  })().finally(() => {
+    flushInFlight = null;
+    if (flushRequested) {
+      flushRequested = false;
+      void flushTaskEventOutbox();
+    }
+  });
   return flushInFlight;
 }
 
@@ -120,6 +130,8 @@ export async function enqueueTaskEvent(input: {
 }): Promise<TaskOutboxStatus> {
   const session = getSession();
   if (!session) throw new Error('انتهت جلسة الدخول. سجّل الدخول لحفظ الحدث وربطه بحسابك.');
+  const existing = (await allEvents()).filter((item) => sameIdentity(item, session));
+  const lastCreatedAt = existing.reduce((latest, item) => Math.max(latest, Date.parse(item.createdAt) || 0), 0);
   const event: QueuedTaskEvent = {
     id: input.clientEventId,
     organizationId: session.organizationId,
@@ -127,7 +139,7 @@ export async function enqueueTaskEvent(input: {
     taskId: input.taskId,
     path: input.path,
     body: input.body,
-    createdAt: new Date().toISOString(),
+    createdAt: new Date(Math.max(Date.now(), lastCreatedAt + 1)).toISOString(),
     attempts: 0,
     state: 'pending',
   };
