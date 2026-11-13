@@ -91,6 +91,7 @@ export async function flushTaskEventOutbox(): Promise<void> {
       try {
         await apiRequest(session, event.path, { method: 'POST', body: JSON.stringify(event.body) });
         await deleteEvent(event.id);
+        if (typeof window !== 'undefined') window.dispatchEvent(new Event('neer-task-outbox-change'));
       } catch (error) {
         const message = error instanceof Error ? error.message : 'تعذرت مزامنة الحدث.';
         const statusMatch = message.match(/API \((\d{3})\)/);
@@ -102,6 +103,7 @@ export async function flushTaskEventOutbox(): Promise<void> {
           state: blocked ? 'blocked' : 'pending',
           lastError: message.slice(0, 500),
         });
+        if (typeof window !== 'undefined') window.dispatchEvent(new Event('neer-task-outbox-change'));
         // Preserve FIFO ordering: do not send later lifecycle events past a failed predecessor.
         break;
       }
@@ -130,6 +132,7 @@ export async function enqueueTaskEvent(input: {
     state: 'pending',
   };
   await putEvent(event);
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('neer-task-outbox-change'));
   await flushTaskEventOutbox();
   const remaining = (await allEvents()).find((item) => item.id === event.id);
   return remaining ? (remaining.state === 'blocked' ? 'blocked' : 'pending') : 'synced';
@@ -147,7 +150,8 @@ export async function getTaskEventOutboxSummary(): Promise<{ pending: number; bl
 
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => { void flushTaskEventOutbox(); });
-  window.addEventListener('visibilitychange', () => {
+  document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') void flushTaskEventOutbox();
   });
+  void flushTaskEventOutbox();
 }
