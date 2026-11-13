@@ -969,6 +969,19 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
   }
   const body = req.body as Record<string, unknown> | undefined;
   if ((req.method === 'POST' || req.method === 'PATCH') && (!body || typeof body !== 'object' || Array.isArray(body))) return res.status(400).json({ error: { code: 'INVALID_BODY', message: 'JSON object required.' } });
+  if (req.params.resource === 'task-events' && req.method === 'POST') {
+    const eventTypes = ['location_sample','visit_started','visit_paused','visit_resumed','visit_completed','task_started','task_paused','task_resumed','task_completed','subtask_created','expense_recorded','invoice_attached','follow_up_scheduled','note_added','status_changed','location_unavailable'];
+    if (typeof body!.task_id !== 'string' || !idPattern.test(body!.task_id) ||
+        typeof body!.event_type !== 'string' || !eventTypes.includes(body!.event_type) ||
+        typeof body!.event_label !== 'string' || body!.event_label.length > 200 ||
+        typeof body!.client_event_id !== 'string' || !uuidPattern.test(body!.client_event_id) ||
+        typeof body!.latitude !== 'number' || !Number.isFinite(body!.latitude) || body!.latitude < -90 || body!.latitude > 90 ||
+        typeof body!.longitude !== 'number' || !Number.isFinite(body!.longitude) || body!.longitude < -180 || body!.longitude > 180 ||
+        typeof body!.accuracy_meters !== 'number' || !Number.isFinite(body!.accuracy_meters) || body!.accuracy_meters < 0 || body!.accuracy_meters > 100000 ||
+        (body!.details !== undefined && (!body!.details || typeof body!.details !== 'object' || Array.isArray(body!.details)))) {
+      return res.status(400).json({ error: { code: 'INVALID_TASK_EVENT', message: 'A valid task, event type, GPS fix, label and idempotency key are required.' } });
+    }
+  }
   if (body && ('organization_id' in body || 'organizationId' in body)) return res.status(400).json({ error: { code: 'PROTECTED_FIELD', message: 'Organization id is server controlled.' } });
   let trustedBody = body;
   if (body && req.method === 'POST' && ['task-updates','task-comments','task-history','task-attachments','task-assignees'].includes(req.params.resource)) {
