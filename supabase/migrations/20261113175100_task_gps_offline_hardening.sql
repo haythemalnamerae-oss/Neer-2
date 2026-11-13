@@ -147,6 +147,8 @@ begin
     v_elapsed := greatest(1,round(extract(epoch from (v_now-v_task.timer_started_at))/60)::integer);
   end if;
 
+  perform set_config('neer.task_transition','lifecycle',true);
+
   if p_event_type in ('visit_started','task_started') then
     update public.tasks set
       status='in_progress', execution_status='in_progress',
