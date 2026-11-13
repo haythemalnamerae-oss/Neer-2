@@ -46,7 +46,7 @@ async function allEvents(): Promise<QueuedTaskEvent[]> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const request = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).getAll();
-    request.onsuccess = () => resolve((request.result as QueuedTaskEvent[]).sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
+    request.onsuccess = () => resolve((request.result as QueuedTaskEvent[]).sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)));
     request.onerror = () => reject(request.error || new Error('تعذر قراءة طابور الأحداث.'));
   });
 }
@@ -76,7 +76,7 @@ function sameIdentity(event: QueuedTaskEvent, session: ApiSession): boolean {
   return event.organizationId === session.organizationId && event.userId === session.userId;
 }
 
-/** Flushes FIFO events only for the exact account and organization that created them. */
+/** Flushes events in FIFO order for the exact identity that created them. */
 export async function flushTaskEventOutbox(): Promise<void> {
   if (flushInFlight) return flushInFlight;
   if (typeof navigator !== 'undefined' && !navigator.onLine) return;
@@ -84,19 +84,20 @@ export async function flushTaskEventOutbox(): Promise<void> {
   if (!session) return;
 
   flushInFlight = (async () => {
-    const events = await allEvents();
-    for (const event of events) {
-      if (!sameIdentity(event, session)) continue;
-      if (event.state === 'blocked') break;
+    // Re-read after each acknowledged event so newly enqueued tail events
+    // cannot be stranded behind an already-running flush.
+    while (true) {
+      const event = (await allEvents()).find((item) => sameIdentity(item, session));
+      if (!event || event.state === 'blocked') break;
       try {
         await apiRequest(session, event.path, { method: 'POST', body: JSON.stringify(event.body) });
         await deleteEvent(event.id);
         if (typeof window !== 'undefined') window.dispatchEvent(new Event('neer-task-outbox-change'));
       } catch (error) {
         const message = error instanceof Error ? error.message : 'تعذرت مزامنة الحدث.';
-        const statusMatch = message.match(/API \((\d{3})\)/);
-        const status = statusMatch ? Number(statusMatch[1]) : 0;
-        const blocked = status >= 400 && status < 500 && status !== 408 && status !== 429;
+        const statusMatch = message.match(/API \\((\\d{3})\\)|HTTP (\\d{3})/i);
+        const status = statusMatch ? Number(statusMatch[1] || statusMatch[2]) : 0;
+        const blocked = status >= 400 && status < 500 && status !== 408 && status !== 409 && status !== 429;
         await putEvent({
           ...event,
           attempts: event.attempts + 1,
@@ -104,7 +105,6 @@ export async function flushTaskEventOutbox(): Promise<void> {
           lastError: message.slice(0, 500),
         });
         if (typeof window !== 'undefined') window.dispatchEvent(new Event('neer-task-outbox-change'));
-        // Preserve FIFO ordering: do not send later lifecycle events past a failed predecessor.
         break;
       }
     }
@@ -138,14 +138,28 @@ export async function enqueueTaskEvent(input: {
   return remaining ? (remaining.state === 'blocked' ? 'blocked' : 'pending') : 'synced';
 }
 
-export async function getTaskEventOutboxSummary(): Promise<{ pending: number; blocked: number }> {
+export type TaskEventOutboxSummary = { pending: number; blocked: number; lastError?: string };
+
+export async function getTaskEventOutboxSummary(): Promise<TaskEventOutboxSummary> {
   const session = getSession();
   if (!session) return { pending: 0, blocked: 0 };
   const events = (await allEvents()).filter((event) => sameIdentity(event, session));
+  const blockedEvents = events.filter((event) => event.state === 'blocked');
   return {
     pending: events.filter((event) => event.state === 'pending').length,
-    blocked: events.filter((event) => event.state === 'blocked').length,
+    blocked: blockedEvents.length,
+    lastError: blockedEvents[0]?.lastError,
   };
+}
+
+/** Re-queues blocked events after their cause has been corrected. */
+export async function retryBlockedTaskEvents(): Promise<void> {
+  const session = getSession();
+  if (!session) throw new Error('انتهت الجلسة؛ سجّل الدخول لمزامنة الأحداث.');
+  const events = (await allEvents()).filter((event) => sameIdentity(event, session) && event.state === 'blocked');
+  for (const event of events) await putEvent({ ...event, state: 'pending', lastError: undefined });
+  if (events.length && typeof window !== 'undefined') window.dispatchEvent(new Event('neer-task-outbox-change'));
+  await flushTaskEventOutbox();
 }
 
 if (typeof window !== 'undefined') {
