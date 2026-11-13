@@ -147,9 +147,8 @@ begin
     v_elapsed := greatest(1,round(extract(epoch from (v_now-v_task.timer_started_at))/60)::integer);
   end if;
 
-  perform set_config('neer.task_transition','lifecycle',true);
-
   if p_event_type in ('visit_started','task_started') then
+    perform set_config('neer.task_transition','lifecycle',true);
     update public.tasks set
       status='in_progress', execution_status='in_progress',
       actual_start_time=coalesce(actual_start_time,v_now),
@@ -157,6 +156,7 @@ begin
       is_timer_running=true, timer_started_at=v_now, updated_at=v_now
     where organization_id=p_organization_id and id=p_task_id;
   elsif p_event_type in ('visit_paused','task_paused') then
+    perform set_config('neer.task_transition','lifecycle',true);
     update public.tasks set
       status='paused', execution_status='paused',
       is_paused=true, paused_at=v_now,
@@ -165,12 +165,14 @@ begin
       is_timer_running=false, timer_started_at=null, updated_at=v_now
     where organization_id=p_organization_id and id=p_task_id;
   elsif p_event_type in ('visit_resumed','task_resumed') then
+    perform set_config('neer.task_transition','lifecycle',true);
     update public.tasks set
       status='in_progress', execution_status='in_progress',
       is_paused=false, paused_at=null, pause_reason=null,
       is_timer_running=true, timer_started_at=v_now, updated_at=v_now
     where organization_id=p_organization_id and id=p_task_id;
   else
+    perform set_config('neer.task_transition','outcome',true);
     update public.tasks set
       status=case when v_outcome='completed' then 'pending_approval' else 'deferred' end,
       execution_status=case when v_outcome='completed' then 'completed' else 'deferred' end,
