@@ -85,3 +85,9 @@ Newly confirmed P0 gaps:
 - FinanceApiService generates a new idempotency key for every attempt and throws if post-commit snapshot refresh fails; this can make a successful operation look failed and a retry use a new key.
 
 Legacy service classes and unused wrappers are also catalogued in `docs/SERVICE_UI_TRACE.md`. Source tracing is complete for all discovered mounted views and paths; runtime behavior remains unverified without local browser/device tests.
+
+
+## تحديث 2026-11-13 — إغلاق بعض فجوات GPS والطابور
+- أصبح تعذر الموقع يسجل كحدث واضح دون اختلاق إحداثيات، مع تدقيق محاولات البدء/الإيقاف/الاستئناف وإنهاء المهمة.
+- الطابور يتجاوز أحداث blocked الخاصة بمهام أخرى كي لا يوقف عمل الموظف كله، مع الحفاظ على منع انتقال lifecycle آخر للمهمة ذات الحدث العالق.
+- لا تزال نتائج المهام والمرفقات لا تعمل كحزمة offline كاملة؛ وتكامل Android الأصلي غير موجود في مصدر main المفحوص.
