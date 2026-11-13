@@ -156,3 +156,13 @@
 - استبدل fallback UUID الضعيف المعتمد على Math.random بمولد UUID v4 آمن باستخدام crypto.getRandomValues في نافذة نتيجة المهمة.
 - مراجعة SECURITY DEFINER: جميع الدوال الـ26 في public لا تملك EXECUTE لـPUBLIC أو anon؛ التنفيذ مقتصر على authenticated. لكل دالة search_path مضبوط، ودوال المالية تستخدم private.assert_finance_org_access (auth.uid + عضوية نشطة + دور admin/finance_officer)، ودوال المهام تتحقق من العضوية/الصلاحية أو private.can_access_task. لم تُلغَ صلاحيات authenticated لأنها مطلوبة لمسارات RPC المستخدمة، والتحذير العام لا يثبت وحده ثغرة.
 - لا تزال حماية كلمات المرور المسرّبة إعداداً يتطلب تغييره من إعدادات Auth للمشروع؛ لا توجد أداة إعداد Auth متاحة في هذه الجلسة لتغييره والتحقق منه.
+
+
+### تحقق قبول SQL إضافي بعد توحيد RPC — 2026-11-13
+- ترحيل `20261113220000_task_event_write_rpc.sql` أنشأ `record_task_event` للأحداث غير الانتقالية مع تحقق عضوية وصلاحية المهمة وGPS/حالة عدم توفر الموقع والتفاصيل وUUID، وسحب INSERT المباشر من authenticated على `task_events`.
+- أصبح `record_field_task_event` SECURITY DEFINER بعد مراجعة جسمه: يتحقق صراحة من `auth.uid()`، عضوية المؤسسة، `private.can_access_task(...,'edit')`، نوع المهمة، الانتقال الصحيح، GPS، وidempotency، ويقفل صف المهمة. منح EXECUTE لـauthenticated فقط؛ لا توجد صلاحية INSERT مباشرة لـauthenticated أو anon.
+- اختبار SQL داخل معاملات rollback (دون أي بيانات دائمة): نجاح تسجيل حدث عام وإعادة إرساله دون تكرار؛ نجاح بدء مهمة ميدانية وإعادة المحاولة؛ تسجيل تعذر GPS بإحداثيات NULL؛ رفض مستخدم غير عضو؛ رفض إحداثيات غير صالحة؛ نجاح سجل التدقيق لكل حدث. اختبار outcome منفصل أكد أن الإكمال يحول المهمة إلى pending_approval ويكتب حدثاً وسجل تدقيق.
+- كشف الاختبار أن trigger تدقيق الأحداث يستخدم `entity='task_event'` بينما CHECK constraint لم يكن يسمح بها؛ أضيفت القيمة إلى constraint، ثم نجحت اختبارات الإدخال والتدقيق. جميع سجلات الاختبار أُلغيت بـROLLBACK.
+- أضيفت قيود قاعدة بيانات تمنع دقة GPS فوق 100000m ووصف حدث فارغ/أطول من 200 حرف.
+- آخر فحص بعد الجولة: Health صفر؛ Performance 31 unused_index (INFO)؛ Security 28 تحذيراً عاماً لدوال SECURITY DEFINER قابلة للاستدعاء من authenticated، وتحذير واحد لحماية كلمات المرور المسرّبة المعطلة. تمت مراجعة الدوال: لا تنفيذ لـPUBLIC/anon، search_path مضبوط، والتحقق الداخلي للعضوية/الصلاحية موجود؛ لم تُلغَ صلاحيات مستخدمة في التطبيق.
+- جداول tasks/task_events/task_history/audit_logs/task_requests/expenses/fund_transactions بقيت صفراً بعد rollback؛ لم تُغير بيانات مالية أو تشغيلية.
