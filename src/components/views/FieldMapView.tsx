@@ -19,7 +19,7 @@ import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
 import { Task, TaskStatus } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
 import { refreshTaskSnapshot, updateTaskLifecycle } from '../../services/tasks.api';
-import { captureRequiredLocation, ensureFieldVisitCanStart, recordFieldLifecycleEvent, startFieldLocationTracking, stopFieldLocationTracking } from '../../lib/operations/fieldEvents';
+import { captureRequiredLocation, ensureFieldVisitCanStart, recordFieldLifecycleEvent, recordFieldLocationFailure, startFieldLocationTracking, stopFieldLocationTracking } from '../../lib/operations/fieldEvents';
 import { hasPermission } from '../../lib/rbac/permissions';
 import { formatCurrency, TASK_STATUS_CONFIG } from '../../lib/utils/format';
 import { Button } from '../ui/button';
@@ -157,6 +157,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
       startFieldLocationTracking(task.id);
       setLocationSuccessMsg('تم بدء التنفيذ وتوثيق الحدث والموقع على الخادم بنجاح.');
     } catch (error) {
+      await recordFieldLocationFailure(task.id, 'تعذر بدء المهمة بسبب الموقع', error).catch(() => undefined);
       window.alert(error instanceof Error ? error.message : 'تعذر بدء المهمة دون موقع GPS موثق.');
     } finally {
       setIsLocating(false);
@@ -184,6 +185,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
       await refreshTaskSnapshot();
       stopFieldLocationTracking(task.id);
     } catch (error) {
+      await recordFieldLocationFailure(task.id, 'تعذر إيقاف المهمة بسبب الموقع', error).catch(() => undefined);
       window.alert(error instanceof Error ? error.message : 'تعذر توثيق الإيقاف المؤقت.');
     } finally {
       setIsLocating(false);
@@ -210,6 +212,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
       await refreshTaskSnapshot();
       startFieldLocationTracking(task.id);
     } catch (error) {
+      await recordFieldLocationFailure(task.id, 'تعذر استئناف المهمة بسبب الموقع', error).catch(() => undefined);
       window.alert(error instanceof Error ? error.message : 'تعذر توثيق استئناف المهمة.');
     } finally {
       setIsLocating(false);
