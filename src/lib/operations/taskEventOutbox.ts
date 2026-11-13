@@ -10,6 +10,7 @@ type QueuedTaskEvent = {
   path: string;
   body: Record<string, unknown>;
   createdAt: string;
+  sequence?: number;
   attempts: number;
   state: 'pending' | 'blocked';
   lastError?: string;
@@ -17,6 +18,7 @@ type QueuedTaskEvent = {
 
 const DB_NAME = 'neer-task-event-outbox-v1';
 const STORE_NAME = 'events';
+const META_STORE_NAME = 'meta';
 let dbPromise: Promise<IDBDatabase> | null = null;
 let flushInFlight: Promise<void> | null = null;
 let flushRequested = false;
@@ -27,10 +29,11 @@ function openDb(): Promise<IDBDatabase> {
   }
   if (!dbPromise) {
     dbPromise = new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, 1);
+      const request = indexedDB.open(DB_NAME, 2);
       request.onupgradeneeded = () => {
         const db = request.result;
         if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+        if (!db.objectStoreNames.contains(META_STORE_NAME)) db.createObjectStore(META_STORE_NAME, { keyPath: 'key' });
       };
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error || new Error('تعذر فتح طابور الأحداث المحلي.'));
@@ -47,8 +50,26 @@ async function allEvents(): Promise<QueuedTaskEvent[]> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const request = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).getAll();
-    request.onsuccess = () => resolve((request.result as QueuedTaskEvent[]).sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)));
+    request.onsuccess = () => resolve((request.result as QueuedTaskEvent[]).sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0) || a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)));
     request.onerror = () => reject(request.error || new Error('تعذر قراءة طابور الأحداث.'));
+  });
+}
+
+async function nextSequence(): Promise<number> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(META_STORE_NAME, 'readwrite');
+    const store = tx.objectStore(META_STORE_NAME);
+    const request = store.get('sequence');
+    let sequence = 0;
+    request.onsuccess = () => {
+      sequence = Number(request.result?.value || 0) + 1;
+      store.put({ key: 'sequence', value: sequence });
+    };
+    request.onerror = () => reject(request.error || new Error('تعذر تخصيص ترتيب الحدث المحلي.'));
+    tx.oncomplete = () => resolve(sequence);
+    tx.onerror = () => reject(tx.error || new Error('تعذر حفظ ترتيب الحدث المحلي.'));
+    tx.onabort = () => reject(tx.error || new Error('تم إلغاء تخصيص ترتيب الحدث المحلي.'));
   });
 }
 
@@ -136,6 +157,7 @@ export async function enqueueTaskEvent(input: {
     throw new Error('يوجد حدث بدء أو إيقاف أو استئناف لهذه المهمة لم تتم مزامنته بعد. انتظر المزامنة قبل تسجيل انتقال آخر حتى لا تتعارض حالة المهمة.');
   }
   const lastCreatedAt = existing.reduce((latest, item) => Math.max(latest, Date.parse(item.createdAt) || 0), 0);
+  const sequence = await nextSequence();
   const event: QueuedTaskEvent = {
     id: input.clientEventId,
     organizationId: session.organizationId,
@@ -144,6 +166,7 @@ export async function enqueueTaskEvent(input: {
     path: input.path,
     body: input.body,
     createdAt: new Date(Math.max(Date.now(), lastCreatedAt + 1)).toISOString(),
+    sequence,
     attempts: 0,
     state: 'pending',
   };
