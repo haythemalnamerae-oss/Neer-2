@@ -190,6 +190,21 @@ export async function recordLocationUnavailable(input: {
     : 'تم حفظ تعذر الموقع محلياً وينتظر المزامنة عند عودة الاتصال.');
 }
 
+/** Persist GPS failure reasons without inventing coordinates. */
+export async function recordFieldLocationFailure(taskId: string, eventLabel: string, error: unknown): Promise<void> {
+  if (!(error instanceof FieldLocationError)) return;
+  const status: LocationUnavailableStatus =
+    error.reason === 'permission_denied' ? 'permission_denied' :
+    error.reason === 'services_disabled' ? 'services_disabled' :
+    error.reason === 'timeout' ? 'timeout' : 'unavailable';
+  await recordLocationUnavailable({
+    taskId,
+    eventLabel,
+    status,
+    details: { reason: error.reason, message: error.message },
+  });
+}
+
 export async function recordFieldLifecycleEvent(input: {
   taskId: string;
   eventType: Extract<FieldEventType, 'visit_started' | 'visit_paused' | 'visit_resumed' | 'visit_completed' | 'task_started' | 'task_paused' | 'task_resumed' | 'task_completed'>;
