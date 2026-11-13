@@ -61,3 +61,5 @@
 - [ ] رفض استدعاء update_task_lifecycle دون UUID ثابت، وقبول UUID صحيح فقط.
 - [ ] رفض POST العام إلى task-events إذا غاب client_event_id أو كان الحدث/الإحداثيات خارج القائمة أو النطاق.
 - [ ] إعادة فحص Supabase Performance: يجب ألا يظهر unindexed_foreign_keys بعد ترحيل الفهرسين؛ unused_index لا يُعالج بالحذف دون workload فعلي.
+
+- [ ] إرسال POST task-events مع حقول إضافية مزورة مثل actor_auth_user_id أو occurred_at أو received_at أو organization_id: يجب ألا يكتبها الخادم، ويجب أن يستخدم الهوية والمؤسسة والوقت من الجلسة والخادم.
