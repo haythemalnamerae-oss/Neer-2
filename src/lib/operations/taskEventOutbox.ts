@@ -190,8 +190,10 @@ export async function flushTaskEventOutbox(): Promise<void> {
     // Re-read after each acknowledged event so newly enqueued tail events
     // cannot be stranded behind an already-running flush.
     while (true) {
-      const event = (await allEvents()).find((item) => sameIdentity(item, session));
-      if (!event || event.state === 'blocked') break;
+      const event = (await allEvents()).find((item) => sameIdentity(item, session) && item.state === 'pending');
+      // A permanently rejected event blocks only its own task transition (enforced at enqueue),
+      // not unrelated tasks owned by the same field officer.
+      if (!event) break;
       try {
         await apiRequest(session, event.path, { method: 'POST', body: JSON.stringify(event.body) });
         await deleteEvent(event.id);
