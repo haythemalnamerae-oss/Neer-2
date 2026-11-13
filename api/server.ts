@@ -856,7 +856,9 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
       return res.status(409).json({ error: { code: 'NOTIFICATION_READ_ONLY', message: 'Only marking your own notification as read is allowed.' } });
     }
   }
-  const action = (req.method === 'POST' && req.params.resource === 'task-events') ? 'edit' : (req.method === 'POST' && taskChildResources.has(req.params.resource)) || (['task-attachments','task-assignees'].includes(req.params.resource) && req.method === 'DELETE') || (req.params.resource === 'notifications' && req.method === 'PATCH') ? 'view' : req.method === 'GET' ? 'view' : req.method === 'POST' ? 'create' : req.method === 'PATCH' ? 'edit' : req.method === 'DELETE' ? 'delete' : '';
+  const action = req.params.resource === 'task-events' && req.method === 'POST' ? 'edit'
+    : (req.method === 'POST' && taskChildResources.has(req.params.resource)) || (['task-attachments','task-assignees'].includes(req.params.resource) && req.method === 'DELETE') || (req.params.resource === 'notifications' && req.method === 'PATCH') ? 'view'
+    : req.method === 'GET' ? 'view' : req.method === 'POST' ? 'create' : req.method === 'PATCH' ? 'edit' : req.method === 'DELETE' ? 'delete' : '';
   if (action !== 'view' && transactionOnlyResources.has(req.params.resource)) {
     return res.status(409).json({ error: { code: 'FINANCIAL_TRANSACTION_REQUIRED', message: 'Financial records are read-only through generic CRUD. Use a dedicated transactional workflow so balances, approvals, and audit records remain atomic.' } });
   }
