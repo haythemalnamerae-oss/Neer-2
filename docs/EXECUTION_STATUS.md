@@ -1,6 +1,6 @@
 # حالة تنفيذ استكمال النقاط الثماني — Neer-2
 
-**آخر تحديث:** 2026-11-12  
+**آخر تحديث:** 2026-11-13  
 **المستودع:** `haythemalnamerae-oss/Neer-2`  
 **الفرع:** `main` فقط  
 **Supabase project:** `xtfuvxomfhlfjtpljofh`
@@ -166,3 +166,10 @@
 - أضيفت قيود قاعدة بيانات تمنع دقة GPS فوق 100000m ووصف حدث فارغ/أطول من 200 حرف.
 - آخر فحص بعد الجولة: Health صفر؛ Performance 31 unused_index (INFO)؛ Security 28 تحذيراً عاماً لدوال SECURITY DEFINER قابلة للاستدعاء من authenticated، وتحذير واحد لحماية كلمات المرور المسرّبة المعطلة. تمت مراجعة الدوال: لا تنفيذ لـPUBLIC/anon، search_path مضبوط، والتحقق الداخلي للعضوية/الصلاحية موجود؛ لم تُلغَ صلاحيات مستخدمة في التطبيق.
 - جداول tasks/task_events/task_history/audit_logs/task_requests/expenses/fund_transactions بقيت صفراً بعد rollback؛ لم تُغير بيانات مالية أو تشغيلية.
+
+
+### تثبيت الحالة بعد آخر تعديل عميل — 2026-11-13
+- تم تضييق نوع TypeScript في `recordTaskEvent` ليستبعد أحداث lifecycle؛ انتقالات start/pause/resume/complete لا يمكن استدعاؤها من مسار الأحداث العام بالخطأ.
+- تم فحص ترتيب middleware: `authenticate` مربوط على `/api/v1` قبل مسارات تسجيل الأحداث؛ كل endpoint يتطلب Bearer صالحاً وعضوية نشطة للمؤسسة، ثم يتحقق من `tasks.edit`.
+- آخر فحص نهائي: 54 migration مسجلة؛ Health صفر؛ Performance 31 unused_index (INFO)؛ Security 28 SECURITY DEFINER warnings وواحد leaked-password protection. لم تُشغّل أي build أو lint أو E2E أو device test.
+- آخر SHA بعد تثبيت هذا التحديث يُراجع من main مباشرة؛ لا توجد فروع إضافية.
