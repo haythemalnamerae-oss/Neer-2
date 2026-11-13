@@ -713,7 +713,7 @@ app.post('/api/v1/task-events/lifecycle', async (req, res) => {
         !uuid.test(body.client_event_id) || !body.details || typeof body.details !== 'object' || Array.isArray(body.details) || JSON.stringify(body.details).length > 20000) {
       return res.status(400).json({ error: { code: 'INVALID_FIELD_EVENT', message: 'A task, lifecycle event, valid GPS fix, idempotency key and JSON details are required.' } });
     }
-    const response = await supabaseFetch('/rest/v1/rpc/record_field_task_event', auth.token, {
+    const response = await supabaseFetch('/rest/v1/rpc/record_field_task_event_secure', auth.token, {
       method: 'POST',
       body: JSON.stringify({
         p_organization_id: auth.organizationId,
@@ -807,6 +807,57 @@ app.post('/api/v1/finance/:workflow', async (req, res) => {
   } catch (error) {
     console.error('Finance workflow failed:', error);
     return res.status(503).json({ error: { code: 'FINANCE_WORKFLOW_FAILED', message: 'The financial transaction could not be completed.' } });
+  }
+});
+
+app.post('/api/v1/task-events', async (req, res) => {
+  const auth = (req as AuthenticatedRequest).auth;
+  try {
+    if (!(await allowed(auth, 'tasks', 'edit'))) {
+      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Missing permission tasks.edit.' } });
+    }
+    const body = req.body as Record<string, unknown> | undefined;
+    const eventTypes = ['location_sample','subtask_created','expense_recorded','invoice_attached','follow_up_scheduled','note_added','status_changed','location_unavailable'];
+    const unavailable = body?.event_type === 'location_unavailable';
+    const status = body?.location_status;
+    const validUnavailable = unavailable &&
+      ['permission_denied','services_disabled','unavailable','timeout'].includes(String(status)) &&
+      (body?.latitude === undefined || body.latitude === null) &&
+      (body?.longitude === undefined || body.longitude === null) &&
+      (body?.accuracy_meters === undefined || body.accuracy_meters === null);
+    const validCaptured = !unavailable && status === 'captured' &&
+      typeof body?.latitude === 'number' && Number.isFinite(body.latitude) && body.latitude >= -90 && body.latitude <= 90 &&
+      typeof body?.longitude === 'number' && Number.isFinite(body.longitude) && body.longitude >= -180 && body.longitude <= 180 &&
+      typeof body?.accuracy_meters === 'number' && Number.isFinite(body.accuracy_meters) && body.accuracy_meters >= 0 && body.accuracy_meters <= 100000;
+    const details = body?.details === undefined ? {} : body.details;
+    if (!body || typeof body.task_id !== 'string' || !idPattern.test(body.task_id) ||
+        typeof body.event_type !== 'string' || !eventTypes.includes(body.event_type) ||
+        typeof body.event_label !== 'string' || !body.event_label.trim() || body.event_label.length > 200 ||
+        typeof body.client_event_id !== 'string' || !uuidPattern.test(body.client_event_id) ||
+        (!validCaptured && !validUnavailable) ||
+        !details || typeof details !== 'object' || Array.isArray(details) || JSON.stringify(details).length > 20000) {
+      return res.status(400).json({ error: { code: 'INVALID_TASK_EVENT', message: 'A valid task event, label, idempotency key, details and consistent GPS status are required.' } });
+    }
+    const response = await supabaseFetch('/rest/v1/rpc/record_task_event', auth.token, {
+      method: 'POST',
+      body: JSON.stringify({
+        p_organization_id: auth.organizationId,
+        p_task_id: body.task_id,
+        p_event_type: body.event_type,
+        p_event_label: body.event_label,
+        p_latitude: unavailable ? null : body.latitude,
+        p_longitude: unavailable ? null : body.longitude,
+        p_accuracy_meters: unavailable ? null : body.accuracy_meters,
+        p_location_status: status,
+        p_details: details,
+        p_client_event_id: body.client_event_id,
+      }),
+    });
+    if (!response.ok) return sendDbError(res, response.status, await response.text());
+    return res.status(201).json({ eventId: await response.json() });
+  } catch (error) {
+    console.error('Task event append failed:', error);
+    return res.status(503).json({ error: { code: 'TASK_EVENT_FAILED', message: 'The task event could not be saved.' } });
   }
 });
 
