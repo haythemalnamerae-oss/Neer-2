@@ -57,3 +57,7 @@
 - [ ] بعد ترقية IndexedDB من version 1 إلى 2، تبقى الأحداث القديمة قابلة للقراءة وتسبق الأحداث الجديدة.
 - [ ] إدراج حدثين متزامنين من تبويبين مختلفين يعطي sequence مختلفًا ومتزايدًا ويحافظ على FIFO.
 - [ ] POST إلى task-events بدور view فقط يُرفض؛ بدور edit مع صلاحية المهمة يمر إلى RLS.
+
+- [ ] رفض استدعاء update_task_lifecycle دون UUID ثابت، وقبول UUID صحيح فقط.
+- [ ] رفض POST العام إلى task-events إذا غاب client_event_id أو كان الحدث/الإحداثيات خارج القائمة أو النطاق.
+- [ ] إعادة فحص Supabase Performance: يجب ألا يظهر unindexed_foreign_keys بعد ترحيل الفهرسين؛ unused_index لا يُعالج بالحذف دون workload فعلي.
