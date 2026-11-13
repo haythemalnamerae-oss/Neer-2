@@ -636,7 +636,7 @@ app.post('/api/v1/tasks/lifecycle', async (req, res) => {
     if (!body || typeof body.taskId !== 'string' || !idPattern.test(body.taskId) ||
         !['start','pause','resume'].includes(body.action) ||
         (body.action === 'pause' && (typeof body.reason !== 'string' || !body.reason.trim())) ||
-        (body.clientEventId !== undefined && (typeof body.clientEventId !== 'string' || !uuidPattern.test(body.clientEventId))) ||
+        (typeof body.clientEventId !== 'string' || !uuidPattern.test(body.clientEventId)) ||
         (body.clientOccurredAt !== undefined && body.clientOccurredAt !== null && (typeof body.clientOccurredAt !== 'string' || !Number.isFinite(Date.parse(body.clientOccurredAt)))) ||
         (body.deviceTimezone !== undefined && (typeof body.deviceTimezone !== 'string' || body.deviceTimezone.length > 80))) {
       return res.status(400).json({ error: { code: 'INVALID_TASK_LIFECYCLE', message: 'Task lifecycle payload is invalid.' } });
