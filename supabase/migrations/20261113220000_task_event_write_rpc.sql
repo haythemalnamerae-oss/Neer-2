@@ -47,12 +47,12 @@ begin
   end if;
 
   if p_event_type='location_unavailable' then
-    if p_location_status not in ('permission_denied','services_disabled','unavailable','timeout')
+    if p_location_status is null or p_location_status not in ('permission_denied','services_disabled','unavailable','timeout')
        or p_latitude is not null or p_longitude is not null or p_accuracy_meters is not null then
       raise exception using errcode='22023', message='A location-unavailable event must not contain coordinates';
     end if;
   else
-    if p_location_status<>'captured'
+    if p_location_status is null or p_location_status<>'captured'
        or p_latitude is null or p_latitude not between -90 and 90
        or p_longitude is null or p_longitude not between -180 and 180
        or p_accuracy_meters is null or p_accuracy_meters<0 or p_accuracy_meters>100000 then
