@@ -63,3 +63,8 @@
 - [ ] إعادة فحص Supabase Performance: يجب ألا يظهر unindexed_foreign_keys بعد ترحيل الفهرسين؛ unused_index لا يُعالج بالحذف دون workload فعلي.
 
 - [ ] إرسال POST task-events مع حقول إضافية مزورة مثل actor_auth_user_id أو occurred_at أو received_at أو organization_id: يجب ألا يكتبها الخادم، ويجب أن يستخدم الهوية والمؤسسة والوقت من الجلسة والخادم.
+
+- [ ] إدراج متزامن من تبويبين: فحص منع انتقال lifecycle المكرر يتم داخل معاملة IndexedDB واحدة، ويجب أن ينجح حدث واحد فقط للمهمة نفسها.
+- [ ] عند 401 تبقى الأحداث pending، وبعد استعادة الجلسة تتم مزامنتها مرة واحدة.
+- [ ] POST عام إلى `/task-events` مع `task_started/task_paused/task_resumed/task_completed/visit_*` يجب أن يرفض 400؛ المسار الوحيد لهذه الانتقالات هو RPC lifecycle الذري.
+- [ ] POST إلى `/task-events/lifecycle` يسجل الحدث ويحدث حالة المهمة في المعاملة نفسها؛ أي فشل لا يترك حدثاً منفصلاً أو حالة جزئية.
