@@ -24,6 +24,7 @@ import { hasPermission } from '../../lib/rbac/permissions';
 import { formatCurrency, TASK_STATUS_CONFIG } from '../../lib/utils/format';
 import { Button } from '../ui/button';
 
+import { TaskSyncStatus } from '../tasks/TaskSyncStatus';
 interface FieldMapViewProps {
   onSelectTask: (task: Task) => void;
   onOpenNewTask: () => void;
@@ -336,6 +337,8 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
           </select>}
         </div>
       </div>
+
+      <TaskSyncStatus />
 
       {/* Main Map View & Side Details Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
