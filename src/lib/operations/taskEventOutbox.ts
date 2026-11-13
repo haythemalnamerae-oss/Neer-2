@@ -55,21 +55,77 @@ async function allEvents(): Promise<QueuedTaskEvent[]> {
   });
 }
 
-async function nextSequence(): Promise<number> {
+async function enqueueEventAtomically(input: {
+  id: string;
+  organizationId: string;
+  userId: string;
+  taskId: string;
+  path: string;
+  body: Record<string, unknown>;
+}): Promise<QueuedTaskEvent> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(META_STORE_NAME, 'readwrite');
-    const store = tx.objectStore(META_STORE_NAME);
-    const request = store.get('sequence');
-    let sequence = 0;
-    request.onsuccess = () => {
-      sequence = Number(request.result?.value || 0) + 1;
-      store.put({ key: 'sequence', value: sequence });
+    const tx = db.transaction([STORE_NAME, META_STORE_NAME], 'readwrite');
+    const eventsStore = tx.objectStore(STORE_NAME);
+    const metaStore = tx.objectStore(META_STORE_NAME);
+    const allRequest = eventsStore.getAll();
+    const sequenceRequest = metaStore.get('sequence');
+    let allReady = false;
+    let sequenceReady = false;
+    let existingEvents: QueuedTaskEvent[] = [];
+    let previousSequence = 0;
+    let createdEvent: QueuedTaskEvent | null = null;
+    let failure: Error | null = null;
+
+    const commitIfReady = () => {
+      if (!allReady || !sequenceReady || createdEvent || failure) return;
+      const sameUserEvents = existingEvents.filter((event) =>
+        event.organizationId === input.organizationId && event.userId === input.userId
+      );
+      if (input.path.endsWith('/lifecycle') && sameUserEvents.some((event) =>
+        event.taskId === input.taskId && event.path.endsWith('/lifecycle')
+      )) {
+        failure = new Error('يوجد حدث بدء أو إيقاف أو استئناف لهذه المهمة لم تتم مزامنته بعد. انتظر المزامنة قبل تسجيل انتقال آخر حتى لا تتعارض حالة المهمة.');
+        tx.abort();
+        return;
+      }
+      const lastCreatedAt = sameUserEvents.reduce((latest, event) =>
+        Math.max(latest, Date.parse(event.createdAt) || 0), 0
+      );
+      createdEvent = {
+        id: input.id,
+        organizationId: input.organizationId,
+        userId: input.userId,
+        taskId: input.taskId,
+        path: input.path,
+        body: input.body,
+        createdAt: new Date(Math.max(Date.now(), lastCreatedAt + 1)).toISOString(),
+        sequence: previousSequence + 1,
+        attempts: 0,
+        state: 'pending',
+      };
+      eventsStore.add(createdEvent);
+      metaStore.put({ key: 'sequence', value: previousSequence + 1 });
     };
-    request.onerror = () => reject(request.error || new Error('تعذر تخصيص ترتيب الحدث المحلي.'));
-    tx.oncomplete = () => resolve(sequence);
-    tx.onerror = () => reject(tx.error || new Error('تعذر حفظ ترتيب الحدث المحلي.'));
-    tx.onabort = () => reject(tx.error || new Error('تم إلغاء تخصيص ترتيب الحدث المحلي.'));
+
+    allRequest.onsuccess = () => {
+      existingEvents = allRequest.result as QueuedTaskEvent[];
+      allReady = true;
+      commitIfReady();
+    };
+    sequenceRequest.onsuccess = () => {
+      previousSequence = Number(sequenceRequest.result?.value || 0);
+      sequenceReady = true;
+      commitIfReady();
+    };
+    allRequest.onerror = () => { failure = new Error('تعذر قراءة طابور الأحداث.'); };
+    sequenceRequest.onerror = () => { failure = new Error('تعذر تخصيص ترتيب الحدث المحلي.'); };
+    tx.oncomplete = () => {
+      if (createdEvent) resolve(createdEvent);
+      else reject(failure || new Error('تعذر حفظ الحدث المحلي.'));
+    };
+    tx.onerror = () => reject(failure || tx.error || new Error('تعذر حفظ الحدث المحلي.'));
+    tx.onabort = () => reject(failure || tx.error || new Error('تم إلغاء حفظ الحدث المحلي.'));
   });
 }
 
@@ -122,7 +178,7 @@ export async function flushTaskEventOutbox(): Promise<void> {
         const message = error instanceof Error ? error.message : 'تعذرت مزامنة الحدث.';
         const statusMatch = message.match(/API \((\d{3})\)|HTTP (\d{3})/i);
         const status = statusMatch ? Number(statusMatch[1] || statusMatch[2]) : 0;
-        const blocked = status >= 400 && status < 500 && status !== 408 && status !== 429;
+        const blocked = status >= 400 && status < 500 && status !== 401 && status !== 408 && status !== 429;
         await putEvent({
           ...event,
           attempts: event.attempts + 1,
@@ -151,26 +207,14 @@ export async function enqueueTaskEvent(input: {
 }): Promise<TaskOutboxStatus> {
   const session = getSession();
   if (!session) throw new Error('انتهت جلسة الدخول. سجّل الدخول لحفظ الحدث وربطه بحسابك.');
-  const existing = (await allEvents()).filter((item) => sameIdentity(item, session));
-  const isLifecycleEvent = input.path.endsWith('/lifecycle');
-  if (isLifecycleEvent && existing.some((item) => item.taskId === input.taskId && item.path.endsWith('/lifecycle'))) {
-    throw new Error('يوجد حدث بدء أو إيقاف أو استئناف لهذه المهمة لم تتم مزامنته بعد. انتظر المزامنة قبل تسجيل انتقال آخر حتى لا تتعارض حالة المهمة.');
-  }
-  const lastCreatedAt = existing.reduce((latest, item) => Math.max(latest, Date.parse(item.createdAt) || 0), 0);
-  const sequence = await nextSequence();
-  const event: QueuedTaskEvent = {
+  const event = await enqueueEventAtomically({
     id: input.clientEventId,
     organizationId: session.organizationId,
     userId: session.userId,
     taskId: input.taskId,
     path: input.path,
     body: input.body,
-    createdAt: new Date(Math.max(Date.now(), lastCreatedAt + 1)).toISOString(),
-    sequence,
-    attempts: 0,
-    state: 'pending',
-  };
-  await putEvent(event);
+  });
   if (typeof window !== 'undefined') window.dispatchEvent(new Event('neer-task-outbox-change'));
   await flushTaskEventOutbox();
   const remaining = (await allEvents()).find((item) => item.id === event.id);
