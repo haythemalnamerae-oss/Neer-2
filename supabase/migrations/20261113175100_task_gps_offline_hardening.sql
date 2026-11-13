@@ -74,7 +74,7 @@ begin
   if not found then
     raise exception 'Task not found in this organization' using errcode = 'P0002';
   end if;
-  if v_task.task_type_category not in ('field','visit') then
+  if v_task.task_type_category is null or v_task.task_type_category not in ('field','visit') then
     raise exception 'GPS lifecycle events are only valid for field and visit tasks' using errcode = '22023';
   end if;
   if (v_task.task_type_category='visit' and p_event_type not like 'visit_%')
