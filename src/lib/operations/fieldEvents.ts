@@ -36,6 +36,32 @@ declare global {
   interface Window { NeerNative?: NativeFieldBridge; }
 }
 
+function createClientEventId(): string {
+  if (typeof crypto === 'undefined') throw new FieldLocationError('مولد UUID الآمن غير متاح على هذا الجهاز.', 'unavailable');
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+}
+
+function validateFieldEventInput(input: {
+  eventLabel: string;
+  location: CapturedLocation;
+}): void {
+  if (typeof input.eventLabel !== 'string' || !input.eventLabel.trim() || input.eventLabel.length > 200) {
+    throw new FieldLocationError('وصف الحدث مطلوب ويجب ألا يتجاوز 200 حرف.', 'unavailable');
+  }
+  const { latitude, longitude, accuracyMeters } = input.location;
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) ||
+      !Number.isFinite(accuracyMeters) || latitude < -90 || latitude > 90 ||
+      longitude < -180 || longitude > 180 || accuracyMeters < 0 || accuracyMeters > 100000) {
+    throw new FieldLocationError('إحداثيات الموقع أو دقتها خارج النطاق المقبول.', 'unavailable');
+  }
+}
+
 function nativeFieldBridge(): NativeFieldBridge | null {
   return typeof window !== 'undefined' ? window.NeerNative || null : null;
 }
@@ -97,7 +123,8 @@ export async function recordTaskEvent(input: {
   const session = getSession();
   if (!session) throw new Error('انتهت جلسة الدخول. سجّل الدخول مجدداً قبل توثيق الحدث الميداني.');
 
-  const clientEventId = crypto.randomUUID();
+  validateFieldEventInput(input);
+  const clientEventId = createClientEventId();
   const status = await enqueueTaskEvent({
     taskId: input.taskId,
     path: '/task-events',
@@ -131,7 +158,8 @@ export async function recordFieldLifecycleEvent(input: {
 }): Promise<void> {
   const session = getSession();
   if (!session) throw new Error('انتهت جلسة الدخول. سجّل الدخول مجدداً قبل توثيق الحدث الميداني.');
-  const clientEventId = crypto.randomUUID();
+  validateFieldEventInput(input);
+  const clientEventId = createClientEventId();
   const clientOccurredAt = new Date().toISOString();
   const status = await enqueueTaskEvent({
     taskId: input.taskId,
