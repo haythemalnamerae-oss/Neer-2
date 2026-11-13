@@ -713,7 +713,7 @@ app.post('/api/v1/task-events/lifecycle', async (req, res) => {
         !uuid.test(body.client_event_id) || !body.details || typeof body.details !== 'object' || Array.isArray(body.details) || JSON.stringify(body.details).length > 20000) {
       return res.status(400).json({ error: { code: 'INVALID_FIELD_EVENT', message: 'A task, lifecycle event, valid GPS fix, idempotency key and JSON details are required.' } });
     }
-    const response = await supabaseFetch('/rest/v1/rpc/record_field_task_event_secure', auth.token, {
+    const response = await supabaseFetch('/rest/v1/rpc/record_field_task_event', auth.token, {
       method: 'POST',
       body: JSON.stringify({
         p_organization_id: auth.organizationId,
