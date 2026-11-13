@@ -25,7 +25,7 @@ let flushRequested = false;
 
 function openDb(): Promise<IDBDatabase> {
   if (typeof indexedDB === 'undefined') {
-    return Promise.reject(new Error('التخزين المحلي الآمن للأحداث غير متاح في هذا المتصفح.'));
+    return Promise.reject(new Error('التخزين المحلي للأحداث غير متاح في هذا المتصفح.'));
   }
   if (!dbPromise) {
     dbPromise = new Promise((resolve, reject) => {
