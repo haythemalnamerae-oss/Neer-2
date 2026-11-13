@@ -137,3 +137,12 @@
 - فحص سجل المستودع `smp000011-ux/med-joy-flow` أكد أن مجلد `android-mobile` أزيل من `main` في commit `8eea0942380ca4fc618a2f7fba4f37ca3e29f3b7` بتاريخ 2026-11-09 بعنوان `remove legacy android-mobile application from main`. لم أعد إحياء المجلد أو أتجاوز قرار الحذف. لذلك لا يمكن تنفيذ جسر Android/Foreground Service في المصدر الحالي دون قرار صريح بإعادة إدخال التطبيق.
 
 - أضيف تحقق مبكر في عميل GPS لرفض وصف الحدث الفارغ أو الأطول من 200 حرف، والإحداثيات خارج النطاق، ودقة GPS السالبة أو الأكبر من 100000m قبل إدخال الحدث في الطابور. كما أضيف fallback UUID v4 آمن باستخدام `crypto.getRandomValues` للأجهزة التي لا تدعم `crypto.randomUUID`.
+
+
+### آخر إغلاق للمراجعة — 2026-11-13
+- ترحيل `20261113212000_task_event_label_validation.sql` مطبق ومسجل في Supabase؛ RPC يمنع وصف الحدث الفارغ أو الأطول من 200 حرف، بالإضافة إلى حدود GPS ومفتاح التكرار.
+- IndexedDB: تمت معالجة `versionchange` بإغلاق الاتصال القديم وتصفير مرجع الاتصال حتى لا تبقى الترقية محجوبة بسبب تبويب قديم.
+- فحص Supabase النهائي: Health = صفر lints؛ Performance = 34 unused_index فقط (INFO)؛ Security = 26 SECURITY DEFINER warnings + تحذير leaked password protection.
+- قاعدة البيانات: `task_events` عليها RLS، ولا امتيازات مباشرة UPDATE/DELETE/TRUNCATE لـanon/authenticated؛ دالة تسجيل GPS SECURITY INVOKER، وتحتوي قفل صف المهمة وفحوص label/GPS.
+- لم تنشأ سجلات اختبار أو تغييرات مالية: عند الفحص كانت tasks=0 وtask_events=0 وtask_requests=0 وexpenses=0 وfund_transactions=0.
+- آخر SHA موثق بعد هذا التحديث سيُراجع من الفرع مباشرة؛ لم ينفذ build أو lint أو E2E أو اختبار جهاز.
