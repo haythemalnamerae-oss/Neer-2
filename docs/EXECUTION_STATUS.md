@@ -120,3 +120,8 @@
 
 - إضافة ترحيل `20261113210000_task_foreign_key_indexes.sql` وتطبيق فهرسين مركبين لمفتاحي foreign key في tasks (`organization_id, requested_by` و`organization_id, task_type_key`) لمعالجة ملاحظتي unindexed foreign keys؛ لم تُحذف أي فهارس أخرى.
 - تمت ترقية مخزن IndexedDB إلى version 2 وإضافة عداد تسلسلي ذري في meta store لترتيب الأحداث حتى عند الإدراج المتزامن من أكثر من تبويب.
+
+- ترحيل `20261113211000_require_task_lifecycle_idempotency.sql` مطبق؛ أصبحت دالة lifecycle ترفض غياب UUID ثابت، والـAPI يفرضه قبل استدعاء RPC.
+- مسار POST العام إلى `task-events` أصبح يتحقق من نوع الحدث، UUID، الإحداثيات والدقة، إضافة إلى صلاحية `tasks.edit` قبل الوصول إلى RLS.
+- فحص الأداء بعد ترحيل الفهارس لم يعد يعرض `unindexed_foreign_keys`؛ بقيت 34 ملاحظة `unused_index` فقط، ولم تُحذف فهارس لأن الجداول التشغيلية فارغة.
+- فحص Health ما زال دون lints. فحص Security ما زال يعرض 26 دالة SECURITY DEFINER قابلة للاستدعاء من authenticated وتحذير حماية كلمات المرور المسرّبة المعطلة؛ لم تُلغَ صلاحيات الدوال جماعياً، وتحتاج مراجعة كل دالة على حدة.
