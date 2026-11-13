@@ -68,3 +68,6 @@
 - [ ] عند 401 تبقى الأحداث pending، وبعد استعادة الجلسة تتم مزامنتها مرة واحدة.
 - [ ] POST عام إلى `/task-events` مع `task_started/task_paused/task_resumed/task_completed/visit_*` يجب أن يرفض 400؛ المسار الوحيد لهذه الانتقالات هو RPC lifecycle الذري.
 - [ ] POST إلى `/task-events/lifecycle` يسجل الحدث ويحدث حالة المهمة في المعاملة نفسها؛ أي فشل لا يترك حدثاً منفصلاً أو حالة جزئية.
+
+- [ ] WebView/متصفح لا يدعم `crypto.randomUUID` لكنه يدعم `crypto.getRandomValues`: يجب إنشاء UUID v4 صالح وإرسال الحدث.
+- [ ] eventLabel فارغ/أطول من 200، أو GPS accuracy أكبر من 100000m: يرفضه العميل قبل إدخاله إلى IndexedDB.
