@@ -95,7 +95,7 @@ export async function flushTaskEventOutbox(): Promise<void> {
         if (typeof window !== 'undefined') window.dispatchEvent(new Event('neer-task-outbox-change'));
       } catch (error) {
         const message = error instanceof Error ? error.message : 'تعذرت مزامنة الحدث.';
-        const statusMatch = message.match(/API \\((\\d{3})\\)|HTTP (\\d{3})/i);
+        const statusMatch = message.match(/API \((\d{3})\)|HTTP (\d{3})/i);
         const status = statusMatch ? Number(statusMatch[1] || statusMatch[2]) : 0;
         const blocked = status >= 400 && status < 500 && status !== 408 && status !== 409 && status !== 429;
         await putEvent({
