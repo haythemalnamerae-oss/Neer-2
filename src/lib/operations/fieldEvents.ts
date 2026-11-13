@@ -1,4 +1,5 @@
-import { apiRequest, getSession } from '../api/session';
+import { getSession } from '../api/session';
+import { enqueueTaskEvent } from './taskEventOutbox';
 
 export type CapturedLocation = {
   latitude: number;
@@ -96,9 +97,12 @@ export async function recordTaskEvent(input: {
   const session = getSession();
   if (!session) throw new Error('انتهت جلسة الدخول. سجّل الدخول مجدداً قبل توثيق الحدث الميداني.');
 
-  await apiRequest(session, '/task-events', {
-    method: 'POST',
-    body: JSON.stringify({
+  const clientEventId = crypto.randomUUID();
+  const status = await enqueueTaskEvent({
+    taskId: input.taskId,
+    path: '/task-events',
+    clientEventId,
+    body: {
       task_id: input.taskId,
       standing_account_id: input.standingAccountId || null,
       event_type: input.eventType,
@@ -108,10 +112,13 @@ export async function recordTaskEvent(input: {
       longitude: input.location.longitude,
       accuracy_meters: input.location.accuracyMeters,
       location_status: 'captured',
-      client_event_id: crypto.randomUUID(),
+      client_event_id: clientEventId,
       details: input.details || {},
-    }),
+    },
   });
+  if (status !== 'synced') throw new Error(status === 'blocked'
+    ? 'حُفظ الحدث محلياً لكن رفضه الخادم؛ راجع صلاحية المهمة أو تفاصيل الحدث.'
+    : 'حُفظ الحدث على الجهاز وينتظر عودة الاتصال والمزامنة. لا تغلق بيانات التطبيق أو تمسحها.');
 }
 
 
@@ -124,19 +131,31 @@ export async function recordFieldLifecycleEvent(input: {
 }): Promise<void> {
   const session = getSession();
   if (!session) throw new Error('انتهت جلسة الدخول. سجّل الدخول مجدداً قبل توثيق الحدث الميداني.');
-  await apiRequest(session, '/task-events/lifecycle', {
-    method: 'POST',
-    body: JSON.stringify({
+  const clientEventId = crypto.randomUUID();
+  const clientOccurredAt = new Date().toISOString();
+  const status = await enqueueTaskEvent({
+    taskId: input.taskId,
+    path: '/task-events/lifecycle',
+    clientEventId,
+    body: {
       task_id: input.taskId,
       event_type: input.eventType,
       event_label: input.eventLabel,
       latitude: input.location.latitude,
       longitude: input.location.longitude,
       accuracy_meters: input.location.accuracyMeters,
-      client_event_id: crypto.randomUUID(),
-      details: input.details || {},
-    }),
+      client_event_id: clientEventId,
+      details: {
+        ...(input.details || {}),
+        clientOccurredAt,
+        deviceTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        locationSource: 'native_android_bridge',
+      },
+    },
   });
+  if (status !== 'synced') throw new Error(status === 'blocked'
+    ? 'حُفظ حدث الموقع محلياً لكن رفضه الخادم؛ يلزم تصحيح سبب الرفض قبل متابعة المزامنة.'
+    : 'حُفظ حدث الموقع على الجهاز وينتظر المزامنة. ستُرسل الأحداث بالترتيب عند عودة الاتصال.');
 }
 
 /** Background tracking is owned by the Android foreground service, not browser timers. */
