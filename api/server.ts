@@ -978,12 +978,29 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
         typeof body!.latitude !== 'number' || !Number.isFinite(body!.latitude) || body!.latitude < -90 || body!.latitude > 90 ||
         typeof body!.longitude !== 'number' || !Number.isFinite(body!.longitude) || body!.longitude < -180 || body!.longitude > 180 ||
         typeof body!.accuracy_meters !== 'number' || !Number.isFinite(body!.accuracy_meters) || body!.accuracy_meters < 0 || body!.accuracy_meters > 100000 ||
+        (body!.standing_account_id !== undefined && body!.standing_account_id !== null && typeof body!.standing_account_id !== 'string') ||
         (body!.details !== undefined && (!body!.details || typeof body!.details !== 'object' || Array.isArray(body!.details)))) {
       return res.status(400).json({ error: { code: 'INVALID_TASK_EVENT', message: 'A valid task, event type, GPS fix, label and idempotency key are required.' } });
     }
   }
   if (body && ('organization_id' in body || 'organizationId' in body)) return res.status(400).json({ error: { code: 'PROTECTED_FIELD', message: 'Organization id is server controlled.' } });
   let trustedBody = body;
+  if (body && req.method === 'POST' && req.params.resource === 'task-events') {
+    // Allowlist client-controlled event fields. Identity, organization and timestamps
+    // are always server supplied and cannot be spoofed through generic CRUD.
+    trustedBody = {
+      task_id: body.task_id,
+      standing_account_id: body.standing_account_id ?? null,
+      event_type: body.event_type,
+      event_label: body.event_label,
+      latitude: body.latitude,
+      longitude: body.longitude,
+      accuracy_meters: body.accuracy_meters,
+      location_status: 'captured',
+      client_event_id: body.client_event_id,
+      details: body.details || {},
+    };
+  }
   if (body && req.method === 'POST' && ['task-updates','task-comments','task-history','task-attachments','task-assignees'].includes(req.params.resource)) {
     if (!auth.appUserId) return res.status(403).json({ error: { code: 'OPERATIONAL_PROFILE_REQUIRED', message: 'A linked operational profile is required.' } });
     const profileQuery = new URLSearchParams({ select: 'id,name,role_title_ar,avatar', organization_id: `eq.${auth.organizationId}`, id: `eq.${auth.appUserId}`, limit: '1' });
