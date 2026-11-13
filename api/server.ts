@@ -971,15 +971,22 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
   if ((req.method === 'POST' || req.method === 'PATCH') && (!body || typeof body !== 'object' || Array.isArray(body))) return res.status(400).json({ error: { code: 'INVALID_BODY', message: 'JSON object required.' } });
   if (req.params.resource === 'task-events' && req.method === 'POST') {
     const eventTypes = ['location_sample','subtask_created','expense_recorded','invoice_attached','follow_up_scheduled','note_added','status_changed','location_unavailable'];
+    const isLocationUnavailable = body!.event_type === 'location_unavailable';
+    const validLocationStatus = ['permission_denied','services_disabled','unavailable','timeout'].includes(String(body!.location_status));
+    const validCapturedLocation = typeof body!.latitude === 'number' && Number.isFinite(body!.latitude) && body!.latitude >= -90 && body!.latitude <= 90 &&
+      typeof body!.longitude === 'number' && Number.isFinite(body!.longitude) && body!.longitude >= -180 && body!.longitude <= 180 &&
+      typeof body!.accuracy_meters === 'number' && Number.isFinite(body!.accuracy_meters) && body!.accuracy_meters >= 0 && body!.accuracy_meters <= 100000;
+    const validUnavailableLocation = isLocationUnavailable && validLocationStatus &&
+      (body!.latitude === undefined || body!.latitude === null) &&
+      (body!.longitude === undefined || body!.longitude === null) &&
+      (body!.accuracy_meters === undefined || body!.accuracy_meters === null);
     if (typeof body!.task_id !== 'string' || !idPattern.test(body!.task_id) ||
         typeof body!.event_type !== 'string' || !eventTypes.includes(body!.event_type) ||
-        typeof body!.event_label !== 'string' || body!.event_label.length > 200 ||
+        typeof body!.event_label !== 'string' || !body!.event_label.trim() || body!.event_label.length > 200 ||
         typeof body!.client_event_id !== 'string' || !uuidPattern.test(body!.client_event_id) ||
-        typeof body!.latitude !== 'number' || !Number.isFinite(body!.latitude) || body!.latitude < -90 || body!.latitude > 90 ||
-        typeof body!.longitude !== 'number' || !Number.isFinite(body!.longitude) || body!.longitude < -180 || body!.longitude > 180 ||
-        typeof body!.accuracy_meters !== 'number' || !Number.isFinite(body!.accuracy_meters) || body!.accuracy_meters < 0 || body!.accuracy_meters > 100000 ||
-        (body!.standing_account_id !== undefined && body!.standing_account_id !== null && typeof body!.standing_account_id !== 'string') ||
-        (body!.details !== undefined && (!body!.details || typeof body!.details !== 'object' || Array.isArray(body!.details)))) {
+        (!validCapturedLocation && !validUnavailableLocation) ||
+        (body!.standing_account_id !== undefined && body!.standing_account_id !== null && (typeof body!.standing_account_id !== 'string' || !idPattern.test(body!.standing_account_id))) ||
+        (body!.details !== undefined && (!body!.details || typeof body!.details !== 'object' || Array.isArray(body!.details) || JSON.stringify(body!.details).length > 20000))) {
       return res.status(400).json({ error: { code: 'INVALID_TASK_EVENT', message: 'A valid task, event type, GPS fix, label and idempotency key are required.' } });
     }
   }
@@ -993,10 +1000,10 @@ app.all('/api/v1/:resource/:id?', async (req, res) => {
       standing_account_id: body.standing_account_id ?? null,
       event_type: body.event_type,
       event_label: body.event_label,
-      latitude: body.latitude,
-      longitude: body.longitude,
-      accuracy_meters: body.accuracy_meters,
-      location_status: 'captured',
+      latitude: body.event_type === 'location_unavailable' ? null : body.latitude,
+      longitude: body.event_type === 'location_unavailable' ? null : body.longitude,
+      accuracy_meters: body.event_type === 'location_unavailable' ? null : body.accuracy_meters,
+      location_status: body.event_type === 'location_unavailable' ? body.location_status : 'captured',
       client_event_id: body.client_event_id,
       details: body.details || {},
     };
