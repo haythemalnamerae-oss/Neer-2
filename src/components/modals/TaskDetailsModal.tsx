@@ -91,7 +91,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
       })
       .finally(() => { if (current) setIsLoadingEmployeeTime(false); });
     return () => { current = false; };
-  }, [isOpen, task?.id, task?.status, task?.timeSpentMinutes]);
+  }, [isOpen, task?.id, task?.status, task?.timeSpentMinutes, task?.updatedAt]);
 
   // Attachment states
   const [attachmentDocType, setAttachmentDocType] = useState('فاتورة شراء');
@@ -102,6 +102,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   const currentUser = dataStore.getCurrentUser();
   const canEditTask = hasPermission(currentUser.role, 'tasks', 'edit');
   const canApproveTask = hasPermission(currentUser.role, 'tasks', 'approve');
+  const myTimeSession = employeeTimeSessions.find((session) => session.actor_app_user_id === currentUser.id && session.status !== 'completed');
   const requiresFieldLocation = task.taskTypeCategory === 'field' || task.taskTypeCategory === 'visit';
   const users = dataStore.getUsers();
   const allExpenses = dataStore.getExpenses();
@@ -451,7 +452,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
 
             {/* Execution Lifecycle Buttons */}
             <div className="flex items-center gap-2.5 shrink-0">
-              {task.status !== 'in_progress' && task.status !== 'completed' && task.status !== 'approved' && task.status !== 'pending_approval' && (
+              {!isLoadingEmployeeTime && !myTimeSession && task.status !== 'completed' && task.status !== 'approved' && task.status !== 'pending_approval' && task.status !== 'cancelled' && (
                 <Button
                   variant="primary"
                   size="sm"
@@ -459,29 +460,29 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                   disabled={isLocating}
                   icon={<Play className="w-4 h-4 ml-1" />}
                 >
-                  {isLocating ? 'جارٍ تحديد الموقع...' : 'بدء المهمة'}
+                  {isLocating ? 'جارٍ تحديد الموقع...' : 'بدء وقتي'}
                 </Button>
               )}
 
-              {task.status === 'in_progress' && !task.isPaused && (
+              {myTimeSession?.status === 'active' && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setIsPausePromptOpen(true)}
                   icon={<Pause className="w-4 h-4 ml-1 text-amber-700" />}
                 >
-                  إيقاف مؤقت
+                  إيقاف وقتي مؤقتاً
                 </Button>
               )}
 
-              {task.isPaused && (
+              {myTimeSession?.status === 'paused' && (
                 <Button
                   variant="primary"
                   size="sm"
                   onClick={handleResumeTask}
                   icon={<RotateCcw className="w-4 h-4 ml-1" />}
                 >
-                  استئناف العمل
+                  استئناف وقتي
                 </Button>
               )}
 
