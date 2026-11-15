@@ -75,6 +75,16 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   const [isReviewingTask, setIsReviewingTask] = useState(false);
   const [employeeTimeSessions, setEmployeeTimeSessions] = useState<TaskTimeSession[]>([]);
   const [isLoadingEmployeeTime, setIsLoadingEmployeeTime] = useState(false);
+  const [clockNow, setClockNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const hasActiveSession = employeeTimeSessions.some((session) =>
+      session.status === 'active' && Boolean(session.last_resumed_at)
+    );
+    if (!isOpen || !hasActiveSession) return;
+    const intervalId = window.setInterval(() => setClockNow(Date.now()), 1000);
+    return () => window.clearInterval(intervalId);
+  }, [isOpen, employeeTimeSessions]);
 
   useEffect(() => {
     if (!isOpen || !task?.id) {
@@ -116,7 +126,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   const taskExpenses = allExpenses.filter((e) => e.taskId === task.id);
   const employeeTimeSummaries = employeeTimeSessions.reduce((summary, timeSession) => {
     const liveSeconds = timeSession.status === 'active' && timeSession.last_resumed_at
-      ? Math.max(0, Math.floor((Date.now() - new Date(timeSession.last_resumed_at).getTime()) / 1000))
+      ? Math.max(0, Math.floor((clockNow - new Date(timeSession.last_resumed_at).getTime()) / 1000))
       : 0;
     const current = summary[timeSession.actor_app_user_id] || {
       actorAppUserId: timeSession.actor_app_user_id,
