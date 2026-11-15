@@ -712,7 +712,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
                   </button>
                 )}
 
-                {canEditTask && mySelectedTimeSession?.status === 'active' && !['pending_approval','approved','rejected','completed','deferred','cancelled'].includes(selectedTask.status) && (
+                {canEditTask && mySelectedTimeSession?.status === 'active' && mySelectedTimeSession.sync_state !== 'blocked' && !['pending_approval','approved','rejected','completed','deferred','cancelled'].includes(selectedTask.status) && (
                   <button
                     onClick={() => handlePauseTask(selectedTask)}
                     className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
@@ -722,7 +722,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
                   </button>
                 )}
 
-                {canEditTask && mySelectedTimeSession?.status === 'paused' && !['pending_approval','approved','rejected','completed','deferred','cancelled'].includes(selectedTask.status) && (
+                {canEditTask && mySelectedTimeSession?.status === 'paused' && mySelectedTimeSession.sync_state !== 'blocked' && !['pending_approval','approved','rejected','completed','deferred','cancelled'].includes(selectedTask.status) && (
                   <button
                     onClick={() => handleResumeTask(selectedTask)}
                     className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md cursor-pointer active:scale-95"
@@ -732,7 +732,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
                   </button>
                 )}
 
-                {canEditTask && mySelectedTimeSession && (
+                {canEditTask && mySelectedTimeSession && mySelectedTimeSession.sync_state !== 'blocked' && (
                   <button
                     onClick={() => void stopTaskTimeSession(selectedTask.id)
                       .then(async () => {
