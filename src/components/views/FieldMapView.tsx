@@ -173,6 +173,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
       });
       const coords = { lat: location.latitude, lng: location.longitude };
       await refreshTaskSnapshot();
+      setSelectedTaskTimeSessions(await getTaskTimeSessions(task.id));
       setUserLiveCoords({ ...coords, accuracy: Math.round(location.accuracyMeters) });
       startFieldLocationTracking(task.id);
       setLocationSuccessMsg('تم بدء التنفيذ وتوثيق الحدث والموقع على الخادم بنجاح.');
