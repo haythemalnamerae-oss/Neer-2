@@ -176,7 +176,7 @@ export async function updateTaskLifecycle(taskId: string, action: 'start' | 'pau
   const clientEventId = newUuid();
   const status = await enqueueTaskEvent({
     taskId,
-    path: '/tasks/lifecycle',
+    path: '/tasks/time-session',
     clientEventId,
     body: {
       taskId,
@@ -189,8 +189,8 @@ export async function updateTaskLifecycle(taskId: string, action: 'start' | 'pau
   });
   if (status !== 'synced') {
     throw new Error(status === 'blocked'
-      ? 'حُفظ طلب تغيير حالة المهمة محلياً لكن رفضه الخادم؛ راجع الصلاحيات أو حالة المهمة.'
-      : 'حُفظ طلب تغيير حالة المهمة على الجهاز وينتظر المزامنة. ستُرسل الأحداث بالترتيب عند عودة الاتصال.');
+      ? 'حُفظ طلب تسجيل وقت الموظف محلياً لكن رفضه الخادم؛ راجع الصلاحيات أو حالة المهمة.'
+      : 'حُفظ طلب تسجيل وقت الموظف على الجهاز وينتظر المزامنة. ستُرسل الأحداث بالترتيب عند عودة الاتصال.');
   }
   await refreshAfterMutation(session);
 }
