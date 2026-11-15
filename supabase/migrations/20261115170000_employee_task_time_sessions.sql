@@ -170,6 +170,19 @@ begin
     and s.status in ('active','paused')
   for update;
 
+  if p_action='stop' and not found then
+    select count(*)::integer into v_active_count
+    from public.task_time_sessions s
+    where s.organization_id=p_organization_id and s.task_id=p_task_id and s.status='active';
+    return jsonb_build_object(
+      'session_id',null,
+      'status','none',
+      'total_seconds',0,
+      'active_employee_sessions',v_active_count,
+      'already_processed',false
+    );
+  end if;
+
   if p_action='start' then
     if found then
       raise exception using errcode='55000', message='An open time session already exists; resume it or stop it first';
