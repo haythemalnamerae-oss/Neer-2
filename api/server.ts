@@ -626,6 +626,46 @@ app.post('/api/v1/tasks/attach', async (req, res) => {
   }
 });
 
+app.post('/api/v1/tasks/time-session', async (req, res) => {
+  const auth = (req as AuthenticatedRequest).auth;
+  try {
+    if (!(await allowed(auth, 'tasks', 'edit'))) {
+      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Missing permission tasks.edit.' } });
+    }
+    const body = req.body as Record<string, unknown> | undefined;
+    if (!body || typeof body.taskId !== 'string' || !idPattern.test(body.taskId) ||
+        typeof body.action !== 'string' || !['start','pause','resume','stop'].includes(body.action) ||
+        typeof body.clientEventId !== 'string' || !uuidPattern.test(body.clientEventId) ||
+        (body.reason !== undefined && body.reason !== null && (typeof body.reason !== 'string' || body.reason.length > 1000)) ||
+        (body.clientOccurredAt !== undefined && body.clientOccurredAt !== null &&
+          (typeof body.clientOccurredAt !== 'string' || !Number.isFinite(Date.parse(body.clientOccurredAt)))) ||
+        (body.deviceTimezone !== undefined && body.deviceTimezone !== null &&
+          (typeof body.deviceTimezone !== 'string' || body.deviceTimezone.length > 80))) {
+      return res.status(400).json({ error: { code: 'INVALID_TASK_TIME_SESSION', message: 'Task time-session payload is invalid.' } });
+    }
+    if (body.action === 'pause' && (typeof body.reason !== 'string' || !body.reason.trim())) {
+      return res.status(400).json({ error: { code: 'PAUSE_REASON_REQUIRED', message: 'A reason is required to pause an employee time session.' } });
+    }
+    const response = await supabaseFetch('/rest/v1/rpc/manage_task_time_session', auth.token, {
+      method: 'POST',
+      body: JSON.stringify({
+        p_organization_id: auth.organizationId,
+        p_task_id: body.taskId,
+        p_action: body.action,
+        p_reason: body.reason || null,
+        p_client_event_id: body.clientEventId,
+        p_client_occurred_at: body.clientOccurredAt || null,
+        p_device_timezone: body.deviceTimezone || null,
+      }),
+    });
+    if (!response.ok) return sendDbError(res, response.status, await response.text());
+    return res.status(200).json(await response.json());
+  } catch (error) {
+    console.error('Employee task time-session update failed:', error);
+    return res.status(503).json({ error: { code: 'TASK_TIME_SESSION_FAILED', message: 'The employee time session could not be saved.' } });
+  }
+});
+
 app.post('/api/v1/tasks/lifecycle', async (req, res) => {
   const auth = (req as AuthenticatedRequest).auth;
   try {
