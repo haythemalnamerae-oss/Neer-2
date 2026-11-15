@@ -1,7 +1,7 @@
 import type { Task, TaskOutcome, TaskStepStatus, TaskAttachment } from '../types/domain';
 import { apiRequest, getSession, loadUiSnapshot, refreshSession, SessionError, type ApiSession } from '../lib/api/session';
 import { dataStore } from '../lib/storage';
-import { enqueueTaskEvent } from '../lib/operations/taskEventOutbox';
+import { enqueueTaskEvent, getTaskOutboxEvents } from '../lib/operations/taskEventOutbox';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -174,11 +174,13 @@ export async function recordTaskOutcomeOnServer(
 export type TaskTimeSession = {
   id: string;
   actor_app_user_id: string;
-  status: 'active' | 'paused' | 'completed';
+  status: 'active' | 'paused' | 'completed' | 'blocked';
   started_at: string;
   last_resumed_at: string | null;
   ended_at: string | null;
   total_seconds: number | string;
+  sync_state?: 'pending' | 'blocked';
+  last_error?: string;
 };
 
 export async function getTaskTimeSessions(taskId: string): Promise<TaskTimeSession[]> {
@@ -187,7 +189,98 @@ export async function getTaskTimeSessions(taskId: string): Promise<TaskTimeSessi
     session,
     `/tasks/time-sessions?taskId=${encodeURIComponent(taskId)}`,
   );
-  return response.sessions || [];
+  const sessions = [...(response.sessions || [])];
+  if (!session.appUserId) return sessions;
+
+  const pendingEvents = await getTaskOutboxEvents(taskId);
+  let openIndex = sessions.findIndex((item) =>
+    item.actor_app_user_id === session.appUserId && item.status !== 'completed'
+  );
+
+  const createLocalSession = (eventId: string, at: string, status: TaskTimeSession['status']): TaskTimeSession => ({
+    id: `local-${eventId}`,
+    actor_app_user_id: session.appUserId!,
+    status,
+    started_at: at,
+    last_resumed_at: status === 'active' ? at : null,
+    ended_at: status === 'completed' ? at : null,
+    total_seconds: 0,
+    sync_state: 'pending',
+  });
+
+  for (const queued of pendingEvents) {
+    const body = queued.body || {};
+    const details = typeof body.details === 'object' && body.details !== null
+      ? body.details as Record<string, unknown>
+      : {};
+    const rawEventType = typeof body.event_type === 'string' ? body.event_type : '';
+    const action = typeof body.action === 'string' ? body.action :
+      rawEventType.endsWith('_started') ? 'start' :
+      rawEventType.endsWith('_paused') ? 'pause' :
+      rawEventType.endsWith('_resumed') ? 'resume' :
+      rawEventType.endsWith('_completed') ? 'stop' : '';
+    if (!['start','pause','resume','stop'].includes(action)) continue;
+
+    const atValue = typeof body.clientOccurredAt === 'string' ? body.clientOccurredAt :
+      typeof details.clientOccurredAt === 'string' ? details.clientOccurredAt : queued.createdAt;
+    const at = Number.isFinite(Date.parse(atValue)) ? new Date(atValue).toISOString() : queued.createdAt;
+
+    if (queued.state === 'blocked') {
+      if (openIndex >= 0) {
+        sessions[openIndex] = { ...sessions[openIndex], sync_state: 'blocked', last_error: queued.lastError };
+      } else if (action !== 'stop') {
+        const blocked = createLocalSession(queued.id, at, 'blocked');
+        blocked.sync_state = 'blocked';
+        blocked.last_error = queued.lastError;
+        sessions.push(blocked);
+      }
+      break;
+    }
+
+    if (action === 'start') {
+      if (openIndex < 0) {
+        sessions.push(createLocalSession(queued.id, at, 'active'));
+        openIndex = sessions.length - 1;
+      } else {
+        sessions[openIndex] = { ...sessions[openIndex], sync_state: 'pending' };
+      }
+      continue;
+    }
+
+    if (action === 'pause' || action === 'stop') {
+      if (openIndex < 0 && action === 'pause') {
+        sessions.push(createLocalSession(queued.id, at, 'paused'));
+        openIndex = sessions.length - 1;
+      }
+      if (openIndex >= 0) {
+        const current = sessions[openIndex];
+        const extraSeconds = current.status === 'active' && current.last_resumed_at
+          ? Math.max(0, Math.floor((Date.parse(at) - Date.parse(current.last_resumed_at)) / 1000))
+          : 0;
+        sessions[openIndex] = {
+          ...current,
+          status: action === 'pause' ? 'paused' : 'completed',
+          total_seconds: (Number(current.total_seconds) || 0) + extraSeconds,
+          last_resumed_at: null,
+          ended_at: action === 'stop' ? at : null,
+          sync_state: 'pending',
+        };
+        if (action === 'stop') openIndex = -1;
+      }
+      continue;
+    }
+
+    if (action === 'resume') {
+      if (openIndex < 0) {
+        sessions.push(createLocalSession(queued.id, at, 'active'));
+        openIndex = sessions.length - 1;
+      } else {
+        sessions[openIndex] = { ...sessions[openIndex], status: 'active', last_resumed_at: at, sync_state: 'pending' };
+      }
+    }
+  }
+
+  return sessions;
 }
 
 export async function stopTaskTimeSession(taskId: string): Promise<void> {
