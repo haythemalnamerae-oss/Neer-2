@@ -298,3 +298,11 @@
 - `20261115151932_guard_terminal_task_time_sessions`
 - `20261115152052_legacy_timer_event_idempotency`
 - فحص ما بعد rollback: tasks=0، task_time_sessions=0، task_time_session_events=0، وأحداث/سجل تاريخ اختبار phase3=0.
+
+### لقطة المراجعة الأخيرة بعد جميع التعديلات — 2026-11-15
+- Health Advisor: صفر ملاحظات.
+- Performance Advisor: 33 ملاحظة unused_index بمستوى INFO؛ لا يظهر تحذير unindexed foreign key.
+- Security Advisor: 28 تحذير SECURITY DEFINER، وتحذير leaked-password protection، وملاحظة INFO واحدة لـprivate RLS بلا policy مباشرة.
+- جداول جلسات الوقت: RLS مفعّل، ولا توجد منح كتابة مباشرة لـauthenticated.
+- بعد كل معاملات rollback: عدد المهام والجلسات وأحداث الجلسات = صفر.
+- فروع GitHub كما ظهرت في الفحص: main وfix/vercel-routing-performance وv0/mobile-responsive-fix؛ لم يُنشأ أو يُعدل أي فرع غير main.
