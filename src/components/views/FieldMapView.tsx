@@ -57,15 +57,22 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
       return;
     }
     let current = true;
-    setIsLoadingTaskTimeSessions(true);
-    void getTaskTimeSessions(selectedTask.id)
-      .then((sessions) => { if (current) setSelectedTaskTimeSessions(sessions); })
-      .catch((error) => {
-        console.error('Unable to load field-map employee time sessions:', error);
-        if (current) setSelectedTaskTimeSessions([]);
-      })
-      .finally(() => { if (current) setIsLoadingTaskTimeSessions(false); });
-    return () => { current = false; };
+    const loadSessions = () => {
+      setIsLoadingTaskTimeSessions(true);
+      void getTaskTimeSessions(selectedTask.id)
+        .then((sessions) => { if (current) setSelectedTaskTimeSessions(sessions); })
+        .catch((error) => {
+          console.error('Unable to load field-map employee time sessions:', error);
+          if (current) setSelectedTaskTimeSessions([]);
+        })
+        .finally(() => { if (current) setIsLoadingTaskTimeSessions(false); });
+    };
+    loadSessions();
+    if (typeof window !== 'undefined') window.addEventListener('neer-task-outbox-change', loadSessions);
+    return () => {
+      current = false;
+      if (typeof window !== 'undefined') window.removeEventListener('neer-task-outbox-change', loadSessions);
+    };
   }, [selectedTask?.id, selectedTask?.status, selectedTask?.updatedAt, selectedTask?.timeSpentMinutes]);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
