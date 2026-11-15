@@ -75,6 +75,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   const [isReviewingTask, setIsReviewingTask] = useState(false);
   const [employeeTimeSessions, setEmployeeTimeSessions] = useState<TaskTimeSession[]>([]);
   const [isLoadingEmployeeTime, setIsLoadingEmployeeTime] = useState(false);
+  const [employeeTimeError, setEmployeeTimeError] = useState<string | null>(null);
   const [clockNow, setClockNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -89,16 +90,21 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   useEffect(() => {
     if (!isOpen || !task?.id) {
       setEmployeeTimeSessions([]);
+      setEmployeeTimeError(null);
       return;
     }
     let current = true;
     const loadSessions = () => {
       setIsLoadingEmployeeTime(true);
+      setEmployeeTimeError(null);
       void getTaskTimeSessions(task.id)
         .then((sessions) => { if (current) setEmployeeTimeSessions(sessions); })
         .catch((error) => {
           console.error('Unable to load employee task time sessions:', error);
-          if (current) setEmployeeTimeSessions([]);
+          if (current) {
+            setEmployeeTimeSessions([]);
+            setEmployeeTimeError(error instanceof Error ? error.message : 'تعذر قراءة جلسات الوقت.');
+          }
         })
         .finally(() => { if (current) setIsLoadingEmployeeTime(false); });
     };
@@ -488,7 +494,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
 
             {/* Execution Lifecycle Buttons */}
             <div className="flex items-center gap-2.5 shrink-0">
-              {!isLoadingEmployeeTime && !myTimeSession && task.status !== 'completed' && task.status !== 'approved' && task.status !== 'pending_approval' && task.status !== 'cancelled' && (
+              {!isLoadingEmployeeTime && !employeeTimeError && !myTimeSession && task.status !== 'completed' && task.status !== 'approved' && task.status !== 'pending_approval' && task.status !== 'cancelled' && (
                 <Button
                   variant="primary"
                   size="sm"
@@ -625,7 +631,9 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
               </h4>
               <span className="text-[10px] text-slate-500">جلسات مستقلة موثقة خادمياً</span>
             </div>
-            {isLoadingEmployeeTime ? (
+            {employeeTimeError ? (
+              <p role="alert" className="text-xs text-rose-700">تعذر قراءة جلسات وقت الموظفين: {employeeTimeError} لا تبدأ جلسة جديدة قبل نجاح القراءة.</p>
+            ) : isLoadingEmployeeTime ? (
               <p className="text-xs text-slate-500">جارٍ تحميل جلسات الوقت...</p>
             ) : employeeTimeSessions.length === 0 ? (
               <p className="text-xs text-slate-500">لا توجد جلسات وقت مسجلة لهذه المهمة بعد.</p>
