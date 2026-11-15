@@ -28,7 +28,10 @@ type AuthResponse = {
 };
 
 export class SessionError extends Error {
-  constructor(message: string) { super(message); this.name = 'SessionError'; }
+  constructor(message: string, public readonly statusCode?: number) {
+    super(message);
+    this.name = 'SessionError';
+  }
 }
 
 function requireConfig() {
@@ -160,7 +163,10 @@ export async function apiRequest<T>(session: ApiSession, path: string, init: Req
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
     if (response.status === 401) clearSession();
-    throw new SessionError(payload.error?.message || payload.message || `فشل طلب API (${response.status}).`);
+    throw new SessionError(
+      payload.error?.message || payload.message || `فشل طلب API (${response.status}).`,
+      response.status,
+    );
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
