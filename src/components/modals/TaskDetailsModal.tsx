@@ -464,7 +464,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                 </Button>
               )}
 
-              {myTimeSession?.status === 'active' && (
+              {myTimeSession?.status === 'active' && !['pending_approval','approved','rejected','completed','deferred','cancelled'].includes(task.status) && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -475,7 +475,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                 </Button>
               )}
 
-              {myTimeSession?.status === 'paused' && (
+              {myTimeSession?.status === 'paused' && !['pending_approval','approved','rejected','completed','deferred','cancelled'].includes(task.status) && (
                 <Button
                   variant="primary"
                   size="sm"
