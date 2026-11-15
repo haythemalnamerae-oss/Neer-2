@@ -13,7 +13,7 @@ create or replace function public.record_field_task_event(
 )
 returns uuid
 language plpgsql
-security invoker
+security definer
 set search_path = ''
 as $$
 declare
