@@ -64,3 +64,5 @@
 - بعد انتقال المهمة إلى pending_approval أو حالة نهائية، يمنع RPC pause/resume؛ يبقى stop متاحًا لإغلاق جلسة الموظف المتبقية دون تغيير حالة الاعتماد.
 - تم تحويل endpoint القديم `/tasks/lifecycle` إلى المسار الجديد، وسُحبت صلاحية authenticated من RPC القديم `update_task_lifecycle` لمنع الرجوع إلى المؤقت المشترك.
 - فهرس `task_time_session_events_session_idx` يغطي المفتاح الأجنبي إلى جدول الجلسات.
+
+- أحداث إغلاق المؤقت القديم التي لا يمكن نسبتها إلى جلسة موظف تحفظ في `task_time_session_events` مع `session_id=NULL` وUUID idempotency؛ إعادة الطلب بنفس UUID تعيد نتيجة legacy_closed دون تكرار إضافة المدة.
