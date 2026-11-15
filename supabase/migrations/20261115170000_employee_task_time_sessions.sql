@@ -255,8 +255,6 @@ begin
     'already_processed',false
   );
 end;
-$;
+$BODY$;
 
 revoke all on function public.manage_task_time_session(uuid,text,text,text,uuid,timestamptz,text) from public, anon;
-$BODY$;
-$;
