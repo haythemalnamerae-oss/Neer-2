@@ -185,14 +185,21 @@ export type TaskTimeSession = {
 
 export async function getTaskTimeSessions(taskId: string): Promise<TaskTimeSession[]> {
   const session = requireSession();
-  const response = await apiRequest<{ sessions: TaskTimeSession[] }>(
-    session,
-    `/tasks/time-sessions?taskId=${encodeURIComponent(taskId)}`,
-  );
-  const sessions = [...(response.sessions || [])];
+  const pendingEvents = await getTaskOutboxEvents(taskId).catch(() => []);
+  let sessions: TaskTimeSession[] = [];
+  try {
+    const response = await apiRequest<{ sessions: TaskTimeSession[] }>(
+      session,
+      `/tasks/time-sessions?taskId=${encodeURIComponent(taskId)}`,
+    );
+    sessions = [...(response.sessions || [])];
+  } catch (error) {
+    const hasPendingLifecycle = pendingEvents.some((event) =>
+      event.path.endsWith('/time-session') || event.path.endsWith('/lifecycle')
+    );
+    if (!hasPendingLifecycle) throw error;
+  }
   if (!session.appUserId) return sessions;
-
-  const pendingEvents = await getTaskOutboxEvents(taskId);
   let openIndex = sessions.findIndex((item) =>
     item.actor_app_user_id === session.appUserId && item.status !== 'completed'
   );
