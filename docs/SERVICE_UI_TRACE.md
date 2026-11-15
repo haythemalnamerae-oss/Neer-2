@@ -76,7 +76,7 @@
 |---|---|---|
 | إنشاء حزمة مهمة وخطواتها | `/tasks/create-bundle` | RPC ذري `create_task_bundle` |
 | تسجيل نتيجة المهمة ومتابعة جديدة وحدث موقع | `/tasks/record-outcome` | RPC ذري `record_task_outcome_bundle` |
-| بدء/إيقاف/استئناف مهمة غير ميدانية | `/tasks/lifecycle` | RPC `update_task_lifecycle` |
+| بدء/إيقاف/استئناف/إغلاق وقت موظف في مهمة غير ميدانية | `/tasks/time-session` | RPC `manage_task_time_session` مع جلسة مستقلة لكل مستخدم |
 | اعتماد/رفض المهمة | `/tasks/review` | RPC `review_task_approval` |
 | إلغاء المهمة | `/tasks/cancel` | RPC إلغاء مخصص؛ لا حذف فعلي |
 | تحديث checklist | `PATCH /task-checklist` | مورد task_checklist_items مع RLS |
@@ -89,16 +89,26 @@
 | رابط مرفق | Storage signed URL | رابط موقّع مؤقت |
 | حذف مرفق | `DELETE /task-attachments` ثم Storage DELETE | حذف metadata ثم الكائن |
 | حدث GPS عادي | `POST /task-events` | إدراج حدث append-only |
-| دورة GPS الميدانية | `POST /task-events/lifecycle` | RPC `record_field_task_event` |
+| دورة GPS الميدانية + جلسة وقت الموظف | `POST /task-events/lifecycle` | RPC `record_field_task_event` يستدعي `manage_task_time_session` ضمن المعاملة نفسها |
 
 ملاحظات:
-- `TaskOutcomeModal` يحتفظ بمعرّف طلب النتيجة في حالة النموذج لتكرار المحاولة بنفس request ID.
+- `TaskOutcomeModal` يحتفظ بمعرّف طلب النتيجة في حالة النموذج لتكرار المحاولة بنفس request ID؛ RPC النتيجة يغلق جلسة وقت مقدم النتيجة ذريًا.
 - `TaskDetailsModal` يعرض مراجعة الإنجاز فقط عند `pending_approval`، ويخفي بدء التنفيذ/إنهاء المهمة أثناء انتظار المراجعة. زر الاعتماد/الإعادة يتطلب `tasks.approve` ويمنع المنشئ من مراجعة نتيجته في الواجهة، مع إعادة التحقق الحاسمة داخل `review_task_approval`.
 - تسجيل نتيجة المهمة عملية ذرية في قاعدة البيانات، لكن رفع الإثبات يحدث قبل RPC النتيجة؛ إذا فشل تسجيل النتيجة قد يبقى ملف مرفوع غير مرتبط.
 - إضافة subtask ثم تسجيل حدث الموقع عمليتان منفصلتان؛ فشل الحدث لا يلغي subtask الذي حُفظ.
 - حذف metadata للمرفق يسبق حذف كائن Storage؛ فشل حذف الكائن بعد حذف metadata قد يترك كائنًا يتيمًا.
 - `mutateTaskResource` يرفع خطأً واضحًا إذا نجحت الكتابة وفشل تحديث snapshot؛ يجب عدم إعادة العملية عند ظهور رسالة الحفظ مع فشل التحديث.
 - تحديث اللقطة يجلب حتى 500 سجل لكل مجموعة دون pagination.
+
+
+### جلسات وقت الموظفين — تحديث 2026-11-15
+- TaskDetailsModal وFieldMapView يقرآن جلسات الموظفين عبر getTaskTimeSessions، ويعرضان وقت كل موظف وحالته.
+- أزرار بدء/إيقاف مؤقت/استئناف/إنهاء وقتي مرتبطة بجلسة المستخدم الحالي، ولا تعتمد فقط على حالة البطاقة المشتركة.
+- المهام غير الميدانية تستخدم updateTaskLifecycle → Outbox → POST /tasks/time-session → manage_task_time_session.
+- الأحداث الميدانية تستخدم recordFieldLifecycleEvent → Outbox → POST /task-events/lifecycle → record_field_task_event، والدالة تسجل جلسة الموظف داخل المعاملة نفسها.
+- TaskOutcomeModal → recordTaskOutcomeOnServer → record_task_outcome_bundle يغلق جلسة مقدم النتيجة.
+- القراءة تتطلب tasks.view والكتابة تتطلب tasks.edit؛ RLS على جداول الجلسات يحصر القراءة في نطاق المهمة والمؤسسة.
+- لم تُنفذ بعد اختبارات تشغيلية بحسابين حقيقيين أو browser E2E؛ هذا تحديث تتبع ساكن وليس قبولًا تشغيليًا.
 
 ## 6. تتبع الخدمات المالية
 
@@ -140,6 +150,8 @@
 - POST `/api/v1/tasks/review`
 - POST `/api/v1/tasks/cancel`
 - POST `/api/v1/tasks/attach`
+- GET `/api/v1/tasks/time-sessions`
+- POST `/api/v1/tasks/time-session`
 - POST `/api/v1/tasks/lifecycle`
 - GET `/api/v1/admin/permissions`
 - PUT `/api/v1/admin/permissions/:roleKey`
