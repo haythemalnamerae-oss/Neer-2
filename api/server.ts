@@ -705,7 +705,7 @@ app.post('/api/v1/tasks/lifecycle', async (req, res) => {
         (body.deviceTimezone !== undefined && (typeof body.deviceTimezone !== 'string' || body.deviceTimezone.length > 80))) {
       return res.status(400).json({ error: { code: 'INVALID_TASK_LIFECYCLE', message: 'Task lifecycle payload is invalid.' } });
     }
-    const response = await supabaseFetch('/rest/v1/rpc/update_task_lifecycle', auth.token, {
+    const response = await supabaseFetch('/rest/v1/rpc/manage_task_time_session', auth.token, {
       method: 'POST',
       body: JSON.stringify({
         p_organization_id: auth.organizationId,
