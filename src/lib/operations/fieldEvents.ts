@@ -243,32 +243,9 @@ export async function recordFieldLifecycleEvent(input: {
     },
   });
 
-  // Keep the GPS/lifecycle audit event first in the per-task outbox, then record
-  // the authenticated employee's independent work-time session with its own key.
-  const sessionAction =
-    input.eventType.endsWith('_started') ? 'start' :
-    input.eventType.endsWith('_paused') ? 'pause' :
-    input.eventType.endsWith('_resumed') ? 'resume' : 'stop';
-  const sessionClientEventId = createClientEventId();
-  const sessionStatus = status === 'blocked' ? 'blocked' : await enqueueTaskEvent({
-    taskId: input.taskId,
-    path: '/tasks/time-session',
-    clientEventId: sessionClientEventId,
-    body: {
-      taskId: input.taskId,
-      action: sessionAction,
-      reason: typeof input.details?.reason === 'string' ? input.details.reason : null,
-      clientEventId: sessionClientEventId,
-      clientOccurredAt,
-      deviceTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    },
-  });
-
-  if (status !== 'synced' || sessionStatus !== 'synced') {
-    throw new Error(status === 'blocked' || sessionStatus === 'blocked'
-      ? 'حُفظ حدث المهمة أو جلسة الوقت محلياً لكن رفض الخادم أحدهما؛ يلزم معالجة الحدث المحظور قبل متابعة المزامنة.'
-      : 'حُفظ حدث الموقع وجلسة وقت الموظف على الجهاز وينتظران المزامنة بالترتيب عند عودة الاتصال.');
-  }
+  if (status !== 'synced') throw new Error(status === 'blocked'
+    ? 'حُفظ حدث الموقع محلياً لكن رفضه الخادم؛ يلزم تصحيح سبب الرفض قبل متابعة المزامنة.'
+    : 'حُفظ حدث الموقع على الجهاز وينتظر المزامنة. ستُرسل الأحداث بالترتيب عند عودة الاتصال.');
 }
 
 /** Background tracking is owned by the Android foreground service, not browser timers. */
