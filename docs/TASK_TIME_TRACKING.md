@@ -66,3 +66,9 @@
 - فهرس `task_time_session_events_session_idx` يغطي المفتاح الأجنبي إلى جدول الجلسات.
 
 - أحداث إغلاق المؤقت القديم التي لا يمكن نسبتها إلى جلسة موظف تحفظ في `task_time_session_events` مع `session_id=NULL` وUUID idempotency؛ إعادة الطلب بنفس UUID تعيد نتيجة legacy_closed دون تكرار إضافة المدة.
+
+### اختبارات SQL المنفذة (ROLLBACK) — 2026-11-15
+- نجح تسلسل مستخدم واحد start/pause/retry/resume/stop؛ إعادة pause بنفس UUID أعادت already_processed=true دون إنشاء حدث مكرر.
+- نجح إغلاق مؤقت legacy نشط دون جلسة، وحُفظت 120 ثانية كدقيقتين؛ إعادة الطلب بنفس UUID لم تضف الدقائق مرة ثانية.
+- نجح تدفق field GPS start/pause في إنشاء جلسة مرتبطة بأحداث GPS، ثم أغلق record_task_outcome_bundle الجلسة ذريًا عند تسجيل النتيجة.
+- كل سجلات الاختبار ألغيت بـROLLBACK. لا تثبت هذه الاختبارات تزامن مستخدمين مختلفين أو HTTP/RLS/E2E أو عمل Android الأصلي.
