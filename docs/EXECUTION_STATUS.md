@@ -240,3 +240,36 @@
 
 **الترحيلات:** `20261115170000`, `20261115180000`, `20261115190000`  
 **مراجع commits التنفيذ:** راجع سجل `main` بتاريخ 2026-11-15؛ جميع التغييرات مباشرة على main دون فروع جديدة.
+
+
+### تحصينات التوافق والواجهة — 2026-11-15
+- أضيف توافق آمن مع المؤقتات القديمة: إغلاق المؤقت المشترك السابق دون إسناد مدته زورًا لموظف، واستئناف مهمة قديمة بإنشاء جلسة جديدة، مع منع ازدواج حساب المدة.
+- منع pause/resume بعد انتقال المهمة إلى اعتماد/حالة نهائية، مع إبقاء stop متاحًا لإغلاق جلسة الموظف المتبقية.
+- endpoint القديم `/tasks/lifecycle` أصبح يوجّه إلى `manage_task_time_session`، وسُحبت صلاحية authenticated من RPC القديم `update_task_lifecycle`.
+- أضيف فهرس المفتاح الأجنبي `task_time_session_events_session_idx`.
+- تم تحديث تفاصيل المهمة والخريطة الميدانية لتعرض جلسة الموظف الحالي، وتتيح بدء وقته/إيقافه/استئنافه/إغلاقه مستقلاً عن حالة المهمة العامة.
+- تم تحديث مسار قراءة الجلسات لاستخدام pagination خادمي بحد أمان 50,000 سجل.
+
+### تحقق Supabase بعد التحصينات
+- Health: صفر ملاحظات.
+- Performance: لا يظهر تحذير unindexed foreign key؛ توجد 35 ملاحظة unused_index بمستوى INFO، ولم نحذف أي فهرس.
+- Security: 28 تحذير SECURITY DEFINER قابل للتنفيذ من authenticated (تشمل RPCs مقصودة تتحقق داخليًا من الهوية والصلاحية)؛ وتحذير واحد لتعطيل leaked-password protection؛ وملاحظة INFO واحدة لأن `private.task_outcome_requests` محمي بلا سياسات مباشرة.
+- جدول جلسات الوقت وجدول أحداثه: RLS=true، سياستان للقراءة، صفر منح كتابة مباشرة لـauthenticated، وصفر سجلات تشغيلية حتى الآن.
+- `manage_task_time_session`: SECURITY DEFINER وsearch_path فارغ، EXECUTE لـauthenticated فقط، ولا EXECUTE لـanon.
+- `record_field_task_event` و`record_task_outcome_bundle` يستدعيان RPC جلسات الوقت داخل معاملة كل منهما؛ لم يبق حساب مدة legacy داخل هذين المسارين.
+- تم سحب EXECUTE لـauthenticated من `update_task_lifecycle` القديم.
+
+### ترحيلات إضافية مسجلة في Supabase
+- `20261115151600_atomic_employee_field_time_security_fix`
+- `20261115151606_index_task_time_session_event_fk`
+- `20261115151733_legacy_task_timer_compatibility`
+- `20261115151824_legacy_timer_stop_state_compatibility`
+- `20261115151848_revoke_legacy_task_lifecycle_rpc`
+- `20261115152000_guard_terminal_task_time_sessions`
+
+### ما يزال يمنع القبول 100%
+- لم تتوفر بيانات مهام تشغيلية/حسابات اختبار لإثبات سيناريو موظفين متزامنين؛ عدد صفوف جلسات الوقت والأحداث ما زال صفرًا.
+- لم تُنفذ اختبارات HTTP/JWT بحسابين فعليين أو اختبار صلاحيات view-only/مؤسسة أخرى.
+- لم تُنفذ اختبارات المتصفح أو IndexedDB/Offline بعد إعادة تشغيل التطبيق.
+- لم يُنفذ Android Foreground Service/WorkManager؛ المستودع الحالي لا يحتوي التطبيق الأصلي، والمشروع السابق أزال مجلد android-mobile بقرار موثق.
+- لم يُشغل lint أو TypeScript build أو browser E2E أو بناء محلي؛ لا بناء أو نشر سحابي.
