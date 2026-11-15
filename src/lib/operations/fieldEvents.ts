@@ -249,15 +249,16 @@ export async function recordFieldLifecycleEvent(input: {
     input.eventType.endsWith('_started') ? 'start' :
     input.eventType.endsWith('_paused') ? 'pause' :
     input.eventType.endsWith('_resumed') ? 'resume' : 'stop';
+  const sessionClientEventId = createClientEventId();
   const sessionStatus = status === 'blocked' ? 'blocked' : await enqueueTaskEvent({
     taskId: input.taskId,
     path: '/tasks/time-session',
-    clientEventId: createClientEventId(),
+    clientEventId: sessionClientEventId,
     body: {
       taskId: input.taskId,
       action: sessionAction,
       reason: typeof input.details?.reason === 'string' ? input.details.reason : null,
-      clientEventId: createClientEventId(),
+      clientEventId: sessionClientEventId,
       clientOccurredAt,
       deviceTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     },
