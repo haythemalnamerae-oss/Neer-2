@@ -194,10 +194,14 @@ export async function getTaskTimeSessions(taskId: string): Promise<TaskTimeSessi
     );
     sessions = [...(response.sessions || [])];
   } catch (error) {
+    // Only use the local projection when the request failed at the network
+    // layer. HTTP/auth/permission/server errors must remain visible; pending
+    // local events must never hide a revoked or invalid session.
+    const isNetworkFailure = error instanceof TypeError;
     const hasPendingLifecycle = pendingEvents.some((event) =>
       event.path.endsWith('/time-session') || event.path.endsWith('/lifecycle')
     );
-    if (!hasPendingLifecycle) throw error;
+    if (!isNetworkFailure || !hasPendingLifecycle) throw error;
   }
   if (!session.appUserId) return sessions;
   let openIndex = sessions.findIndex((item) =>
