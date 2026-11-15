@@ -107,6 +107,22 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   const users = dataStore.getUsers();
   const allExpenses = dataStore.getExpenses();
   const taskExpenses = allExpenses.filter((e) => e.taskId === task.id);
+  const employeeTimeSummaries = employeeTimeSessions.reduce((summary, timeSession) => {
+    const liveSeconds = timeSession.status === 'active' && timeSession.last_resumed_at
+      ? Math.max(0, Math.floor((Date.now() - new Date(timeSession.last_resumed_at).getTime()) / 1000))
+      : 0;
+    const current = summary[timeSession.actor_app_user_id] || {
+      actorAppUserId: timeSession.actor_app_user_id,
+      totalSeconds: 0,
+      status: 'completed' as TaskTimeSession['status'],
+    };
+    current.totalSeconds += (Number(timeSession.total_seconds) || 0) + liveSeconds;
+    if (timeSession.status === 'active' || (timeSession.status === 'paused' && current.status !== 'active')) {
+      current.status = timeSession.status;
+    }
+    summary[timeSession.actor_app_user_id] = current;
+    return summary;
+  }, {} as Record<string, { actorAppUserId: string; totalSeconds: number; status: TaskTimeSession['status'] }>);
 
   const statusCfg = TASK_STATUS_CONFIG[task.status] || { label: task.status, badgeColor: 'neu-inset-sm text-slate-700' };
   const priorityCfg = TASK_PRIORITY_CONFIG[task.priority] || { label: task.priority, badgeColor: 'neu-raised text-slate-700' };
@@ -595,22 +611,17 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
               <p className="text-xs text-slate-500">لا توجد جلسات وقت مسجلة لهذه المهمة بعد.</p>
             ) : (
               <div className="space-y-2">
-                {employeeTimeSessions.map((timeSession) => {
-                  const storedSeconds = Number(timeSession.total_seconds) || 0;
-                  const liveSeconds = timeSession.status === 'active' && timeSession.last_resumed_at
-                    ? Math.max(0, Math.floor((Date.now() - new Date(timeSession.last_resumed_at).getTime()) / 1000))
-                    : 0;
-                  const totalSeconds = storedSeconds + liveSeconds;
-                  const hours = Math.floor(totalSeconds / 3600);
-                  const minutes = Math.floor((totalSeconds % 3600) / 60);
-                  const seconds = totalSeconds % 60;
-                  const employeeName = users.find((user) => user.id === timeSession.actor_app_user_id)?.name || timeSession.actor_app_user_id;
-                  const stateLabel = timeSession.status === 'active' ? 'يعمل الآن' : timeSession.status === 'paused' ? 'متوقف مؤقتاً' : 'انتهت الجلسة';
+                {Object.values(employeeTimeSummaries).map((employeeSummary) => {
+                  const hours = Math.floor(employeeSummary.totalSeconds / 3600);
+                  const minutes = Math.floor((employeeSummary.totalSeconds % 3600) / 60);
+                  const seconds = employeeSummary.totalSeconds % 60;
+                  const employeeName = users.find((user) => user.id === employeeSummary.actorAppUserId)?.name || employeeSummary.actorAppUserId;
+                  const stateLabel = employeeSummary.status === 'active' ? 'يعمل الآن' : employeeSummary.status === 'paused' ? 'متوقف مؤقتاً' : 'انتهى العمل';
                   return (
-                    <div key={timeSession.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/70 px-3 py-2">
+                    <div key={employeeSummary.actorAppUserId} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/70 px-3 py-2">
                       <div className="min-w-0">
                         <strong className="block text-xs text-slate-800 truncate">{employeeName}</strong>
-                        <span className={`text-[10px] ${timeSession.status === 'active' ? 'text-emerald-700' : 'text-slate-500'}`}>{stateLabel}</span>
+                        <span className={`text-[10px] ${employeeSummary.status === 'active' ? 'text-emerald-700' : 'text-slate-500'}`}>{stateLabel}</span>
                       </div>
                       <strong className="text-xs text-slate-800 tabular-nums" dir="ltr">
                         {String(hours).padStart(2, '0')}:{String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
