@@ -171,6 +171,25 @@ export async function recordTaskOutcomeOnServer(
   };
 }
 
+export type TaskTimeSession = {
+  id: string;
+  actor_app_user_id: string;
+  status: 'active' | 'paused' | 'completed';
+  started_at: string;
+  last_resumed_at: string | null;
+  ended_at: string | null;
+  total_seconds: number | string;
+};
+
+export async function getTaskTimeSessions(taskId: string): Promise<TaskTimeSession[]> {
+  const session = requireSession();
+  const response = await apiRequest<{ sessions: TaskTimeSession[] }>(
+    session,
+    `/tasks/time-sessions?taskId=${encodeURIComponent(taskId)}`,
+  );
+  return response.sessions || [];
+}
+
 export async function updateTaskLifecycle(taskId: string, action: 'start' | 'pause' | 'resume', reason?: string): Promise<void> {
   const session = requireSession();
   const clientEventId = newUuid();
