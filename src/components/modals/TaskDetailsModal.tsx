@@ -494,7 +494,10 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                   onClick={() => {
                     setIsLocating(true);
                     void stopTaskTimeSession(task.id)
-                      .then(() => { if (requiresFieldLocation) stopFieldLocationTracking(task.id); })
+                      .then(async () => {
+                      if (requiresFieldLocation) stopFieldLocationTracking(task.id);
+                      setEmployeeTimeSessions(await getTaskTimeSessions(task.id));
+                    })
                       .catch((error) => window.alert(error instanceof Error ? error.message : 'تعذر إغلاق جلسة وقتك.'))
                       .finally(() => setIsLocating(false));
                   }}
