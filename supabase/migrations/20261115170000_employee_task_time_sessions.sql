@@ -50,6 +50,9 @@ create table if not exists public.task_time_session_events (
 create index if not exists task_time_session_events_task_idx
   on public.task_time_session_events (organization_id, task_id, occurred_at desc);
 
+create index if not exists task_time_session_events_session_idx
+  on public.task_time_session_events (session_id);
+
 alter table public.task_time_sessions enable row level security;
 alter table public.task_time_session_events enable row level security;
 
