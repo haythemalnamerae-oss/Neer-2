@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   X,
   Calendar,
@@ -31,8 +31,8 @@ import { Task, TaskStatus, TaskStepStatus } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
 import {
   addTaskComment, addTaskDailyUpdate, addTaskSubtask, configureTaskStep, reviewTaskStep, reviewTaskSubtask, deleteTaskAttachmentOnServer,
-  getTaskAttachmentSignedUrl, refreshTaskSnapshot, setChecklistItem,
-  setTaskStepStatus, updateTaskLifecycle, updateTaskSubtaskStatus, updateTaskStatusOnServer, uploadTaskAttachment,
+  getTaskAttachmentSignedUrl, getTaskTimeSessions, refreshTaskSnapshot, setChecklistItem,
+  setTaskStepStatus, updateTaskLifecycle, updateTaskSubtaskStatus, updateTaskStatusOnServer, uploadTaskAttachment, type TaskTimeSession,
 } from '../../services/tasks.api';
 import { captureRequiredLocation, ensureFieldVisitCanStart, recordFieldLifecycleEvent, recordFieldLocationFailure, recordTaskEvent, startFieldLocationTracking, stopFieldLocationTracking, type FieldEventType } from '../../lib/operations/fieldEvents';
 import { formatCurrency, TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG } from '../../lib/utils/format';
@@ -73,6 +73,25 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   const [deferredDateInput, setDeferredDateInput] = useState('');
   const [isLocating, setIsLocating] = useState(false);
   const [isReviewingTask, setIsReviewingTask] = useState(false);
+  const [employeeTimeSessions, setEmployeeTimeSessions] = useState<TaskTimeSession[]>([]);
+  const [isLoadingEmployeeTime, setIsLoadingEmployeeTime] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !task?.id) {
+      setEmployeeTimeSessions([]);
+      return;
+    }
+    let current = true;
+    setIsLoadingEmployeeTime(true);
+    void getTaskTimeSessions(task.id)
+      .then((sessions) => { if (current) setEmployeeTimeSessions(sessions); })
+      .catch((error) => {
+        console.error('Unable to load employee task time sessions:', error);
+        if (current) setEmployeeTimeSessions([]);
+      })
+      .finally(() => { if (current) setIsLoadingEmployeeTime(false); });
+    return () => { current = false; };
+  }, [isOpen, task?.id, task?.status, task?.timeSpentMinutes]);
 
   // Attachment states
   const [attachmentDocType, setAttachmentDocType] = useState('فاتورة شراء');
@@ -538,6 +557,48 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
               </div>
             </div>
           )}
+
+          {/* Employee-specific work time: never duplicate the whole task duration for every assignee. */}
+          <div className="mt-4 p-4 rounded-2xl neu-inset-sm">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <h4 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
+                <Clock className="w-4 h-4 text-blue-700" />
+                وقت العمل حسب الموظف
+              </h4>
+              <span className="text-[10px] text-slate-500">جلسات مستقلة موثقة خادمياً</span>
+            </div>
+            {isLoadingEmployeeTime ? (
+              <p className="text-xs text-slate-500">جارٍ تحميل جلسات الوقت...</p>
+            ) : employeeTimeSessions.length === 0 ? (
+              <p className="text-xs text-slate-500">لا توجد جلسات وقت مسجلة لهذه المهمة بعد.</p>
+            ) : (
+              <div className="space-y-2">
+                {employeeTimeSessions.map((timeSession) => {
+                  const storedSeconds = Number(timeSession.total_seconds) || 0;
+                  const liveSeconds = timeSession.status === 'active' && timeSession.last_resumed_at
+                    ? Math.max(0, Math.floor((Date.now() - new Date(timeSession.last_resumed_at).getTime()) / 1000))
+                    : 0;
+                  const totalSeconds = storedSeconds + liveSeconds;
+                  const hours = Math.floor(totalSeconds / 3600);
+                  const minutes = Math.floor((totalSeconds % 3600) / 60);
+                  const seconds = totalSeconds % 60;
+                  const employeeName = users.find((user) => user.id === timeSession.actor_app_user_id)?.name || timeSession.actor_app_user_id;
+                  const stateLabel = timeSession.status === 'active' ? 'يعمل الآن' : timeSession.status === 'paused' ? 'متوقف مؤقتاً' : 'انتهت الجلسة';
+                  return (
+                    <div key={timeSession.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/70 px-3 py-2">
+                      <div className="min-w-0">
+                        <strong className="block text-xs text-slate-800 truncate">{employeeName}</strong>
+                        <span className={`text-[10px] ${timeSession.status === 'active' ? 'text-emerald-700' : 'text-slate-500'}`}>{stateLabel}</span>
+                      </div>
+                      <strong className="text-xs text-slate-800 tabular-nums" dir="ltr">
+                        {String(hours).padStart(2, '0')}:{String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
+                      </strong>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           {/* Key People Line (الهيكل الإداري: المنشئ، المشرف، المنفذ) */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mt-4 pt-3.5 border-t border-black/[0.04] text-xs sm:text-sm">
