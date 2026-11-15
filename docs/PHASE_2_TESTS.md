@@ -164,3 +164,6 @@
 - [ ] عند pending_approval/terminal: pause وresume يرفضان، وstop يغلق جلسة الموظف دون إعادة فتح المهمة.
 - [ ] التحقق أن endpoint القديم /tasks/lifecycle يستخدم RPC الجديد، وأن authenticated لا يستطيع استدعاء update_task_lifecycle مباشرة.
 - [ ] التحقق من فهرس FK task_time_session_events_session_idx وعدم ظهور تحذير unindexed FK.
+
+- [ ] إعادة إرسال UUID نفسه لعملية إغلاق مؤقت legacy ذات `session_id=NULL` تعيد `legacy_closed` ولا تضيف المدة مرتين.
+- [ ] إغلاق مؤقت legacy يحول المهمة إلى paused، إلا إذا كانت المهمة في حالة اعتماد/إنهاء.
