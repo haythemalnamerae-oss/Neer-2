@@ -1,5 +1,5 @@
 // Source: Google Maps Platform Code Assist
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   MapPin,
   Clock,
@@ -18,7 +18,7 @@ import {
 import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
 import { Task, TaskStatus } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
-import { refreshTaskSnapshot, updateTaskLifecycle } from '../../services/tasks.api';
+import { getTaskTimeSessions, refreshTaskSnapshot, stopTaskTimeSession, updateTaskLifecycle, type TaskTimeSession } from '../../services/tasks.api';
 import { captureRequiredLocation, ensureFieldVisitCanStart, recordFieldLifecycleEvent, recordFieldLocationFailure, startFieldLocationTracking, stopFieldLocationTracking } from '../../lib/operations/fieldEvents';
 import { hasPermission } from '../../lib/rbac/permissions';
 import { formatCurrency, TASK_STATUS_CONFIG } from '../../lib/utils/format';
@@ -48,6 +48,25 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
     : canViewAllTasks ? tasks : [];
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [selectedTaskTimeSessions, setSelectedTaskTimeSessions] = useState<TaskTimeSession[]>([]);
+  const [isLoadingTaskTimeSessions, setIsLoadingTaskTimeSessions] = useState(false);
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      setSelectedTaskTimeSessions([]);
+      return;
+    }
+    let current = true;
+    setIsLoadingTaskTimeSessions(true);
+    void getTaskTimeSessions(selectedTask.id)
+      .then((sessions) => { if (current) setSelectedTaskTimeSessions(sessions); })
+      .catch((error) => {
+        console.error('Unable to load field-map employee time sessions:', error);
+        if (current) setSelectedTaskTimeSessions([]);
+      })
+      .finally(() => { if (current) setIsLoadingTaskTimeSessions(false); });
+    return () => { current = false; };
+  }, [selectedTask?.id, selectedTask?.status, selectedTask?.updatedAt, selectedTask?.timeSpentMinutes]);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -55,6 +74,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
   const [userLiveCoords, setUserLiveCoords] = useState<{ lat: number; lng: number; accuracy?: number } | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [locationSuccessMsg, setLocationSuccessMsg] = useState('');
+  const mySelectedTimeSession = selectedTaskTimeSessions.find((session) => session.actor_app_user_id === currentUser.id && session.status !== 'completed');
 
   // Map API Key retrieval
   const apiKey = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || '';
@@ -678,42 +698,56 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
 
               {/* Primary Execution Control Buttons */}
               <div className="space-y-2 pt-2 border-t border-slate-100">
-                {canEditTask && selectedTask.status === 'scheduled' && (
+                {canEditTask && !isLoadingTaskTimeSessions && !mySelectedTimeSession &&
+                  !['completed','approved','pending_approval','cancelled','deferred','rejected'].includes(selectedTask.status) && (
                   <button
                     onClick={() => handleStartTaskWithLocation(selectedTask)}
                     className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-[#2A443B] hover:bg-[#1f332c] text-white text-xs font-bold font-sans-inter transition-all shadow-md cursor-pointer active:scale-95"
                   >
                     <Play className="w-4 h-4 fill-white" />
-                    <span>بدء المهمة وتوثيق الوقت والموقع (GPS)</span>
+                    <span>بدء وقتي وتوثيق الموقع (GPS)</span>
                   </button>
                 )}
 
-                {canEditTask && selectedTask.status === 'in_progress' && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => handlePauseTask(selectedTask)}
-                      className="flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
-                    >
-                      <Pause className="w-4 h-4" />
-                      <span>إيقاف مؤقت</span>
-                    </button>
-                    <button
-                      onClick={() => onRecordOutcome(selectedTask)}
-                      className="flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
-                    >
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>إنهاء وإغلاق</span>
-                    </button>
-                  </div>
+                {canEditTask && mySelectedTimeSession?.status === 'active' && (
+                  <button
+                    onClick={() => handlePauseTask(selectedTask)}
+                    className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
+                  >
+                    <Pause className="w-4 h-4" />
+                    <span>إيقاف وقتي مؤقتاً</span>
+                  </button>
                 )}
 
-                {canEditTask && selectedTask.status === 'paused' && (
+                {canEditTask && mySelectedTimeSession?.status === 'paused' && (
                   <button
                     onClick={() => handleResumeTask(selectedTask)}
                     className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md cursor-pointer active:scale-95"
                   >
                     <Play className="w-4 h-4 fill-white" />
-                    <span>استئناف العمل الميداني</span>
+                    <span>استئناف وقتي الميداني</span>
+                  </button>
+                )}
+
+                {canEditTask && mySelectedTimeSession && (
+                  <button
+                    onClick={() => void stopTaskTimeSession(selectedTask.id)
+                      .then(() => { stopFieldLocationTracking(selectedTask.id); return refreshTaskSnapshot(); })
+                      .catch((error) => window.alert(error instanceof Error ? error.message : 'تعذر إنهاء جلسة الوقت.'))}
+                    className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer"
+                  >
+                    <Clock className="w-4 h-4" />
+                    <span>إنهاء وقتي فقط</span>
+                  </button>
+                )}
+
+                {canEditTask && ['in_progress','paused'].includes(selectedTask.status) && (
+                  <button
+                    onClick={() => onRecordOutcome(selectedTask)}
+                    className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>إنهاء المهمة وتسجيل النتيجة</span>
                   </button>
                 )}
 
