@@ -173,3 +173,30 @@
 - تم فحص ترتيب middleware: `authenticate` مربوط على `/api/v1` قبل مسارات تسجيل الأحداث؛ كل endpoint يتطلب Bearer صالحاً وعضوية نشطة للمؤسسة، ثم يتحقق من `tasks.edit`.
 - آخر فحص نهائي: 54 migration مسجلة؛ Health صفر؛ Performance 31 unused_index (INFO)؛ Security 28 SECURITY DEFINER warnings وواحد leaked-password protection. لم تُشغّل أي build أو lint أو E2E أو device test.
 - آخر SHA بعد تثبيت هذا التحديث يُراجع من main مباشرة؛ لا توجد فروع إضافية.
+
+
+---
+
+## استكمال المرحلة الثانية — 2026-11-15
+
+### تغييرات مثبتة على main
+- تم استبدال fallback المعتمد على `Math.random()` في `src/services/tasks.api.ts` بمولد UUID v4 يستخدم `crypto.randomUUID()` أو `crypto.getRandomValues()`. إذا لم يتوفر مولد آمن تتوقف العملية برسالة واضحة بدلاً من إنشاء معرف ضعيف. يشمل ذلك معرفات البطاقات والطلبات ومفاتيح idempotency التي تمر عبر `newId/newUuid`.
+- أضيف الترحيل `20261115150200_enable_private_task_outcome_requests_rls.sql` وفُعّل RLS على `private.task_outcome_requests`.
+- قبل الترحيل، تم التحقق من عدم وجود أي منح مباشر للجدول إلى `anon` أو `authenticated`، وعدم وجود سياسات، وأن المرجع البرمجي الوحيد المكتشف هو `record_task_outcome_bundle` بصلاحية SECURITY DEFINER ومالك postgres وsearch_path مضبوط. بقي `FORCE ROW LEVEL SECURITY` معطلاً حتى يستمر RPC المملوك لـpostgres في الوصول إلى الجدول.
+- تحقق ما بعد الترحيل: RLS مفعّل، FORCE RLS غير مفعّل، الجدول لا يحتوي سجلات، وسجل Supabase يتضمن الترحيل `20261115150200`.
+- راجعنا دوال GPS الثلاث: `record_field_task_event` و`record_task_event` تضبطان search_path فارغًا وتستخدمان أسماء مؤهلة للمخططات، و`update_task_lifecycle` تضبط search_path صراحة؛ جميعها تتحقق من auth.uid وصلاحية المهمة، ومفاتيح التكرار، وتنفذ قفل صف المهمة عند الانتقالات اللازمة.
+- أُعيد فحص Supabase Advisors: Health صفر؛ Performance عدد 31 ملاحظة unused_index بمستوى INFO؛ Security يعرض 28 تحذير SECURITY DEFINER لدوال authenticated وتحذير حماية كلمات المرور المسرّبة المعطلة، إضافة إلى ملاحظة INFO عن RLS بلا سياسة على الجدول الخاص بعد تفعيله. لم تُحذف فهارس ولم تُلغَ صلاحيات RPC جماعيًا.
+
+### ما لم يُنجز ولا يجوز اعتباره مقبولاً
+- لا يوجد مشروع Android أصلي في هذا المستودع؛ لا Foreground Service ولا WorkManager ولا تتبع GPS دوري بالخلفية.
+- لا توجد جلسات وقت منفصلة لكل موظف في المهمة الجماعية.
+- لا يوجد تحديث محلي متكامل لحالة المهمة يسمح بسلسلة lifecycle متعددة دون اتصال؛ الانتقال التالي للمهمة نفسها يبقى محجوبًا حتى مزامنة السابق.
+- لا توجد اختبارات HTTP موجبة بحسابين Auth فعليين، ولا اختبار جهاز Android أو إعادة تشغيله أو استعادة الطابور بعد إغلاق التطبيق.
+- لم تُشغّل lint أو TypeScript build أو browser E2E أو اختبارات محلية؛ لم يُنفذ بناء أو نشر سحابي.
+
+### قرار المرحلة
+تظل المرحلة الثانية **غير معتمدة تشغيليًا**. تقدير الإنجاز البرمجي السابق (نحو 65%) لا يتغير جوهريًا بهذا التحصين المحدود. يجب استكمال تكامل Android في المستودع/التطبيق المعتمد منفصلًا، وتوزيع وقت الموظفين، وسلسلة Offline، والاختبارات المحلية والحقيقية قبل إعلان 100%.
+
+**آخر تعديل كودي في هذا الاستكمال:** `8fcfb8e2600e99a77f4198ae01fba987acc6eb60`  
+**تعديل RLS على main:** `5289441eaad2b29d5cf112f2dd24e43d8b707b9f`  
+**ترحيل Supabase:** `20261115150200`
