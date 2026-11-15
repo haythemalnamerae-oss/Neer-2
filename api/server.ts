@@ -626,6 +626,32 @@ app.post('/api/v1/tasks/attach', async (req, res) => {
   }
 });
 
+app.get('/api/v1/tasks/time-sessions', async (req, res) => {
+  const auth = (req as AuthenticatedRequest).auth;
+  try {
+    if (!(await allowed(auth, 'tasks', 'view'))) {
+      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Missing permission tasks.view.' } });
+    }
+    const taskId = typeof req.query.taskId === 'string' ? req.query.taskId : '';
+    if (!taskId || !idPattern.test(taskId)) {
+      return res.status(400).json({ error: { code: 'INVALID_TASK_ID', message: 'A valid task id is required.' } });
+    }
+    const query = new URLSearchParams({
+      select: 'id,actor_app_user_id,status,started_at,last_resumed_at,ended_at,total_seconds',
+      organization_id: `eq.${auth.organizationId}`,
+      task_id: `eq.${taskId}`,
+      order: 'started_at.desc',
+      limit: '500',
+    });
+    const response = await supabaseFetch(`/rest/v1/task_time_sessions?${query.toString()}`, auth.token);
+    if (!response.ok) return sendDbError(res, response.status, await response.text());
+    return res.status(200).json({ sessions: await response.json() });
+  } catch (error) {
+    console.error('Task employee time-session read failed:', error);
+    return res.status(503).json({ error: { code: 'TASK_TIME_SESSION_READ_FAILED', message: 'Employee time sessions could not be loaded.' } });
+  }
+});
+
 app.post('/api/v1/tasks/time-session', async (req, res) => {
   const auth = (req as AuthenticatedRequest).auth;
   try {
