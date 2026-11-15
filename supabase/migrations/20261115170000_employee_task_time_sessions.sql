@@ -83,7 +83,7 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $BODY$
 declare
   v_actor_id text;
   v_task public.tasks%rowtype;
@@ -258,5 +258,5 @@ end;
 $;
 
 revoke all on function public.manage_task_time_session(uuid,text,text,text,uuid,timestamptz,text) from public, anon;
-grant execute on function public.manage_task_time_session(uuid,text,text,text,uuid,timestamptz,text) to authenticated;
+$BODY$;
 $;
