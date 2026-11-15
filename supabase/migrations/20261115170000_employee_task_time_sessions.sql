@@ -134,18 +134,20 @@ begin
     raise exception using errcode='P0002', message='Task not found in this organization';
   end if;
 
+  v_event_type := case p_action
+    when 'start' then 'started'
+    when 'pause' then 'paused'
+    when 'resume' then 'resumed'
+    else 'stopped'
+  end;
+
   select * into v_existing
   from public.task_time_session_events e
   where e.organization_id=p_organization_id and e.client_event_id=p_client_event_id;
   if found then
     if v_existing.task_id<>p_task_id
        or v_existing.actor_auth_user_id<>auth.uid()
-       or v_existing.event_type<>case p_action
-         when 'start' then 'started'
-         when 'pause' then 'paused'
-         when 'resume' then 'resumed'
-         else 'stopped'
-       end then
+       or v_existing.event_type<>v_event_type then
       raise exception using errcode='23505', message='Idempotency key was already used for a different time-session action';
     end if;
     select * into v_session from public.task_time_sessions s where s.id=v_existing.session_id;
@@ -157,13 +159,6 @@ begin
       'already_processed',true
     );
   end if;
-
-  v_event_type := case p_action
-    when 'start' then 'started'
-    when 'pause' then 'paused'
-    when 'resume' then 'resumed'
-    else 'stopped'
-  end;
 
   select * into v_session
   from public.task_time_sessions s
