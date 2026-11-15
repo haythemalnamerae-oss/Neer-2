@@ -93,6 +93,8 @@ declare
   v_now timestamptz := clock_timestamp();
   v_active_count integer := 0;
   v_total_seconds bigint := 0;
+  v_elapsed_seconds bigint := 0;
+  v_added_minutes integer := 0;
 begin
   if auth.uid() is null then
     raise exception using errcode='28000', message='Authentication required';
@@ -186,8 +188,10 @@ begin
     if not found or v_session.status<>'active' then
       raise exception using errcode='55000', message='Only your active time session can be paused';
     end if;
-    v_session.total_seconds := v_session.total_seconds
-      + greatest(0,floor(extract(epoch from (v_now-v_session.last_resumed_at)))::bigint);
+    v_elapsed_seconds := greatest(0,floor(extract(epoch from (v_now-v_session.last_resumed_at)))::bigint);
+    v_added_minutes := floor((v_session.total_seconds + v_elapsed_seconds)/60)::integer
+      - floor(v_session.total_seconds/60)::integer;
+    v_session.total_seconds := v_session.total_seconds + v_elapsed_seconds;
     update public.task_time_sessions
     set status='paused',last_resumed_at=null,total_seconds=v_session.total_seconds,updated_at=v_now
     where id=v_session.id returning * into v_session;
@@ -203,8 +207,10 @@ begin
       raise exception using errcode='55000', message='No open time session exists for this employee and task';
     end if;
     if v_session.status='active' then
-      v_session.total_seconds := v_session.total_seconds
-        + greatest(0,floor(extract(epoch from (v_now-v_session.last_resumed_at)))::bigint);
+      v_elapsed_seconds := greatest(0,floor(extract(epoch from (v_now-v_session.last_resumed_at)))::bigint);
+      v_added_minutes := floor((v_session.total_seconds + v_elapsed_seconds)/60)::integer
+        - floor(v_session.total_seconds/60)::integer;
+      v_session.total_seconds := v_session.total_seconds + v_elapsed_seconds;
     end if;
     update public.task_time_sessions
     set status='completed',last_resumed_at=null,ended_at=v_now,
@@ -233,10 +239,14 @@ begin
         is_paused=false,paused_at=null,pause_reason=null,
         is_timer_running=false,timer_started_at=null,updated_at=v_now
     where organization_id=p_organization_id and id=p_task_id;
-  elsif v_active_count=0 and v_task.status not in ('pending_approval','approved','rejected','completed','deferred','cancelled') then
+  else
     update public.tasks
-    set status='paused',execution_status='paused',
-        is_paused=true,paused_at=v_now,pause_reason=nullif(btrim(p_reason),''),
+    set time_spent_minutes=time_spent_minutes+v_added_minutes,
+        status=case when v_active_count=0 and status not in ('pending_approval','approved','rejected','completed','deferred','cancelled') then 'paused' else status end,
+        execution_status=case when v_active_count=0 and execution_status not in ('completed','deferred','cancelled') then 'paused' else execution_status end,
+        is_paused=(v_active_count=0 and status not in ('pending_approval','approved','rejected','completed','deferred','cancelled')),
+        paused_at=case when v_active_count=0 then v_now else paused_at end,
+        pause_reason=case when v_active_count=0 then nullif(btrim(p_reason),'') else pause_reason end,
         is_timer_running=false,timer_started_at=null,updated_at=v_now
     where organization_id=p_organization_id and id=p_task_id;
   end if;
