@@ -641,11 +641,9 @@ app.get('/api/v1/tasks/time-sessions', async (req, res) => {
       organization_id: `eq.${auth.organizationId}`,
       task_id: `eq.${taskId}`,
       order: 'started_at.desc',
-      limit: '500',
     });
-    const response = await supabaseFetch(`/rest/v1/task_time_sessions?${query.toString()}`, auth.token);
-    if (!response.ok) return sendDbError(res, response.status, await response.text());
-    return res.status(200).json({ sessions: await response.json() });
+    const sessions = await fetchAllRows(`/rest/v1/task_time_sessions?${query.toString()}`, auth.token);
+    return res.status(200).json({ sessions });
   } catch (error) {
     console.error('Task employee time-session read failed:', error);
     return res.status(503).json({ error: { code: 'TASK_TIME_SESSION_READ_FAILED', message: 'Employee time sessions could not be loaded.' } });
