@@ -104,6 +104,7 @@
 ### جلسات وقت الموظفين — تحديث 2026-11-15
 - TaskDetailsModal وFieldMapView يقرآن جلسات الموظفين عبر getTaskTimeSessions، ويعرضان وقت كل موظف وحالته.
 - أزرار بدء/إيقاف مؤقت/استئناف/إنهاء وقتي مرتبطة بجلسة المستخدم الحالي، ولا تعتمد فقط على حالة البطاقة المشتركة.
+- المسار القديم `/tasks/lifecycle` محفوظ للتوافق لكنه يوجه الآن إلى RPC الجلسات الجديد؛ تم سحب EXECUTE من RPC المؤقت المشترك القديم.
 - المهام غير الميدانية تستخدم updateTaskLifecycle → Outbox → POST /tasks/time-session → manage_task_time_session.
 - الأحداث الميدانية تستخدم recordFieldLifecycleEvent → Outbox → POST /task-events/lifecycle → record_field_task_event، والدالة تسجل جلسة الموظف داخل المعاملة نفسها.
 - TaskOutcomeModal → recordTaskOutcomeOnServer → record_task_outcome_bundle يغلق جلسة مقدم النتيجة.
