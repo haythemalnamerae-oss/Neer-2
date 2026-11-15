@@ -115,14 +115,17 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
       actorAppUserId: timeSession.actor_app_user_id,
       totalSeconds: 0,
       status: 'completed' as TaskTimeSession['status'],
+      syncState: undefined as TaskTimeSession['sync_state'],
     };
     current.totalSeconds += (Number(timeSession.total_seconds) || 0) + liveSeconds;
     if (timeSession.status === 'active' || (timeSession.status === 'paused' && current.status !== 'active')) {
       current.status = timeSession.status;
     }
+    if (timeSession.sync_state === 'blocked') current.syncState = 'blocked';
+    else if (timeSession.sync_state === 'pending' && current.syncState !== 'blocked') current.syncState = 'pending';
     summary[timeSession.actor_app_user_id] = current;
     return summary;
-  }, {} as Record<string, { actorAppUserId: string; totalSeconds: number; status: TaskTimeSession['status'] }>);
+  }, {} as Record<string, { actorAppUserId: string; totalSeconds: number; status: TaskTimeSession['status']; syncState?: TaskTimeSession['sync_state'] }>);
 
   const statusCfg = TASK_STATUS_CONFIG[task.status] || { label: task.status, badgeColor: 'neu-inset-sm text-slate-700' };
   const priorityCfg = TASK_PRIORITY_CONFIG[task.priority] || { label: task.priority, badgeColor: 'neu-raised text-slate-700' };
@@ -480,7 +483,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                 </Button>
               )}
 
-              {myTimeSession?.status === 'active' && !['pending_approval','approved','rejected','completed','deferred','cancelled'].includes(task.status) && (
+              {myTimeSession?.status === 'active' && myTimeSession.sync_state !== 'blocked' && !['pending_approval','approved','rejected','completed','deferred','cancelled'].includes(task.status) && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -491,7 +494,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                 </Button>
               )}
 
-              {myTimeSession?.status === 'paused' && !['pending_approval','approved','rejected','completed','deferred','cancelled'].includes(task.status) && (
+              {myTimeSession?.status === 'paused' && myTimeSession.sync_state !== 'blocked' && !['pending_approval','approved','rejected','completed','deferred','cancelled'].includes(task.status) && (
                 <Button
                   variant="primary"
                   size="sm"
@@ -502,7 +505,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                 </Button>
               )}
 
-              {myTimeSession && (
+              {myTimeSession && myTimeSession.sync_state !== 'blocked' && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -616,7 +619,10 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                   const minutes = Math.floor((employeeSummary.totalSeconds % 3600) / 60);
                   const seconds = employeeSummary.totalSeconds % 60;
                   const employeeName = users.find((user) => user.id === employeeSummary.actorAppUserId)?.name || employeeSummary.actorAppUserId;
-                  const stateLabel = employeeSummary.status === 'active' ? 'يعمل الآن' : employeeSummary.status === 'paused' ? 'متوقف مؤقتاً' : 'انتهى العمل';
+                  const stateLabel = employeeSummary.syncState === 'blocked' ? 'تعذر الإرسال — يحتاج معالجة' :
+                    employeeSummary.syncState === 'pending' ? 'بانتظار المزامنة' :
+                    employeeSummary.status === 'active' ? 'يعمل الآن' :
+                    employeeSummary.status === 'paused' ? 'متوقف مؤقتاً' : 'انتهى العمل';
                   return (
                     <div key={employeeSummary.actorAppUserId} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/70 px-3 py-2">
                       <div className="min-w-0">
