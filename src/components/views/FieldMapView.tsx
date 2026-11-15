@@ -735,7 +735,11 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
                 {canEditTask && mySelectedTimeSession && (
                   <button
                     onClick={() => void stopTaskTimeSession(selectedTask.id)
-                      .then(() => { stopFieldLocationTracking(selectedTask.id); return refreshTaskSnapshot(); })
+                      .then(async () => {
+                        stopFieldLocationTracking(selectedTask.id);
+                        await refreshTaskSnapshot();
+                        setSelectedTaskTimeSessions(await getTaskTimeSessions(selectedTask.id));
+                      })
                       .catch((error) => window.alert(error instanceof Error ? error.message : 'تعذر إنهاء جلسة الوقت.'))}
                     className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer"
                   >
