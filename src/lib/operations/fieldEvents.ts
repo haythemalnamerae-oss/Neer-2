@@ -21,20 +21,6 @@ export class FieldLocationError extends Error {
   }
 }
 
-type NativeFieldBridge = {
-  getVpnStatus: () => Promise<{ active: boolean }>;
-  ensureLocationServices: () => Promise<{ enabled: boolean }>;
-  requestLocationPermission: () => Promise<{ granted: boolean }>;
-  getCurrentLocation: () => Promise<CapturedLocation>;
-  openVpnSettings: () => void;
-  openLocationSettings: () => void;
-  startBackgroundLocationTracking: (taskId: string) => void;
-  stopBackgroundLocationTracking: (taskId: string) => void;
-};
-
-declare global {
-  interface Window { NeerNative?: NativeFieldBridge; }
-}
 
 function createClientEventId(): string {
   if (typeof crypto === 'undefined') throw new FieldLocationError('مولد UUID الآمن غير متاح على هذا الجهاز.', 'unavailable');
@@ -62,54 +48,49 @@ function validateFieldEventInput(input: {
   }
 }
 
-function nativeFieldBridge(): NativeFieldBridge | null {
-  return typeof window !== 'undefined' ? window.NeerNative || null : null;
-}
-
-/**
- * VPN and background-location guarantees require the Android native bridge.
- * A browser-only session fails closed instead of pretending it can inspect VPN
- * state or keep GPS alive after the WebView is suspended.
- */
+/** Browser GPS is requested only in direct response to a field-task action. */
 export async function ensureFieldVisitCanStart(): Promise<void> {
-  const bridge = nativeFieldBridge();
-  if (!bridge) throw new FieldLocationError(
-    'بدء الزيارة يتطلب تطبيق Neer الأصلي على Android للتحقق من VPN وتشغيل تتبع الخلفية. المتصفح وحده لا يستطيع ضمان ذلك.',
-    'native_required',
-  );
-  const vpn = await bridge.getVpnStatus();
-  if (vpn.active) {
-    bridge.openVpnSettings();
-    throw new FieldLocationError('اتصال VPN نشط. أوقف VPN من إعدادات الجهاز ثم أعد محاولة بدء الزيارة.', 'vpn_active');
+  if (typeof navigator === 'undefined' || !navigator.geolocation ||
+      (typeof window !== 'undefined' && !window.isSecureContext)) {
+    throw new FieldLocationError(
+      'يلزم فتح واجهة Neer عبر HTTPS ومتصفح يدعم تحديد الموقع لتوثيق المهام الميدانية.',
+      'unsupported',
+    );
   }
-  const locationServices = await bridge.ensureLocationServices();
-  if (!locationServices.enabled) {
-    bridge.openLocationSettings();
-    throw new FieldLocationError('خدمات الموقع GPS متوقفة. فعّل الموقع من إعدادات الجهاز ثم أعد المحاولة.', 'services_disabled');
-  }
-  const permission = await bridge.requestLocationPermission();
-  if (!permission.granted) throw new FieldLocationError('يلزم منح إذن الموقع للتطبيق قبل بدء الزيارة.', 'permission_denied');
 }
 
-/** A fresh event location is obtained from the native Android location provider only. */
+/** Capture one fresh browser location fix; no continuous or background tracking is started. */
 export async function captureRequiredLocation(): Promise<CapturedLocation> {
-  const bridge = nativeFieldBridge();
-  if (!bridge) throw new FieldLocationError(
-    'لا يمكن توثيق موقع الحدث من المتصفح بأمان. افتح تطبيق Neer الأصلي على Android.',
-    'native_required',
-  );
-  try {
-    const location = await bridge.getCurrentLocation();
-    if (!Number.isFinite(location.latitude) || !Number.isFinite(location.longitude) ||
-        !Number.isFinite(location.accuracyMeters) || location.latitude < -90 || location.latitude > 90 ||
-        location.longitude < -180 || location.longitude > 180 || location.accuracyMeters < 0) {
-      throw new FieldLocationError('أعاد مزود الموقع إحداثيات أو دقة غير صالحة.', 'unavailable');
-    }
-    return location;
-  } catch (error) {
-    if (error instanceof FieldLocationError) throw error;
-    throw new FieldLocationError(error instanceof Error ? error.message : 'تعذر الحصول على موقع GPS حالي من الجهاز.', 'unavailable');
-  }
+  await ensureFieldVisitCanStart();
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const location: CapturedLocation = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracyMeters: position.coords.accuracy,
+        };
+        try {
+          validateFieldEventInput({ eventLabel: 'GPS', location });
+          resolve(location);
+        } catch (error) {
+          reject(error);
+        }
+      },
+      (error) => {
+        if (error.code === error.PERMISSION_DENIED) {
+          reject(new FieldLocationError('تم رفض إذن الموقع. اسمح للمتصفح بالوصول إلى الموقع ثم أعد المحاولة.', 'permission_denied'));
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          reject(new FieldLocationError('خدمات الموقع غير متاحة حالياً على الجهاز.', 'services_disabled'));
+        } else if (error.code === error.TIMEOUT) {
+          reject(new FieldLocationError('انتهت مهلة تحديد الموقع؛ أعد المحاولة في مكان تتوفر فيه إشارة GPS.', 'timeout'));
+        } else {
+          reject(new FieldLocationError('تعذر الحصول على موقع GPS من المتصفح.', 'unavailable'));
+        }
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+    );
+  });
 }
 
 type NonLifecycleFieldEventType = Exclude<FieldEventType,
@@ -238,7 +219,7 @@ export async function recordFieldLifecycleEvent(input: {
         ...(input.details || {}),
         clientOccurredAt,
         deviceTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        locationSource: 'native_android_bridge',
+        locationSource: 'browser_geolocation',
       },
     },
   });
@@ -248,16 +229,14 @@ export async function recordFieldLifecycleEvent(input: {
     : 'حُفظ حدث الموقع على الجهاز وينتظر المزامنة. ستُرسل الأحداث بالترتيب عند عودة الاتصال.');
 }
 
-/** Background tracking is owned by the Android foreground service, not browser timers. */
-export function startFieldLocationTracking(taskId: string): void {
-  const bridge = nativeFieldBridge();
-  if (!bridge) {
-    console.error('Native background location bridge is unavailable; field tracking cannot be guaranteed.');
-    return;
-  }
-  bridge.startBackgroundLocationTracking(taskId);
+/**
+ * Browser sessions deliberately do not run continuous/background GPS.
+ * Location is captured only at explicit start/pause/resume/outcome actions.
+ */
+export function startFieldLocationTracking(_taskId: string): void {
+  // Intentionally no-op: browser background location is neither required nor guaranteed.
 }
 
-export function stopFieldLocationTracking(taskId: string): void {
-  nativeFieldBridge()?.stopBackgroundLocationTracking(taskId);
+export function stopFieldLocationTracking(_taskId: string): void {
+  // Intentionally no-op: each event obtains a one-shot location fix.
 }
