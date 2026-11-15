@@ -82,15 +82,22 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
       return;
     }
     let current = true;
-    setIsLoadingEmployeeTime(true);
-    void getTaskTimeSessions(task.id)
-      .then((sessions) => { if (current) setEmployeeTimeSessions(sessions); })
-      .catch((error) => {
-        console.error('Unable to load employee task time sessions:', error);
-        if (current) setEmployeeTimeSessions([]);
-      })
-      .finally(() => { if (current) setIsLoadingEmployeeTime(false); });
-    return () => { current = false; };
+    const loadSessions = () => {
+      setIsLoadingEmployeeTime(true);
+      void getTaskTimeSessions(task.id)
+        .then((sessions) => { if (current) setEmployeeTimeSessions(sessions); })
+        .catch((error) => {
+          console.error('Unable to load employee task time sessions:', error);
+          if (current) setEmployeeTimeSessions([]);
+        })
+        .finally(() => { if (current) setIsLoadingEmployeeTime(false); });
+    };
+    loadSessions();
+    if (typeof window !== 'undefined') window.addEventListener('neer-task-outbox-change', loadSessions);
+    return () => {
+      current = false;
+      if (typeof window !== 'undefined') window.removeEventListener('neer-task-outbox-change', loadSessions);
+    };
   }, [isOpen, task?.id, task?.status, task?.timeSpentMinutes, task?.updatedAt]);
 
   // Attachment states
