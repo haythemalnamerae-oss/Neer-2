@@ -230,8 +230,11 @@ export async function flushTaskEventOutbox(): Promise<void> {
         if (typeof window !== 'undefined') window.dispatchEvent(new Event('neer-task-outbox-change'));
       } catch (error) {
         const message = error instanceof Error ? error.message : 'تعذرت مزامنة الحدث.';
+        const explicitStatus = typeof (error as { statusCode?: unknown })?.statusCode === 'number'
+          ? (error as { statusCode: number }).statusCode
+          : 0;
         const statusMatch = message.match(/API \((\d{3})\)|HTTP (\d{3})/i);
-        const status = statusMatch ? Number(statusMatch[1] || statusMatch[2]) : 0;
+        const status = explicitStatus || (statusMatch ? Number(statusMatch[1] || statusMatch[2]) : 0);
         const blocked = status >= 400 && status < 500 && status !== 401 && status !== 408 && status !== 429;
         await putEvent({
           ...event,
