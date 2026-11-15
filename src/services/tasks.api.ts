@@ -235,7 +235,7 @@ export async function getTaskTimeSessions(taskId: string): Promise<TaskTimeSessi
     if (queued.state === 'blocked') {
       if (openIndex >= 0) {
         sessions[openIndex] = { ...sessions[openIndex], sync_state: 'blocked', last_error: queued.lastError };
-      } else if (action !== 'stop') {
+      } else {
         const blocked = createLocalSession(queued.id, at, 'blocked');
         blocked.sync_state = 'blocked';
         blocked.last_error = queued.lastError;
