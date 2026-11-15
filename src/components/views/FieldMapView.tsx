@@ -203,6 +203,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
         details: { reason: reason.trim(), source: 'field_map' },
       });
       await refreshTaskSnapshot();
+      setSelectedTaskTimeSessions(await getTaskTimeSessions(task.id));
       stopFieldLocationTracking(task.id);
     } catch (error) {
       await recordFieldLocationFailure(task.id, 'تعذر إيقاف المهمة بسبب الموقع', error).catch(() => undefined);
@@ -230,6 +231,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
         details: { source: 'field_map' },
       });
       await refreshTaskSnapshot();
+      setSelectedTaskTimeSessions(await getTaskTimeSessions(task.id));
       startFieldLocationTracking(task.id);
     } catch (error) {
       await recordFieldLocationFailure(task.id, 'تعذر استئناف المهمة بسبب الموقع', error).catch(() => undefined);
