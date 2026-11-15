@@ -50,20 +50,26 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedTaskTimeSessions, setSelectedTaskTimeSessions] = useState<TaskTimeSession[]>([]);
   const [isLoadingTaskTimeSessions, setIsLoadingTaskTimeSessions] = useState(false);
+  const [taskTimeSessionsError, setTaskTimeSessionsError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!selectedTask?.id) {
       setSelectedTaskTimeSessions([]);
+      setTaskTimeSessionsError(null);
       return;
     }
     let current = true;
     const loadSessions = () => {
       setIsLoadingTaskTimeSessions(true);
+      setTaskTimeSessionsError(null);
       void getTaskTimeSessions(selectedTask.id)
         .then((sessions) => { if (current) setSelectedTaskTimeSessions(sessions); })
         .catch((error) => {
           console.error('Unable to load field-map employee time sessions:', error);
-          if (current) setSelectedTaskTimeSessions([]);
+          if (current) {
+            setSelectedTaskTimeSessions([]);
+            setTaskTimeSessionsError(error instanceof Error ? error.message : 'تعذر قراءة جلسات الوقت.');
+          }
         })
         .finally(() => { if (current) setIsLoadingTaskTimeSessions(false); });
     };
@@ -707,8 +713,13 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
               </div>
 
               {/* Primary Execution Control Buttons */}
+              {taskTimeSessionsError && (
+                <p role="alert" className="rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700">
+                  تعذر قراءة جلسات وقت الموظفين: {taskTimeSessionsError} لا تبدأ جلسة جديدة قبل نجاح القراءة.
+                </p>
+              )}
               <div className="space-y-2 pt-2 border-t border-slate-100">
-                {canEditTask && !isLoadingTaskTimeSessions && !mySelectedTimeSession &&
+                {canEditTask && !isLoadingTaskTimeSessions && !taskTimeSessionsError && !mySelectedTimeSession &&
                   !['completed','approved','pending_approval','cancelled','deferred','rejected'].includes(selectedTask.status) && (
                   <button
                     onClick={() => handleStartTaskWithLocation(selectedTask)}
