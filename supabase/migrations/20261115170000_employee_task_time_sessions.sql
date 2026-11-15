@@ -242,11 +242,26 @@ begin
   else
     update public.tasks
     set time_spent_minutes=time_spent_minutes+v_added_minutes,
-        status=case when v_active_count=0 and status not in ('pending_approval','approved','rejected','completed','deferred','cancelled') then 'paused' else status end,
-        execution_status=case when v_active_count=0 and execution_status not in ('completed','deferred','cancelled') then 'paused' else execution_status end,
-        is_paused=(v_active_count=0 and status not in ('pending_approval','approved','rejected','completed','deferred','cancelled')),
-        paused_at=case when v_active_count=0 then v_now else paused_at end,
-        pause_reason=case when v_active_count=0 then nullif(btrim(p_reason),'') else pause_reason end,
+        status=case
+          when status in ('pending_approval','approved','rejected','completed','deferred','cancelled') then status
+          when v_active_count>0 then 'in_progress'
+          else 'paused'
+        end,
+        execution_status=case
+          when execution_status in ('completed','deferred','cancelled') then execution_status
+          when v_active_count>0 then 'in_progress'
+          else 'paused'
+        end,
+        is_paused=case
+          when status in ('pending_approval','approved','rejected','completed','deferred','cancelled') then is_paused
+          else v_active_count=0
+        end,
+        paused_at=case
+          when status in ('pending_approval','approved','rejected','completed','deferred','cancelled') then paused_at
+          when v_active_count=0 then v_now
+          else null
+        end,
+        pause_reason=case when v_active_count=0 then nullif(btrim(p_reason),'') else null end,
         is_timer_running=false,timer_started_at=null,updated_at=v_now
     where organization_id=p_organization_id and id=p_task_id;
   end if;
