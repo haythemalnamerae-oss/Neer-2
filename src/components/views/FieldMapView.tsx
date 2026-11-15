@@ -156,7 +156,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
 
   const handleStartTaskWithLocation = async (task: Task) => {
     if (task.taskTypeCategory !== 'field' && task.taskTypeCategory !== 'visit') {
-      try { await updateTaskLifecycle(task.id, 'start'); }
+      try { await updateTaskLifecycle(task.id, 'start'); setSelectedTaskTimeSessions(await getTaskTimeSessions(task.id)); }
       catch (error) { window.alert(error instanceof Error ? error.message : 'تعذر بدء المهمة.'); }
       return;
     }
@@ -189,7 +189,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
     const reason = window.prompt('يرجى كتابة سبب الإيقاف المؤقت للمهمة:', 'انتظار توريد المواد / موافقة المشرف');
     if (!reason?.trim()) return;
     if (task.taskTypeCategory !== 'field' && task.taskTypeCategory !== 'visit') {
-      try { await updateTaskLifecycle(task.id, 'pause', reason.trim()); }
+      try { await updateTaskLifecycle(task.id, 'pause', reason.trim()); setSelectedTaskTimeSessions(await getTaskTimeSessions(task.id)); }
       catch (error) { window.alert(error instanceof Error ? error.message : 'تعذر إيقاف المهمة.'); }
       return;
     }
@@ -216,7 +216,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
 
   const handleResumeTask = async (task: Task) => {
     if (task.taskTypeCategory !== 'field' && task.taskTypeCategory !== 'visit') {
-      try { await updateTaskLifecycle(task.id, 'resume'); }
+      try { await updateTaskLifecycle(task.id, 'resume'); setSelectedTaskTimeSessions(await getTaskTimeSessions(task.id)); }
       catch (error) { window.alert(error instanceof Error ? error.message : 'تعذر استئناف المهمة.'); }
       return;
     }
