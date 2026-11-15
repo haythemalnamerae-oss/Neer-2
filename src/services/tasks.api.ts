@@ -190,6 +190,29 @@ export async function getTaskTimeSessions(taskId: string): Promise<TaskTimeSessi
   return response.sessions || [];
 }
 
+export async function stopTaskTimeSession(taskId: string): Promise<void> {
+  const session = requireSession();
+  const clientEventId = newUuid();
+  const status = await enqueueTaskEvent({
+    taskId,
+    path: '/tasks/time-session',
+    clientEventId,
+    body: {
+      taskId,
+      action: 'stop',
+      clientEventId,
+      clientOccurredAt: new Date().toISOString(),
+      deviceTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    },
+  });
+  if (status !== 'synced') {
+    throw new Error(status === 'blocked'
+      ? 'حُفظ طلب إغلاق جلسة وقتك محلياً لكن رفضه الخادم.'
+      : 'حُفظ طلب إغلاق جلسة وقتك وينتظر المزامنة عند عودة الاتصال.');
+  }
+  await refreshAfterMutation(session);
+}
+
 export async function updateTaskLifecycle(taskId: string, action: 'start' | 'pause' | 'resume', reason?: string): Promise<void> {
   const session = requireSession();
   const clientEventId = newUuid();
