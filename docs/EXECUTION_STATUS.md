@@ -285,3 +285,16 @@
 - نجح اختبار المؤقت القديم: إغلاق 125 ثانية حفظ دقيقتين، وأعاد UUID نفسه legacy_closed دون إضافة ثانية.
 - نجح اختبار field GPS: سجل record_field_task_event حدثي start/pause وربطهما بجلسة وقت الموظف، ثم أغلق record_task_outcome_bundle الجلسة ذريًا عند نقل المهمة إلى pending_approval.
 - جميع اختبارات SQL نفذت بتمثيل auth.uid لمستخدم admin واحد داخل معاملات ROLLBACK؛ لم تبقَ سجلات اختبار. لم يختبر ذلك مستخدمين اثنين أو HTTP حقيقيًا أو RLS من جلسة authenticated فعلية.
+
+### سجل الترحيلات النهائي لهذه الجولة
+- `20261115151241_employee_task_time_sessions`
+- `20261115151245_atomic_employee_field_time`
+- `20261115151249_close_employee_time_on_outcome`
+- `20261115151600_atomic_employee_field_time_security_fix`
+- `20261115151606_index_task_time_session_event_fk`
+- `20261115151733_legacy_task_timer_compatibility`
+- `20261115151824_legacy_timer_stop_state_compatibility`
+- `20261115151848_revoke_legacy_task_lifecycle_rpc`
+- `20261115151932_guard_terminal_task_time_sessions`
+- `20261115152052_legacy_timer_event_idempotency`
+- فحص ما بعد rollback: tasks=0، task_time_sessions=0، task_time_session_events=0، وأحداث/سجل تاريخ اختبار phase3=0.
