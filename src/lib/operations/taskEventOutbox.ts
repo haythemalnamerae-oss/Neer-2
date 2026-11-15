@@ -104,13 +104,9 @@ async function enqueueEventAtomically(input: {
       const sameUserEvents = existingEvents.filter((event) =>
         event.organizationId === input.organizationId && event.userId === input.userId
       );
-      if (input.path.endsWith('/lifecycle') && sameUserEvents.some((event) =>
-        event.taskId === input.taskId && event.path.endsWith('/lifecycle')
-      )) {
-        failure = new Error('يوجد حدث بدء أو إيقاف أو استئناف لهذه المهمة لم تتم مزامنته بعد. انتظر المزامنة قبل تسجيل انتقال آخر حتى لا تتعارض حالة المهمة.');
-        tx.abort();
-        return;
-      }
+      // Multiple lifecycle events for one task may queue while offline.
+      // The shared sequence preserves FIFO; flush blocks only events after a
+      // permanently rejected event for that same task.
       const lastCreatedAt = sameUserEvents.reduce((latest, event) =>
         Math.max(latest, Date.parse(event.createdAt) || 0), 0
       );
@@ -149,6 +145,28 @@ async function enqueueEventAtomically(input: {
     tx.onerror = () => reject(failure || tx.error || new Error('تعذر حفظ الحدث المحلي.'));
     tx.onabort = () => reject(failure || tx.error || new Error('تم إلغاء حفظ الحدث المحلي.'));
   });
+}
+
+export type TaskOutboxEventSnapshot = Pick<
+  QueuedTaskEvent,
+  'id' | 'taskId' | 'path' | 'body' | 'createdAt' | 'sequence' | 'state' | 'lastError'
+>;
+
+export async function getTaskOutboxEvents(taskId: string): Promise<TaskOutboxEventSnapshot[]> {
+  const session = getSession();
+  if (!session) return [];
+  return (await allEvents())
+    .filter((event) => sameIdentity(event, session) && event.taskId === taskId)
+    .map((event) => ({
+      id: event.id,
+      taskId: event.taskId,
+      path: event.path,
+      body: event.body,
+      createdAt: event.createdAt,
+      sequence: event.sequence,
+      state: event.state,
+      lastError: event.lastError,
+    }));
 }
 
 async function putEvent(event: QueuedTaskEvent): Promise<void> {
