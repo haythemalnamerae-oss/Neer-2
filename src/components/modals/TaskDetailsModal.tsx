@@ -32,7 +32,7 @@ import { dataStore } from '../../lib/storage';
 import {
   addTaskComment, addTaskDailyUpdate, addTaskSubtask, configureTaskStep, reviewTaskStep, reviewTaskSubtask, deleteTaskAttachmentOnServer,
   getTaskAttachmentSignedUrl, getTaskTimeSessions, refreshTaskSnapshot, setChecklistItem,
-  setTaskStepStatus, updateTaskLifecycle, updateTaskSubtaskStatus, updateTaskStatusOnServer, uploadTaskAttachment, type TaskTimeSession,
+  setTaskStepStatus, stopTaskTimeSession, updateTaskLifecycle, updateTaskSubtaskStatus, updateTaskStatusOnServer, uploadTaskAttachment, type TaskTimeSession,
 } from '../../services/tasks.api';
 import { captureRequiredLocation, ensureFieldVisitCanStart, recordFieldLifecycleEvent, recordFieldLocationFailure, recordTaskEvent, startFieldLocationTracking, stopFieldLocationTracking, type FieldEventType } from '../../lib/operations/fieldEvents';
 import { formatCurrency, TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG } from '../../lib/utils/format';
@@ -483,6 +483,24 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                   icon={<RotateCcw className="w-4 h-4 ml-1" />}
                 >
                   استئناف وقتي
+                </Button>
+              )}
+
+              {myTimeSession && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isLocating}
+                  onClick={() => {
+                    setIsLocating(true);
+                    void stopTaskTimeSession(task.id)
+                      .then(() => { if (requiresFieldLocation) stopFieldLocationTracking(task.id); })
+                      .catch((error) => window.alert(error instanceof Error ? error.message : 'تعذر إغلاق جلسة وقتك.'))
+                      .finally(() => setIsLocating(false));
+                  }}
+                  title="إغلاق جلسة وقتك فقط دون إنهاء المهمة أو جلسات بقية الموظفين"
+                >
+                  إنهاء وقتي
                 </Button>
               )}
 
