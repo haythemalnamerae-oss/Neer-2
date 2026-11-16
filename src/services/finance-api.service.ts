@@ -8,13 +8,12 @@ const IDEMPOTENT_WORKFLOWS = new Set([
 ]);
 const inMemoryIdempotency = new Map<string, string>();
 
-function stablePayloadHash(value: string): string {
-  let hash = 2166136261;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
+async function stablePayloadHash(value: string): Promise<string> {
+  if (!globalThis.crypto?.subtle) {
+    throw new Error('التشفير الآمن غير متاح؛ لم يتم إنشاء طلب مالي قابل للتكرار الآمن.');
   }
-  return (hash >>> 0).toString(16).padStart(8, '0');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 function readOrCreateIdempotencyKey(storageKey: string): string {
@@ -45,7 +44,7 @@ async function workflow<T>(name: string, body: Record<string, unknown>, refresh 
   let storageKey: string | null = null;
   const requestBody = { ...body };
   if (IDEMPOTENT_WORKFLOWS.has(name)) {
-    const fingerprint = stablePayloadHash(JSON.stringify([name, body]));
+    const fingerprint = await stablePayloadHash(JSON.stringify([name, body]));
     storageKey = `neer:finance-idempotency:${session.organizationId}:${session.userId}:${name}:${fingerprint}`;
     requestBody.idempotencyKey = readOrCreateIdempotencyKey(storageKey);
   }
