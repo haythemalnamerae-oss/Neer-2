@@ -89,7 +89,7 @@ export const FinanceApiService = {
     return workflow<Expense>('cover-deficit', { expenseId, });
   },
   createSettlement(fundId: string, periodStart: string, periodEnd: string, expenseIds: string[]) {
-    return workflow<Settlement>('create-settlement', { fundId, periodStart, periodEnd, expenseIds, });
+    return workflow<Settlement>('create-settlement', { fundId, periodStart, periodEnd, expenseIds });
   },
   reviewSettlement(id: string, action: 'audit' | 'approve' | 'reject', notes?: string) {
     return workflow<Settlement>('review-settlement', { settlementId: id, action, notes });

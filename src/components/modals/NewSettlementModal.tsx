@@ -45,13 +45,12 @@ export const NewSettlementModal: React.FC<NewSettlementModalProps> = ({ isOpen, 
     }
 
     try {
-      SettlementsService.create({
+      await FinanceApiService.createSettlement(
         fundId,
         periodStart,
         periodEnd,
-        notes,
-        expenseIds: eligibleExpenses.map((expense) => expense.id),
-      });
+        eligibleExpenses.map((expense) => expense.id),
+      );
       onClose();
     } catch (error) {
       alert(error instanceof Error ? error.message : 'تعذر إنشاء طلب التسوية.');

@@ -222,6 +222,7 @@ export interface Task {
   taskFundRemaining?: number;
   notes?: string;
   createdAt: string;
+  updatedAt?: string;
   
   // Execution Time & Pause Tracking
   timeSpentMinutes?: number;
@@ -306,7 +307,9 @@ export interface StandingAccountInvoice {
 
 export interface StandingAccountEntry {
   id: string;
-  type: 'charge' | 'settlement' | 'payment' | 'advance' | 'collection';\n  entryType?: 'charge' | 'payment' | 'advance' | 'collection';\n  balanceEffect?: number;
+  type: 'charge' | 'settlement' | 'payment' | 'advance' | 'collection';
+  entryType?: 'charge' | 'payment' | 'advance' | 'collection';
+  balanceEffect?: number;
   amount: number;
   date: string;
   description: string;
@@ -435,6 +438,9 @@ export interface Settlement {
   approvedBy?: string;
   approvedAt?: string;
   auditNotes?: string;
+  auditedBy?: string;
+  auditedById?: string;
+  auditedAt?: string;
   settlementVoucherNumber?: string;
   voucherNumber?: string;
   settledByName?: string;

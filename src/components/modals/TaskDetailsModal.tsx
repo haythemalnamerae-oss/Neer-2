@@ -233,7 +233,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     if (action === 'reject' && !reason?.trim()) return;
     setIsReviewingTask(true);
     try {
-      await updateTaskStatusOnServer(task.id, action === 'approve' ? 'approved' : 'rejected', reason);
+      await updateTaskStatusOnServer(task.id, action === 'approve' ? 'approved' : 'rejected', reason || undefined);
       await refreshTaskSnapshot();
       window.alert(action === 'approve' ? 'تم اعتماد إنجاز المهمة.' : 'أعيدت المهمة إلى التنفيذ مع حفظ سبب الرفض.');
     } catch (error) {

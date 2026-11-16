@@ -182,11 +182,11 @@ app.get('/api/v1/reports/summary', async (req, res) => {
     let finance: Record<string, unknown> | null = null;
     if (canReadFinance) {
       const [funds, expenses, settlements, standingAccounts, entries] = await Promise.all([
-        fetchAllRows('/rest/v1/funds?select=id,total_allocation,current_balance,spent_balance,currency,status'),
-        fetchAllRows('/rest/v1/expenses?select=id,fund_id,total_with_tax,status,submitted_by'),
-        fetchAllRows('/rest/v1/settlements?select=id'),
-        fetchAllRows('/rest/v1/standing_accounts?select=id,direction,opening_balance,currency,active'),
-        fetchAllRows('/rest/v1/standing_account_entries?select=standing_account_id,balance_effect'),
+        fetchAllRows('/rest/v1/funds?select=id,total_allocation,current_balance,spent_balance,currency,status', auth.token),
+        fetchAllRows('/rest/v1/expenses?select=id,fund_id,total_with_tax,status,submitted_by', auth.token),
+        fetchAllRows('/rest/v1/settlements?select=id', auth.token),
+        fetchAllRows('/rest/v1/standing_accounts?select=id,direction,opening_balance,currency,active', auth.token),
+        fetchAllRows('/rest/v1/standing_account_entries?select=standing_account_id,balance_effect', auth.token),
       ]);
       const settingsResponse = await supabaseFetch('/rest/v1/rpc/get_organization_settings', auth.token, {
         method: 'POST', body: JSON.stringify({ p_organization_id: auth.organizationId }),
@@ -830,7 +830,7 @@ app.post('/api/v1/finance/standing-account-status', async (req, res) => {
 });
 
 app.post('/api/v1/finance/:workflow', async (req, res) => {
-  const auth = (req as AuthenticatedRequest).auth;
+  const auth = (req as unknown as AuthenticatedRequest).auth;
   if (!['admin','finance_officer'].includes(auth.role) && req.params.workflow !== 'create-expense') {
     return res.status(403).json({ error: { code: 'FINANCE_ROLE_REQUIRED', message: 'Finance officer or administrator role required.' } });
   }
