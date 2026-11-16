@@ -70,3 +70,14 @@ No authenticated-user integration tests were run for cross-tenant reads/writes, 
 9. The main-only branch guard has contents: write and can delete non-reserved branches on its trigger conditions. It was not executed.
 
 Do not change these controls piecemeal without a migration that preserves legitimate UI/API contracts, adds rollback, and includes non-production negative tests.
+
+
+## Follow-up hardening — 2026-11-16
+
+- Applied migration `20261116130250_harden_audit_and_standing_entry` to Supabase and committed its matching SQL file to `main`.
+- Removed the broad `audit_logs` INSERT policy and revoked direct INSERT from `anon`, `authenticated`, and `PUBLIC`; audit writes now rely on trusted database-owned SECURITY DEFINER workflows/triggers. Verification showed INSERT remains only for `service_role` and `postgres`.
+- Restricted `finance_create_standing_entry` to `charge` only. Cash-affecting `payment`, `advance`, and `collection` must use atomic settlement/receipt workflows. Added an audit event with the actual active membership role for this path.
+- Security Advisor no longer reports the prior broad audit-log insert-policy finding. It still reports 29 authenticated-callable SECURITY DEFINER functions, one private RLS-enabled table without a policy (private schema; review schema exposure and grants), and leaked-password protection disabled.
+- Added retry-stable finance idempotency keys in the web service, scoped by organization, user, workflow, and request payload; keys remain until the mutation and snapshot refresh both succeed. If the server commits but refresh fails, retry reuses the same key.
+- Not yet addressed: deficit/cash-box ledger reconciliation, maker-checker for expenses, audit coverage in remaining finance RPCs, server-settings hydration, live permission consistency, full report migration, pagination, and real authenticated browser/API tests.
+- No finance or operational rows were changed by this hardening. No TypeScript build or browser E2E was run in this environment.
