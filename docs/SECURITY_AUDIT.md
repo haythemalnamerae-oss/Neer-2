@@ -81,3 +81,13 @@ Do not change these controls piecemeal without a migration that preserves legiti
 - Added retry-stable finance idempotency keys in the web service, scoped by organization, user, workflow, and request payload; keys remain until the mutation and snapshot refresh both succeed. If the server commits but refresh fails, retry reuses the same key.
 - Not yet addressed: deficit/cash-box ledger reconciliation, maker-checker for expenses, audit coverage in remaining finance RPCs, server-settings hydration, live permission consistency, full report migration, pagination, and real authenticated browser/API tests.
 - No finance or operational rows were changed by this hardening. No TypeScript build or browser E2E was run in this environment.
+
+
+## Expense maker-checker enforcement — 2026-11-16
+
+- Applied Supabase migration `20261116134025_expense_maker_checker_identity` and committed the matching migration file to `main` using the exact version reported by Supabase migration history.
+- Added `expenses.submitted_by_auth_user_id`; a BEFORE INSERT trigger sets it from `auth.uid()`, never from a client-supplied value.
+- Updated `finance_review_expense` to resolve the active organization membership and its actual role, reject review by the authenticated submitter (`MAKER_CANNOT_APPROVE_OWN_EXPENSE`), and write the actual reviewer role to audit logs instead of a hard-coded role.
+- Existing historical expense rows are preserved; the table currently contains zero expense rows, so no historical identity backfill was attempted.
+- Verified in Supabase that the column, trigger and maker-checker guard exist. A full two-user authenticated HTTP/browser test remains pending.
+- Matching migration filename is `supabase/migrations/20261116134025_expense_maker_checker_identity.sql`; an initially created mismatched filename was removed and replaced with the exact database version.
