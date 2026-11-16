@@ -10,6 +10,7 @@ import { dataStore } from '../../lib/storage';
 import { hasPermission } from '../../lib/rbac/permissions';
 import { formatCurrency } from '../../lib/utils/format';
 import { FinanceApiService } from '../../services/finance-api.service';
+import { getSession } from '../../lib/api/session';
 import { updateTaskStatusOnServer } from '../../services/tasks.api';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -24,11 +25,22 @@ export const ApprovalsCenterView: React.FC<ApprovalsCenterViewProps> = ({ onSele
   const currentUser = dataStore.getCurrentUser();
   const settings = dataStore.getSettings();
   const canReviewExpenses = hasPermission(currentUser.role, 'expenses', 'approve');
+  const currentAuthUserId = getSession()?.userId;
   const canReviewTasks = hasPermission(currentUser.role, 'tasks', 'approve');
   const canReviewSettlements = hasPermission(currentUser.role, 'settlements', 'approve');
   const tasks = dataStore.getTasks();
   const expenses = dataStore.getExpenses();
   const settlements = dataStore.getSettlements();
+
+  const isCurrentUserExpenseMaker = (expense: (typeof expenses)[number]) => {
+    if (expense.submittedByAuthUserId && currentAuthUserId) return expense.submittedByAuthUserId === currentAuthUserId;
+    return expense.submittedBy === currentUser.name;
+  };
+  const isCurrentUserSettlementAuditor = (settlement: (typeof settlements)[number]) => {
+    if (settlement.auditedByAuthUserId) return !currentAuthUserId || settlement.auditedByAuthUserId === currentAuthUserId;
+    if (settlement.auditedById) return settlement.auditedById === currentUser.id;
+    return settlement.auditedBy === currentUser.name;
+  };
 
   const pendingExpenses = canReviewExpenses ? expenses.filter((expense) => expense.status === 'pending_approval') : [];
   const pendingTasks = canReviewTasks ? tasks.filter((task) => task.status === 'pending_approval') : [];
@@ -38,6 +50,7 @@ export const ApprovalsCenterView: React.FC<ApprovalsCenterViewProps> = ({ onSele
 
   const handleApproveExpense = async (id: string) => {
     const expense = expenses.find((item) => item.id === id);
+    if (expense && isCurrentUserExpenseMaker(expense)) return;
     const notes = expense?.specialAuditRequired ? window.prompt('هذا المصروف تجاوز حد الصرف الفردي أو الشهري. أدخل ملاحظة التدقيق قبل الاعتماد:') : undefined;
     if (expense?.specialAuditRequired && !notes?.trim()) return;
     try { await FinanceApiService.reviewExpense(id, true, notes?.trim()); }
@@ -65,9 +78,10 @@ export const ApprovalsCenterView: React.FC<ApprovalsCenterViewProps> = ({ onSele
   };
 
   const handleApproveSettlement = async (id: string) => {
-    const notes = window.prompt('ملاحظات التدقيق والمصادقة على التسوية:', `تم تدقيق الفواتير ومطابقة الرصيد والتحقق من الضريبة ${settings.taxRate}%`);
-    const settlement = settlements.find((item) => item.id === id);
-    try { await FinanceApiService.reviewSettlement(id, settlement?.status === 'under_review' && settings.requireDualApprovalForSettlements ? 'audit' : 'approve', notes || undefined); }
+  const settlement = settlements.find((item) => item.id === id);
+  if (settings.requireDualApprovalForSettlements && settlement?.status === 'audited' && isCurrentUserSettlementAuditor(settlement)) return;
+  const notes = window.prompt('ملاحظات التدقيق والمصادقة على التسوية:', `تم تدقيق الفواتير ومطابقة الرصيد والتحقق من الضريبة ${settings.taxRate}%`);
+  try { await FinanceApiService.reviewSettlement(id, settlement?.status === 'under_review' && settings.requireDualApprovalForSettlements ? 'audit' : 'approve', notes || undefined); }
     catch (error) { alert(error instanceof Error ? error.message : 'تعذر اعتماد التسوية.'); }
   };
 
@@ -142,7 +156,9 @@ export const ApprovalsCenterView: React.FC<ApprovalsCenterViewProps> = ({ onSele
               <span>فواتير ومصروفات نقدية تنتظر الاعتماد ({pendingExpenses.length})</span>
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {pendingExpenses.map((exp) => (
+              {pendingExpenses.map((exp) => {
+                const isOwnExpense = isCurrentUserExpenseMaker(exp);
+                return (
                 <div key={exp.id} className="neu-raised rounded-3xl p-5 sm:p-6 space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-xs font-bold text-[#1E4B33] neu-inset-sm px-3 py-1 rounded-full">{exp.code}</span>
@@ -176,6 +192,11 @@ export const ApprovalsCenterView: React.FC<ApprovalsCenterViewProps> = ({ onSele
                     </div>
                   </div>
 
+                  {isOwnExpense ? (
+                    <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900" role="status">
+                      لا يمكنك اعتماد أو رفض فاتورة أنشأتها. يجب أن يراجعها مستخدم آخر.
+                    </p>
+                  ) : (
                   <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#C8D3CC]/50">
                     <Button
                       variant="outline"
@@ -195,8 +216,10 @@ export const ApprovalsCenterView: React.FC<ApprovalsCenterViewProps> = ({ onSele
                       اعتماد المصروف
                     </Button>
                   </div>
+                  )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -304,13 +327,13 @@ export const ApprovalsCenterView: React.FC<ApprovalsCenterViewProps> = ({ onSele
                       variant="success"
                       size="sm"
                       onClick={() => handleApproveSettlement(s.id)}
-                      disabled={settings.requireDualApprovalForSettlements && s.status === 'audited' && (s.auditedById ? s.auditedById === currentUser.id : s.auditedBy === currentUser.name)}
+                      disabled={settings.requireDualApprovalForSettlements && s.status === 'audited' && isCurrentUserSettlementAuditor(s)}
                       icon={<CheckCircle2 className="w-4.5 h-4.5 stroke-[2.2]" />}
                       className="text-xs sm:text-sm font-bold min-h-[42px] px-4"
                     >
                       {settings.requireDualApprovalForSettlements ? (s.status === 'audited' ? 'الاعتماد النهائي' : 'التدقيق الأولي') : 'اعتماد التسوية'}
                     </Button>
-                    {settings.requireDualApprovalForSettlements && s.status === 'audited' && (s.auditedById ? s.auditedById === currentUser.id : s.auditedBy === currentUser.name) && <span className="text-xs text-amber-700">يلزم معتمد مختلف عن المدقق الأول</span>}
+                    {settings.requireDualApprovalForSettlements && s.status === 'audited' && isCurrentUserSettlementAuditor(s) && <span className="text-xs text-amber-700" role="status">يلزم معتمد مختلف عن المدقق الأول</span>}
                   </div>
                 </div>
               ))}

@@ -266,7 +266,7 @@ export async function loadUiSnapshot(session: ApiSession): Promise<void> {
   const funds = (data.funds || []).map((row: Record<string, any>) => fromSnake(row)) as PettyCashFund[];
   const fundById = new Map(funds.map((fund) => [fund.id, fund]));
   const expenses = (data.expenses || []).map((row: Record<string, any>) => ({
-    ...fromSnake(row), fundName: fundById.get(row.fund_id)?.name || '', submittedBy: row.submitted_by || '',
+    ...fromSnake(row), fundName: fundById.get(row.fund_id)?.name || '', submittedBy: row.submitted_by || '', submittedByAuthUserId: row.submitted_by_auth_user_id || undefined,
   })) as Expense[];
   const settlementLinks = data['settlement-expenses'] || [];
   const settlements = (data.settlements || []).map((row: Record<string, any>) => ({

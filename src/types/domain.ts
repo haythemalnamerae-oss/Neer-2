@@ -306,7 +306,9 @@ export interface StandingAccountInvoice {
 
 export interface StandingAccountEntry {
   id: string;
-  type: 'charge' | 'settlement' | 'payment' | 'advance' | 'collection';\n  entryType?: 'charge' | 'payment' | 'advance' | 'collection';\n  balanceEffect?: number;
+  type: 'charge' | 'settlement' | 'payment' | 'advance' | 'collection';
+  entryType?: 'charge' | 'payment' | 'advance' | 'collection';
+  balanceEffect?: number;
   amount: number;
   date: string;
   description: string;
@@ -375,6 +377,7 @@ export interface Expense {
   hasReceipt: boolean;
   status: ExpenseStatus;
   submittedBy: string;
+  submittedByAuthUserId?: string;
   submittedAt: string;
   auditedBy?: string;
   auditedById?: string;
@@ -432,6 +435,10 @@ export interface Settlement {
   expensesCount: number;
   submittedAt: string;
   settledBy: string;
+  auditedBy?: string;
+  auditedById?: string;
+  auditedByAuthUserId?: string;
+  auditedAt?: string;
   approvedBy?: string;
   approvedAt?: string;
   auditNotes?: string;

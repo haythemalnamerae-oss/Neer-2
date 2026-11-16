@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { Settlement } from '../../types/domain';
 import { dataStore } from '../../lib/storage';
+import { getSession } from '../../lib/api/session';
 import { hasPermission } from '../../lib/rbac/permissions';
 import { FinanceApiService } from '../../services/finance-api.service';
 import { formatCurrency } from '../../lib/utils/format';
@@ -25,6 +26,7 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
 
   const currentUser = dataStore.getCurrentUser();
   const settings = dataStore.getSettings();
+  const currentAuthUserId = getSession()?.userId;
   const canCreateSettlement = hasPermission(currentUser.role, 'settlements', 'create');
   const canApproveSettlement = hasPermission(currentUser.role, 'settlements', 'approve');
   const requiresDualApproval = settings.requireDualApprovalForSettlements;
@@ -32,6 +34,11 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
   const settlements = currentUser.role === 'field_officer'
     ? allSettlements.filter((settlement) => settlement.settledBy === currentUser.name)
     : allSettlements;
+  const isCurrentUserSettlementAuditor = (settlement: Settlement) => {
+    if (settlement.auditedByAuthUserId) return !currentAuthUserId || settlement.auditedByAuthUserId === currentAuthUserId;
+    if (settlement.auditedById) return settlement.auditedById === currentUser.id;
+    return settlement.auditedBy === currentUser.name;
+  };
 
   const handlePrint = (st: Settlement) => {
     setSelectedSettlement(st);
@@ -51,9 +58,10 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
   };
 
   const handleApprove = async (id: string) => {
+    const settlement = settlements.find((item) => item.id === id);
+    if (requiresDualApproval && settlement?.status === 'audited' && isCurrentUserSettlementAuditor(settlement)) return;
     const notes = window.prompt('ملاحظات التدقيق والمطابقة:', `تمت مراجعة الفواتير والتحقق من الضريبة ${settings.taxRate}%`);
     try {
-      const settlement = settlements.find((item) => item.id === id);
       await FinanceApiService.reviewSettlement(id, settlement?.status === 'under_review' && requiresDualApproval ? 'audit' : 'approve', notes || undefined);
     } catch (error) {
       alert(error instanceof Error ? error.message : 'تعذر اعتماد التسوية.');
@@ -165,13 +173,13 @@ export const SettlementsView: React.FC<SettlementsViewProps> = ({ onOpenNewSettl
                   variant="success"
                   size="sm"
                   onClick={() => handleApprove(st.id)}
-                  disabled={requiresDualApproval && st.status === 'audited' && (st.auditedById ? st.auditedById === currentUser.id : st.auditedBy === currentUser.name)}
+                  disabled={requiresDualApproval && st.status === 'audited' && isCurrentUserSettlementAuditor(st)}
                   icon={<CheckCircle2 className="w-4.5 h-4.5 stroke-[2.2]" />}
                   className="text-xs sm:text-sm font-bold min-h-[40px]"
                 >
                   {requiresDualApproval ? (st.status === 'audited' ? 'الاعتماد النهائي' : 'التدقيق الأولي') : 'اعتماد التسوية'}
                 </Button>
-                {requiresDualApproval && st.status === 'audited' && (st.auditedById ? st.auditedById === currentUser.id : st.auditedBy === currentUser.name) && <span className="text-xs text-amber-700">يلزم معتمد مختلف عن المدقق الأول</span>}
+                {requiresDualApproval && st.status === 'audited' && isCurrentUserSettlementAuditor(st) && <span className="text-xs text-amber-700" role="status">يلزم معتمد مختلف عن المدقق الأول</span>}
                 <Button
                   variant="danger"
                   size="sm"

@@ -36,7 +36,6 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
   const canApproveExpense = hasPermission(currentUser.role, 'expenses', 'approve');
   const settings = dataStore.getSettings();
   const standingAccounts = dataStore.getStandingAccounts();
-  void standingAccountsVersion;
   const expenses = dataStore.getExpenses();
 
   const [isAddStandingModalOpen, setIsAddStandingModalOpen] = useState(false);

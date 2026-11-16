@@ -13,6 +13,7 @@ import { dataStore } from '../../lib/storage';
 import { hasPermission } from '../../lib/rbac/permissions';
 import { ReportsService } from '../../services/reports.service';
 import { FinanceApiService } from '../../services/finance-api.service';
+import { getSession } from '../../lib/api/session';
 import { formatCurrency, EXPENSE_CATEGORY_CONFIG } from '../../lib/utils/format';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -31,12 +32,17 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
   const settings = dataStore.getSettings();
   const canCreateExpense = hasPermission(currentUser.role, 'expenses', 'create');
   const canApproveExpense = hasPermission(currentUser.role, 'expenses', 'approve');
+  const currentAuthUserId = getSession()?.userId;
   const canExportExpenses = currentUser.role === 'admin' || currentUser.role === 'finance_officer';
   const allExpenses = dataStore.getExpenses();
   const funds = dataStore.getFunds();
   const expenses = currentUser.role === 'field_officer'
     ? allExpenses.filter((expense) => expense.submittedBy === currentUser.name || funds.some((fund) => fund.id === expense.fundId && fund.holderId === currentUser.id))
     : allExpenses;
+  const isCurrentUserExpenseMaker = (expense: (typeof expenses)[number]) => {
+    if (expense.submittedByAuthUserId && currentAuthUserId) return expense.submittedByAuthUserId === currentAuthUserId;
+    return expense.submittedBy === currentUser.name;
+  };
 
   const activeFinancialExpenses = expenses.filter((expense) => expense.status !== 'rejected');
   const totalAmount = activeFinancialExpenses.reduce((sum, expense) => sum + expense.totalWithTax, 0);
@@ -71,6 +77,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
 
   const handleApprove = async (id: string) => {
     const expense = expenses.find((item) => item.id === id);
+    if (expense && isCurrentUserExpenseMaker(expense)) return;
     const notes = expense?.specialAuditRequired ? window.prompt('هذا المصروف تجاوز حد الصرف الفردي أو الشهري. أدخل ملاحظة التدقيق قبل الاعتماد:') : undefined;
     if (expense?.specialAuditRequired && !notes?.trim()) return;
     try {
@@ -190,6 +197,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
             <tbody className="divide-y divide-[#C8D3CC]/30">
               {filteredExpenses.map((exp) => {
                 const catCfg = EXPENSE_CATEGORY_CONFIG[exp.category] || { label: exp.category };
+                const isOwnExpense = Boolean(currentAuthUserId && exp.submittedByAuthUserId === currentAuthUserId);
 
                 return (
                   <tr key={exp.id} className="hover:neu-inset transition">
@@ -259,7 +267,10 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
                             <Eye className="w-5 h-5 stroke-[2.2]" />
                           </button>
                         )}
-                        {canApproveExpense && exp.status === 'pending_approval' && (
+                        {canApproveExpense && exp.status === 'pending_approval' && isOwnExpense && (
+                          <span className="text-xs font-semibold text-amber-800" role="status">لا يمكنك اعتماد فاتورة أنشأتها</span>
+                        )}
+                        {canApproveExpense && exp.status === 'pending_approval' && !isOwnExpense && (
                           <>
                             <button
                               onClick={() => handleApprove(exp.id)}
