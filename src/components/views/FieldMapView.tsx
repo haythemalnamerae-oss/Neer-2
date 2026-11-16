@@ -386,7 +386,7 @@ export const FieldMapView: React.FC<FieldMapViewProps> = ({
           <div className="inner-white-card p-3 overflow-hidden rounded-[26px]">
             <div className="relative w-full h-[540px] rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 shadow-inner">
               {apiKey && (filteredTasks.length > 0 || userLiveCoords) ? (
-                <APIProvider apiKey={apiKey} libraries={['marker']} reuseMaps>
+                <APIProvider apiKey={apiKey} libraries={['marker']}>
                   <Map
                     mapId="DEMO_MAP_ID"
                     defaultCenter={mapCenter}

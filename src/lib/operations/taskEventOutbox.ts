@@ -28,7 +28,7 @@ function openDb(): Promise<IDBDatabase> {
     return Promise.reject(new Error('التخزين المحلي للأحداث غير متاح في هذا المتصفح.'));
   }
   if (!dbPromise) {
-    dbPromise = new Promise((resolve, reject) => {
+    dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, 2);
       let settled = false;
       request.onupgradeneeded = () => {
@@ -65,7 +65,7 @@ function openDb(): Promise<IDBDatabase> {
       throw error;
     });
   }
-  return dbPromise;
+  return dbPromise!;
 }
 
 async function allEvents(): Promise<QueuedTaskEvent[]> {

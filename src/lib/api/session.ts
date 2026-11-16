@@ -1,4 +1,4 @@
-import type { Role, PettyCashFund, Expense, Settlement, CashReceipt, StandingAccount, StandingAccountEntry, TaskAssignee } from '../../types/domain';
+import type { Role, PettyCashFund, Expense, Settlement, CashReceipt, StandingAccount, StandingAccountEntry, TaskAssignee, Task, FollowUp, NotificationItem, AuditLog } from '../../types/domain';
 import { dataStore } from '../storage';
 import { setLivePermissionGrants } from '../rbac/permissions';
 
@@ -261,7 +261,7 @@ export async function loadUiSnapshot(session: ApiSession): Promise<void> {
       assignedAt: item.createdAt,
     })) as TaskAssignee[];
     return task;
-  });
+  }) as unknown as Task[];
 
   const funds = (data.funds || []).map((row: Record<string, any>) => fromSnake(row)) as PettyCashFund[];
   const fundById = new Map(funds.map((fund) => [fund.id, fund]));
@@ -289,12 +289,12 @@ export async function loadUiSnapshot(session: ApiSession): Promise<void> {
     const currentBalance = Number((Number(row.opening_balance || 0) + entries.reduce((sum, entry) => sum + (entry.balanceEffect || 0), 0)).toFixed(2));
     return { ...fromSnake(row), entries, currentBalance };
   }) as StandingAccount[];
-  const followUps = (data['follow-ups'] || []).map((row) => ({ ...fromSnake(row), assignedTo: row.assigned_to, scheduledDate: row.scheduled_date, lastContactDate: row.last_contact_date }));
-  const notifications = (data.notifications || []).map(fromSnake);
+  const followUps = (data['follow-ups'] || []).map((row) => ({ ...fromSnake(row), assignedTo: row.assigned_to, scheduledDate: row.scheduled_date, lastContactDate: row.last_contact_date })) as unknown as FollowUp[];
+  const notifications = (data.notifications || []).map(fromSnake) as unknown as NotificationItem[];
 
   // The server snapshot replaces in-memory operational state. Do not persist shared
   // records to localStorage: that cache is not authoritative and can resurrect stale data.
-  const auditLogs = (data['audit-logs'] || []).map(fromSnake);
+  const auditLogs = (data['audit-logs'] || []).map(fromSnake) as unknown as AuditLog[];
   dataStore.hydrateOperationalData({ tasks, followUps, notifications, auditLogs });
   if (settingsPayload?.settings && typeof settingsPayload.settings === 'object' && !Array.isArray(settingsPayload.settings)) {
     dataStore.hydrateSettings(settingsPayload.settings);

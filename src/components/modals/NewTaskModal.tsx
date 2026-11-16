@@ -154,7 +154,7 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) =
       title,
       description,
       priority,
-      status: 'scheduled',
+      status: 'scheduled' as const,
       taskTypeCategory: effectiveTaskTypeCategory,
       taskType,
       clientName: clientName || undefined,

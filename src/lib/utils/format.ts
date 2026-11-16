@@ -93,6 +93,7 @@ export const SETTLEMENT_STATUS_CONFIG: Record<SettlementStatus, { label: string;
   audited: { label: 'تم التدقيق', color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200' },
   approved: { label: 'معتمدة نهائياً', color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200' },
   closed: { label: 'مغلقة ومؤرشفة', color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200' },
+  rejected: { label: 'مرفوضة', color: 'text-rose-700', bg: 'bg-rose-50 border-rose-200' },
 };
 
 export const FUND_STATUS_CONFIG: Record<FundStatus, { label: string; color: string; bg: string }> = {
