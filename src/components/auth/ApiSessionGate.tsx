@@ -38,7 +38,7 @@ export const ApiSessionGate: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Never expose mock/demo records in a production deployment.
   // Local demo mode is restricted to development builds only.
-  if (!hasSupabaseConfig && import.meta.env.PROD) {
+  if (!hasSupabaseConfig) {
     return (
       <main dir="rtl" className="min-h-screen bg-[#E5EBE7] px-4 py-10 flex items-center justify-center font-['Almarai',sans-serif]">
         <section className="w-full max-w-md rounded-3xl bg-[#F4F7F5] p-7 shadow-xl border border-white/60 text-center">
@@ -51,7 +51,6 @@ export const ApiSessionGate: React.FC<{ children: React.ReactNode }> = ({ childr
       </main>
     );
   }
-  if (!hasSupabaseConfig) return <>{children}</>;
   if (session && ready && !error) return <>{children}</>;
 
   return (
