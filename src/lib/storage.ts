@@ -23,18 +23,6 @@ import {
   TaskDailyUpdate,
 } from '../types/domain';
 import { hasPermission } from './rbac/permissions';
-import { 
-  INITIAL_USERS, 
-  INITIAL_FUNDS, 
-  INITIAL_EXPENSES, 
-  INITIAL_TASKS, 
-  INITIAL_SETTLEMENTS, 
-  INITIAL_FOLLOW_UPS, 
-  INITIAL_AUDIT_LOGS, 
-  INITIAL_NOTIFICATIONS,
-  INITIAL_STANDING_ACCOUNTS,
-  INITIAL_CASH_RECEIPTS,
-} from './mockData';
 
 export interface SystemSettings {
   // General
@@ -126,12 +114,15 @@ export const STORAGE_KEYS = {
   STANDING_ACCOUNTS: 'ops_standing_accounts_v3',
 };
 
-function safeGet<T>(key: string, fallback: T): T {
+const LEGACY_DEMO_DATA_RESET_KEY = 'neer_legacy_demo_data_removed_v1';
+
+function clearLegacyDemoData(): void {
   try {
-    const item = localStorage.getItem(key);
-    return item ? JSON.parse(item) : fallback;
-  } catch {
-    return fallback;
+    if (localStorage.getItem(LEGACY_DEMO_DATA_RESET_KEY) === 'done') return;
+    Object.values(STORAGE_KEYS).forEach((key) => localStorage.removeItem(key));
+    localStorage.setItem(LEGACY_DEMO_DATA_RESET_KEY, 'done');
+  } catch (error) {
+    console.warn('Could not clear legacy local demo data:', error);
   }
 }
 
@@ -162,19 +153,21 @@ export class OpsDataStore {
   private listeners: Set<() => void> = new Set();
 
   private constructor() {
-    this.users = safeGet(STORAGE_KEYS.USERS, INITIAL_USERS);
-    this.currentUserId = safeGet(STORAGE_KEYS.CURRENT_USER_ID, 'usr-1');
-    this.funds = safeGet(STORAGE_KEYS.FUNDS, INITIAL_FUNDS);
-    this.expenses = safeGet(STORAGE_KEYS.EXPENSES, INITIAL_EXPENSES);
-    this.tasks = safeGet(STORAGE_KEYS.TASKS, INITIAL_TASKS);
-    this.settlements = safeGet(STORAGE_KEYS.SETTLEMENTS, INITIAL_SETTLEMENTS);
-    this.followUps = safeGet(STORAGE_KEYS.FOLLOW_UPS, INITIAL_FOLLOW_UPS);
-    this.auditLogs = safeGet(STORAGE_KEYS.AUDIT_LOGS, INITIAL_AUDIT_LOGS);
-    this.notifications = safeGet(STORAGE_KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
-    this.cashReceipts = safeGet(STORAGE_KEYS.CASH_RECEIPTS, INITIAL_CASH_RECEIPTS);
-    this.standingAccounts = safeGet(STORAGE_KEYS.STANDING_ACCOUNTS, INITIAL_STANDING_ACCOUNTS);
-    const savedSettings = safeGet<Partial<SystemSettings>>(STORAGE_KEYS.SETTINGS, {});
-    this.settings = { ...DEFAULT_SETTINGS, ...savedSettings };
+    // Never initialize operational state from mock fixtures or a browser cache.
+    // The authenticated Supabase snapshot is the only source of operational data.
+    clearLegacyDemoData();
+    this.users = [];
+    this.currentUserId = '';
+    this.funds = [];
+    this.expenses = [];
+    this.tasks = [];
+    this.settlements = [];
+    this.followUps = [];
+    this.auditLogs = [];
+    this.notifications = [];
+    this.cashReceipts = [];
+    this.standingAccounts = [];
+    this.settings = DEFAULT_SETTINGS;
   }
 
   public static getInstance(): OpsDataStore {
