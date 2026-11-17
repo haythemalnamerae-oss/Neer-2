@@ -48,7 +48,7 @@ async function authRequest<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new SessionError(payload.msg || payload.message || payload.error_description || 'تعذر تسجيل الدخول إلى Supabase.');
+  if (!response.ok) throw new SessionError(payload.msg || payload.message || payload.error_description || 'تعذر تسجيل الدخول إلى Supabase.', response.status);
   return payload as T;
 }
 
@@ -78,7 +78,13 @@ export function getSession(): ApiSession | null {
 
 function saveSession(value: ApiSession) { localStorage.setItem(SESSION_KEY, JSON.stringify(value)); }
 let refreshInFlight: Promise<ApiSession> | null = null;
-export function clearSession() { localStorage.removeItem(SESSION_KEY); setLivePermissionGrants(null, null); }
+let sessionRevision = 0;
+export function clearSession() {
+  sessionRevision += 1;
+  refreshInFlight = null;
+  localStorage.removeItem(SESSION_KEY);
+  setLivePermissionGrants(null, null);
+}
 
 async function getMemberships(userId: string, token: string) {
   requireConfig();
@@ -96,6 +102,7 @@ async function getMemberships(userId: string, token: string) {
 }
 
 export async function signIn(email: string, password: string): Promise<ApiSession> {
+  clearSession();
   const auth = await authRequest<AuthResponse>('token?grant_type=password', { email, password });
   const memberships = await getMemberships(auth.user.id, auth.access_token);
   const membership = memberships.find((item) => item.active && item.is_default) || memberships.find((item) => item.active);
@@ -127,18 +134,29 @@ export async function refreshSession(session: ApiSession): Promise<ApiSession> {
     throw new SessionError('انتهت الجلسة. يرجى تسجيل الدخول مرة أخرى.');
   }
 
+  const revisionAtStart = sessionRevision;
   refreshInFlight = (async () => {
-    const auth = await authRequest<AuthResponse>('token?grant_type=refresh_token', { refresh_token: base.refreshToken });
-    const next = {
-      ...base,
-      accessToken: auth.access_token,
-      refreshToken: auth.refresh_token,
-      expiresAt: Date.now() + auth.expires_in * 1000,
-      userId: auth.user.id || base.userId,
-      email: auth.user.email || base.email,
-    };
-    saveSession(next);
-    return next;
+    try {
+      const auth = await authRequest<AuthResponse>('token?grant_type=refresh_token', { refresh_token: base.refreshToken });
+      if (revisionAtStart !== sessionRevision) {
+        throw new SessionError('تغيرت جلسة الدخول أثناء تحديثها؛ سجّل الدخول مجددًا.');
+      }
+      const next = {
+        ...base,
+        accessToken: auth.access_token,
+        refreshToken: auth.refresh_token,
+        expiresAt: Date.now() + auth.expires_in * 1000,
+        userId: auth.user.id || base.userId,
+        email: auth.user.email || base.email,
+      };
+      saveSession(next);
+      return next;
+    } catch (cause) {
+      if (cause instanceof SessionError && (cause.statusCode === 400 || cause.statusCode === 401)) {
+        clearSession();
+      }
+      throw cause;
+    }
   })();
 
   try {
