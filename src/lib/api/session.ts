@@ -152,17 +152,20 @@ export async function refreshSession(session: ApiSession): Promise<ApiSession> {
       saveSession(next);
       return next;
     } catch (cause) {
-      if (cause instanceof SessionError && (cause.statusCode === 400 || cause.statusCode === 401)) {
+      if (revisionAtStart === sessionRevision &&
+          cause instanceof SessionError &&
+          (cause.statusCode === 400 || cause.statusCode === 401)) {
         clearSession();
       }
       throw cause;
     }
   })();
 
+  const pendingRefresh = refreshInFlight;
   try {
-    return await refreshInFlight;
+    return await pendingRefresh;
   } finally {
-    refreshInFlight = null;
+    if (refreshInFlight === pendingRefresh) refreshInFlight = null;
   }
 }
 
